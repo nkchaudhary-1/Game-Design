@@ -8,9 +8,9 @@ describe('match pace: spin lasts up to three minutes', () => {
     expect(spinSeconds(10)).toBeLessThan(190);
     expect(TUNING.TIMEOUT).toBe(180);
   });
-  it('every blade lasts at least two minutes left alone, and more Stamina always lasts longer', () => {
-    for (const s of [1, 3, 5, 7, 9]) expect(spinSeconds(s)).toBeGreaterThan(100);
-    for (const id of ['ravok', 'gravion']) expect(spinSeconds(buildBlade(id, { level: 3 }).stats.stamina)).toBeGreaterThan(120);
+  it('every blade lasts well over a minute left alone, and more Stamina always lasts longer', () => {
+    for (const s of [1, 3, 5, 7, 9]) expect(spinSeconds(s)).toBeGreaterThan(75);
+    for (const id of ['ravok', 'gravion']) expect(spinSeconds(buildBlade(id, { level: 3 }).stats.stamina)).toBeGreaterThan(100);
     for (let s = 2; s <= 10; s++) expect(spinSeconds(s)).toBeGreaterThan(spinSeconds(s - 1));
   });
   it('spinSeconds agrees with the decay the simulation actually applies', () => {

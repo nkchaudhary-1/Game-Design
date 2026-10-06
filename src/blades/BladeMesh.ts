@@ -14,7 +14,8 @@ import { drawEmblem } from '../render/emblem';
 import { blobTexture, hdr } from '../render/materials';
 import { brushedMetal } from '../render/procTex';
 import { GFX } from '../render/quality';
-import { armourPlate, bandProfile, boltRing, capProfile, discProfile, finGlow, lathe, merge, radialSegs, ringSector, sweptFin, tipLathe, torusSegs, type FinSpec } from './partGeometry';
+import { boltRing, capProfile, discProfile, lathe, merge, radialSegs, tipLathe, torusSegs } from './partGeometry';
+import { LOOKS, layers } from './shapes';
 import type { BuiltBlade } from './BladeFactory';
 import type { PartVisual } from './parts';
 import { getPart } from './parts';
@@ -65,64 +66,6 @@ function emblemTexture(color: string): THREE.CanvasTexture {
     emblemCache.set(color, t);
   }
   return t;
-}
-
-interface Layers { main: THREE.BufferGeometry[]; mid: THREE.BufferGeometry[]; dark: THREE.BufferGeometry[]; steel: THREE.BufferGeometry[]; accent: THREE.BufferGeometry[]; glow: THREE.BufferGeometry[]; gold: THREE.BufferGeometry[] }
-const layers = (): Layers => ({ main: [], mid: [], dark: [], steel: [], accent: [], glow: [], gold: [] });
-const fin = (a0: number, rin: number, rout: number, sweep: number, halfW: number, y0: number, h: number, notch = 0.35, curl = 1.4): FinSpec =>
-  ({ a0, rin, rout, sweep, halfW, height: h, under: h * 0.35, y0, notch, curl });
-
-function attackStack(R: number, n: number, reach: number, thick: number, L: Layers): number {
-  const step = TAU / n, Ro = R * reach, k = thick;
-  for (let i = 0; i < n; i++) {
-    const a = i * step;
-    L.dark.push(sweptFin(fin(a + 0.66 * step, R * 0.34, Ro * 0.9, 1.5 * step, R * 0.23, 0, R * 0.1 * k)));
-    L.mid.push(sweptFin(fin(a + 0.33 * step, R * 0.36, Ro * 0.96, 1.55 * step, R * 0.2, R * 0.05 * k, R * 0.11 * k)));
-    const top = fin(a, R * 0.4, Ro, 1.6 * step, R * 0.17, R * 0.11 * k, R * 0.12 * k);
-    (i % 3 === 1 ? L.steel : L.main).push(sweptFin(top));
-    L.glow.push(finGlow(top));
-  }
-  // a small counter-rotating claw ring round the core
-  const m = Math.max(5, Math.round(n * 0.6)), ms = TAU / m;
-  for (let i = 0; i < m; i++) L.dark.push(sweptFin(fin(i * ms, R * 0.24, R * 0.52, -1.1 * ms, R * 0.12, R * 0.2 * k, R * 0.07 * k, 0.2, 1.2)));
-  L.dark.push(lathe(bandProfile(R * 0.78, R * 0.2), radialSegs()).translate(0, -R * 0.08, 0));
-  return R * 0.25 * k;
-}
-
-function defenseStack(R: number, n: number, reach: number, thick: number, L: Layers): number {
-  const step = TAU / n, Ro = R * reach, T = R * 0.2 * thick;
-  L.dark.push(lathe(bandProfile(R * 0.9, R * 0.24), radialSegs()).translate(0, -R * 0.1, 0));
-  for (let i = 0; i < n; i++) {
-    const a = i * step;
-    const p = armourPlate({ phi: a, ri: R * 0.5, ro: Ro, wIn: R * 0.5 * step * 0.4, wOut: Ro * step * 0.4, depth: T, dome: R * 0.05, y0: R * 0.04 });
-    (i % 2 === 0 ? L.main : L.steel).push(p);
-    if (i % 2 === 0) {
-      const stud = new THREE.CylinderGeometry(R * 0.045, R * 0.05, R * 0.04, 20);
-      stud.translate(Math.cos(a) * Ro * 0.8, R * 0.04 + T + R * 0.05, Math.sin(a) * Ro * 0.8);
-      L.gold.push(stud);
-      const cap = new THREE.SphereGeometry(R * 0.04, 14, 6, 0, TAU, 0, Math.PI / 2);
-      cap.translate(Math.cos(a) * Ro * 0.8, R * 0.04 + T + R * 0.07, Math.sin(a) * Ro * 0.8);
-      L.gold.push(cap);
-    }
-    // inner dark block, offset half a step
-    const b = (i + 0.5) * step;
-    L.dark.push(armourPlate({ phi: b, ri: R * 0.3, ro: R * 0.5, wIn: R * 0.3 * step * 0.38, wOut: R * 0.5 * step * 0.38, depth: T * 0.8, dome: R * 0.02, y0: R * 0.1 }));
-    L.dark.push(ringSector(Ro * 0.95, Ro * 1.0, a - step * 0.45, a + step * 0.45, R * 0.05, R * 0.0));
-  }
-  L.gold.push(new THREE.TorusGeometry(R * 0.52, R * 0.016, 10, torusSegs()).rotateX(Math.PI / 2).translate(0, R * 0.04 + T * 0.92, 0));
-  return R * 0.04 + T + R * 0.04;
-}
-
-function staminaStack(R: number, n: number, reach: number, thick: number, L: Layers): number {
-  const step = TAU / n, Ro = R * reach, k = thick;
-  L.dark.push(lathe([[R * 0.62, 0], [R * 0.82, 0], [R * 0.82, R * 0.06 * k], [R * 0.62, R * 0.06 * k], [R * 0.62, 0]], radialSegs()).translate(0, R * 0.02, 0));
-  L.dark.push(lathe(bandProfile(R * 0.5, R * 0.14), radialSegs()).translate(0, -R * 0.04, 0));
-  for (let i = 0; i < n; i++) {
-    const f = fin(i * step, R * 0.5, Ro, 2.1 * step, R * 0.15, R * 0.06 * k + (i % 3) * R * 0.018, R * 0.06 * k, 0.15, 1.5);
-    (i % 2 === 0 ? L.main : L.accent).push(sweptFin(f));
-    L.glow.push(finGlow(f, 0.4, 0.15, 0.95));
-  }
-  return R * 0.17 * k;
 }
 
 // ----------------------------------------------------------------------------------------------- view
@@ -234,10 +177,10 @@ export class BladeView {
     });
     const dark = new THREE.Color(s.profile.trim).multiplyScalar(0.42).getStyle();
     const M = {
-      main: paint(cc.main),
-      mid: paint('#14171d', 0.36),
+      main: paint(s.profile.main),
+      mid: paint(s.profile.mid, 0.36),
       dark: steelMat(dark, 0.85),
-      steel: s.cls === 'DEFENSE' ? paint('#e9ecf2', 0.3) : steelMat('#d6dae2', 1),
+      steel: s.profile.alt ? paint(s.profile.alt, 0.3) : steelMat('#d6dae2', 1),
       accent: new THREE.MeshPhysicalMaterial({ color: glowCol, metalness: 0.4, roughness: 0.3, clearcoat: 0.8, emissive: glowCol, emissiveIntensity: s.cls === 'STAMINA' ? 0.5 : 0.25, envMapIntensity: 1 }),
       gold: steelMat('#e2b552', 1),
       cap: new THREE.MeshPhysicalMaterial({ color: '#0b0d11', metalness: 0.9, roughness: 0.28, clearcoat: 0.6, clearcoatRoughness: 0.15, envMapIntensity: 1.2 }),
@@ -247,10 +190,9 @@ export class BladeView {
 
     // ---- the fin / plate stack (class silhouette)
     const L = layers();
-    let top: number;
-    if (s.profile.ringStyle === 'spikes') { this.symmetry = n * 2; top = attackStack(R, n * 2, reach, thick, L); }
-    else if (s.profile.ringStyle === 'plates') { this.symmetry = n + 3; top = defenseStack(R, n + 3, reach, thick, L); }
-    else { this.symmetry = n + 1; top = staminaStack(R, n + 1, reach, thick, L); }
+    const built = (LOOKS[s.profile.look] ?? LOOKS.ravok)({ R, n, reach, k: thick, L });
+    const top = built.top;
+    this.symmetry = built.sym;
 
     const y0 = -0.08 * R;
     this.add(merge(L.dark), M.dark, y0);

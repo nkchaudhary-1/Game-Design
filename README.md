@@ -109,7 +109,7 @@ Built and checked in a software-rendered browser only: **frame rate on a real GP
 src/
   core/      Balance (ratings → physics), Physics (Rapier), Battle (display host), InputBus, Input, Rng
   combat/    Match + systems: spin, collision, abilities, supers, effects  — pure TS, no DOM, no Three
-  blades/    bladeData (21 blades), abilities, supers, parts, BladeFactory, BladeMesh (procedural models)
+  blades/    bladeData (21 blades), abilities, supers, parts, BladeFactory, BladeMesh + shapes (one procedural silhouette per blade)
   arenas/    arenaData (8 arenas), Arena (Core Pit), ArenaView
   ai/        AI state machine + controller (CPU only ever sends controller messages)
   render/ vfx/ audio/   Three.js scene, camera rig, sparks/trails, Web Audio synth
@@ -135,11 +135,11 @@ tools/       balance.ts
 
 | Blade | Stamina | Left alone | Typical fight (CPU Normal) |
 |---|---|---|---|
-| Phantom (Stamina) | 10 | 3:00 | 10 s vs Ravok, 55 s vs Gravion, 65 s mirror |
-| Gravion (Defense) | 8 | 2:39 | 50 s vs Ravok, 55 s vs Phantom, 95 s mirror |
-| Ravok (Attack) | 5 | 2:15 | 10 s vs Phantom, 50 s vs Gravion, 16 s mirror |
+| Phantom (Stamina) | 10 | 3:00 | 10 s vs Ravok, 50 s vs Gravion, 55 s mirror |
+| Gravion (Defense) | 8 | 2:22 | 47 s vs Ravok, 50 s vs Phantom, 88 s mirror |
+| Ravok (Attack) | 5 | 1:48 | 10 s vs Phantom, 47 s vs Gravion, 13 s mirror |
 
-Hits, moves, steering and ring-outs end fights well before the clock does (mean battle ≈ 45 s, was ≈ 19 s; spin lost: decay 35%, moves and
+Hits, moves, steering and ring-outs end fights well before the clock does (mean battle ≈ 41 s, was ≈ 19 s; spin lost: decay 35%, moves and
 steering 39%, hits 27%). Knobs, all in `core/Balance.ts`: `PACE` (decay speed), `DECAY_PER_STAMINA` (how much Stamina matters),
 `ECON` (how hard hits and moves land), `TIMEOUT`, `SUPER_DECAY` (keeps Rage Mode's cost real at the slower pace).
 
@@ -148,11 +148,20 @@ only trump, outlasting, now lives minutes away while Ravok keeps its pressure th
 decides how long you spin, so the longest spin is Stamina 10. If you want every blade at 3:00, the Attack/Stamina matchup needs a design
 decision (weaker first clash, or a real evasion mechanic) rather than a number.
 
+**Control speed.** Blades used to take about a second to move one arena unit (Gravion, 0.4). Steering strength (`CTRL`) is now 2.4×,
+Agility separates blades more sharply (`AGI_EXP` 2.0: Phantom is clearly the nimblest, Gravion the slowest), and the wall pull and
+hit damage were retuned so faster blades don't ring each other out in two seconds. On top of that the **player's blade gets an
+assist** the CPU doesn't: `HUMAN_CTRL` 1.5× and `KICK`, extra acceleration when steering from slow or against the current motion
+(sharp starts and turn-arounds at the same top speed). Measured from rest with full steering, after one second: Ravok moves 5 units
+(was 1.1), Phantom 7 (was 1.7), Gravion 3.4 (was 0.4). The CPU balance below is measured without the assist, so the triangle is a
+CPU-vs-CPU number; against a human the player is a little stronger than the table says. (Putting KICK on the CPU too collapsed every
+matchup to a coin flip, because everyone could then dodge everyone.)
+
 **Smoothness.** What changed and why:
 
 * *Rotation* is capped per frame at a third of the gap between two fins (`vfx/motion.ts`), so a fast spin or a slow frame can never
   look like the blade turning backwards (wagon-wheel strobing). Tilt, camera follow and zoom are eased instead of snapping.
-* *Steering* is eased over about 75 ms in the simulation (`STEER_SMOOTH`), so a key press or a stick flick isn't a step change in the
+* *Steering* is eased over about 35 ms in the simulation (`STEER_SMOOTH`), so a key press or a stick flick isn't a step change in the
   push on the blade. The pad stick has a longer throw (66 px) and a smaller dead zone.
 * *Hit-stop* only fires on big hits and never twice within 0.45 s; before, a clash that kept re-contacting froze the game over and over.
 * *Frame cost*: the first-battle tier is picked from the GPU (discrete or Apple-silicon GPUs get High, integrated GPUs get Medium,
@@ -168,20 +177,21 @@ Latest run (`npm run balance`, CPU Normal, both seats; Level 1 and 7 at 60 battl
 
 | Row beats column | Level 1 | Level 3 | Level 7 |
 |---|---|---|---|
-| Ravok (Attack) → Phantom (Stamina) | 80% | 84% | 90% |
-| Phantom (Stamina) → Gravion (Defense) | 77% | 70% | 83% |
-| Gravion (Defense) → Ravok (Attack) | 80% | 68% | 93% |
+| Ravok (Attack) → Phantom (Stamina) | 82% | 87% | 87% |
+| Phantom (Stamina) → Gravion (Defense) | 65% | 73% | 80% |
+| Gravion (Defense) → Ravok (Attack) | 80% | 78% | 83% |
 
-* At the default Level 3 **every target passes**; Level 1 passes too. At **Level 7** (all Supers unlocked) the counters swing wider
-  (53–93% by seat) and two mirrors drift to 60–62%: Level 7 is not tuned, so expect Supers to move results there.
+* At the default Level 3 **every target passes**. Level 1 passes except Phantom → Gravion, which sits right on the 65% edge. At
+  **Level 7** (all Supers unlocked) one mirror drifts to 60%: Level 7 is not tuned, so expect Supers to move results there.
 * Every counter is a **real edge, not a lock** (65–88% target, both seats ≥ 55%). The first version of the triangle was 100%/0%,
   and it came back at the slower pace: a steady stat edge in passive decay beats the other blade every time once fights are long.
-  Fixed with global knobs (wider but still modest Stamina spread, ±22% match-to-match spin variance) plus two rating nudges
-  (Phantom Stability 4 → 7, Gravion Stamina 7 → 8), not per-blade code.
-* Mirrors are seat-neutral (52–56% for the bottom seat at Level 3). Mean battle ≈ 45 s; time-outs ≈ 0%; ring-out ≈ 23% of results,
-  spin-out ≈ 77%.
-* At **Hard**, the CPU Phantom beats Ravok 77% of the time (Normal: 16%). Hard evades much better than Normal, so the Attack counter
-  does not hold there; Hard needs its own pass if you want it to.
+  Fixed with global knobs (Stamina spread, ±22% match-to-match spin variance, Agility curve, wall pull, hit damage) plus three rating
+  nudges (Phantom Weight 4 → 5 and Stability 4 → 7, Gravion Stamina 7 → 8), not per-blade code. Faster controls pushed Ravok → Phantom
+  to 97% (a first-clash ring-out) until the Agility curve and Phantom's weight were retuned.
+* Mirrors are seat-neutral (52–59% for the bottom seat at Level 3). Mean battle ≈ 41 s; time-outs ≈ 0%; ring-out ≈ 28% of results,
+  spin-out ≈ 71%.
+* At **Hard** the Attack counter does not hold (Ravok → Phantom 43%) and the Phantom mirror drifts to 40%: Hard needs its own pass.
+  Hard beats Easy 83% in the Phantom mirror but only 60% in the Ravok mirror, which is over in ~10 s, before skill shows.
 * **Win-condition mix depends on the matchup.** Attack blades ring things out (Ravok vs Phantom: ~82% ring-outs, ≈ 10 s). **Gravion
   never rings anyone out in CPU play** (0%): Defense wins by outlasting (Gravion mirror ≈ 95 s). A human can shove with a charged Bash,
   but expect Defense games to end on spin-out.
@@ -200,7 +210,7 @@ Latest run (`npm run balance`, CPU Normal, both seats; Level 1 and 7 at 60 battl
 * **18 blades are data only** (stats, moves, Supers listed as “coming soon”); **7 arenas** are data only.
 * **No hazards** yet: `arenas/hazards.ts` is the hook for arena mechanics.
 * **Bundle is ~5 MB (1.9 MB gzip)**, mostly the inlined physics WASM. Fine on broadband; lazy-loading physics is the first fix.
-* **Visual direction** follows the supplied reference pack (cream paper + navy + red UI, spiral-fin armoured blades, concrete diorama arena). The realism pass made blades and the arena high-poly with physically based materials, but they are still generated in code: they match the references' palette, layering and glow, not their hand-sculpted surface detail. Hero-quality models need real meshes. Blades in the same class share a fin pattern (colour, trim and count differ). Gravion, Phantom and the Stamina class have no reference art yet, so their look is extrapolated.
+* **Visual direction** follows the supplied reference pack (cream paper + navy + red UI, spiral-fin armoured blades, concrete diorama arena). The realism pass made blades and the arena high-poly with physically based materials, but they are still generated in code: they match the references' palette, layering and glow, not their hand-sculpted surface detail. Hero-quality models need real meshes. Every one of the 21 blades has its own silhouette and palette (`blades/shapes.ts`: hooked blades, flame tongues, triple claw, saw ring, axe heads, castle octagon, boulders, orbiting discs, clock, petals, spiral arms…). Only four have reference art; the rest are my interpretation of the roster names and roles.
 * The reference art (`src/assets/art/`, cropped by `tools/prep-art.sh`) is used for the Hangar cards, Pre-battle cards and arena thumbnails. The Core Arena reference shows a bunny emblem on the floor; in-game the floor carries the V-chevron instead.
 * The CPU is tuned by simulation, not by people. Difficulty needs real playtests.
 * Phase 2 (per PRD): WebSocket relay, QR join, controller on a phone, 3+ players — the pad/bus boundary is ready for it.

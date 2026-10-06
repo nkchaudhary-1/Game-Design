@@ -38,14 +38,32 @@ describe('steering eases in and out', () => {
     m.step();
     const first = m.blades[0].smX;
     expect(first).toBeGreaterThan(0);
-    expect(first).toBeLessThan(0.2);
+    expect(first).toBeLessThan(0.3);
     for (let i = 0; i < Math.round(0.5 / TUNING.DT); i++) m.step();
     expect(m.blades[0].smX).toBeGreaterThan(0.95);
     m.setSteer(0, 0, 0);
     m.step();
-    expect(m.blades[0].smX).toBeGreaterThan(0.8); // released: it eases out, it does not snap to zero
+    expect(m.blades[0].smX).toBeGreaterThan(0.7); // released: it eases out, it does not snap to zero
     for (let i = 0; i < Math.round(0.5 / TUNING.DT); i++) m.step();
     expect(m.blades[0].smX).toBeLessThan(0.05);
     m.dispose();
+  });
+});
+
+describe('player assist', () => {
+  beforeAll(async () => { await initPhysics(); });
+  it('a human-controlled blade gets away faster than the same blade under the CPU, so controls feel quick', () => {
+    const speedAfter = (control: 'human' | 'ai'): number => {
+      const m = new Match(getArena('core-pit'), [{ built: buildBlade('ravok', { level: 3 }), control }, { built: buildBlade('gravion', { level: 3 }), control: 'ai' }], makeRng(8));
+      m.launch(0, 0, 0); m.launch(1, Math.PI, 0);
+      for (let i = 0; i < 120; i++) m.step();
+      m.setSteer(0, 0, 1);
+      for (let i = 0; i < 60; i++) m.step(); // half a second of full steering
+      const b = m.blades[0];
+      const v = Math.hypot(b.vx, b.vz);
+      m.dispose();
+      return v;
+    };
+    expect(speedAfter('human')).toBeGreaterThan(speedAfter('ai') * 1.2);
   });
 });

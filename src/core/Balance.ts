@@ -15,7 +15,7 @@ export const TUNING = {
   DT: 1 / 120,
   // -- the pit
   BOWL: 13.6 * L,          // inward pull, grows linearly with distance from the centre
-  LIP: 64 * L,             // extra inward pull that ramps up steeply at the rim…
+  LIP: 11.5,               // extra inward pull that ramps up steeply at the rim… (raised with the faster controls)
   GRIP_MIN: 0.1,           // …scaled by spin: at zero spin the wall barely holds. Spin is armour.
   SWIRL: 28 * L,           // tangential push so blades orbit instead of grinding in the centre
   // -- collisions
@@ -23,7 +23,7 @@ export const TUNING = {
   FRICTION: 0.05,
   KB_EXP: 0.58,            // knockback scales with (attack ÷ defense)^KB_EXP
   DEF_EXP: 1.85,           // spin damage divides by defense^DEF_EXP
-  SPIN_DMG: 0.058 / L,     // spin lost per unit of closing speed, × attack ÷ defense^DEF_EXP
+  SPIN_DMG: 0.29,          // spin lost per unit of closing speed, × attack ÷ defense^DEF_EXP (blades are ~2× faster now, so each hit lands softer)
   ATTACK_EDGE: 0.35,       // whoever was closing faster takes less spin damage and deals more
   HIT_MIN: 14 * L,         // closing speed below this is a touch, not a hit
   HIT_CAP: 17,             // max spin lost to a single hit
@@ -31,13 +31,21 @@ export const TUNING = {
   CLASH_TAN: 0.27,         // …and partly sideways: spinning surfaces deflect instead of just bouncing
   DAMAGE_JITTER: 0.15,     // contact-angle variance
   // -- spin
-  PACE: 0.247,             // multiplier on passive spin decay: sets how long a blade left alone keeps spinning (Phantom, Stamina 10 ≈ 3:00; see spinSeconds)
+  PACE: 0.309,             // multiplier on passive spin decay: sets how long a blade left alone keeps spinning (Phantom, Stamina 10 ≈ 3:00; see spinSeconds)
   SUPER_DECAY: 0.6,        // how much of a Super's decay change (×1.8 Rage Mode, ×0.5 Spin Burst…) is applied on the unscaled rate
   ECON: 1,                 // multiplier on spin gained/lost to hits, moves, Supers and drains: how fast hits decide a fight
   DECAY_BASE: 3.0,         // passive spin lost per second at Stamina 5 (before PACE)…
-  DECAY_PER_STAMINA: 0.15, // …less this much per point of Stamina above 5: Stamina is how long you spin
+  DECAY_PER_STAMINA: 0.24, // …less this much per point of Stamina above 5: Stamina is how long you spin
   MOVE_COST: 0.005 / L,    // spin/s lost per unit of speed (floor friction)
-  STEER_SMOOTH: 0.075,     // seconds for steering input to ease in/out: no step changes in the push on the blade
+  AGI_EXP: 2.0,            // how sharply Agility separates blades: higher = nimble blades pull further ahead of heavy ones
+  CTRL: 2.4,               // steering strength: multiplier on every blade's acceleration and turning grip (how quick the controls feel)
+  // Player assist: a human-controlled blade steers harder than the CPU's (the CPU balance is tuned without it, so the
+  // class triangle is unchanged CPU-vs-CPU). KICK adds acceleration when steering from slow or against the current motion:
+  // sharp starts and turn-arounds at the same top speed.
+  HUMAN_CTRL: 1.5,
+  KICK: 1.2,
+  KICK_SPEED: 4,           // KICK fades out as the blade reaches this speed along the steering direction
+  STEER_SMOOTH: 0.035,     // seconds for steering input to ease in/out: no step changes in the push, but no lag either
   STEER_COST: 0.36,        // spin/s lost at full steering — the price of agency
   WOBBLE_BELOW: 22,        // spin % under which a blade wobbles…
   WOBBLE_ACCEL: 34 * L,    // …and gets pushed around
@@ -94,13 +102,13 @@ export interface CombatParams {
 
 export function deriveCombat(s: StatRatings): CombatParams {
   const weight = s.weight;
-  const agiT = Math.pow(clamp((s.agility - 1) / 9, 0, 1), 0.8);
+  const agiT = Math.pow(clamp((s.agility - 1) / 9, 0, 1), TUNING.AGI_EXP);
   return {
     radius: 0.95 + 0.085 * weight,
     height: 0.34,
     mass: (TUNING.MASS_BASE + TUNING.MASS_PER_WEIGHT * weight) * (TUNING.STAB_BASE + TUNING.STAB_PER * s.stability),
-    accel: lerp(2.2, 7.4, agiT) * (1.1 - 0.03 * weight),
-    lateralGrip: 0.6 + 0.35 * s.agility,
+    accel: lerp(3.4, 7.4, agiT) * (1.1 - 0.03 * weight) * TUNING.CTRL,
+    lateralGrip: (0.6 + 0.35 * s.agility) * Math.sqrt(TUNING.CTRL),
     linearDamping: 1.2,
     restitution: TUNING.RESTITUTION,
     friction: TUNING.FRICTION,

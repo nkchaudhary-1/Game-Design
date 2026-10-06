@@ -20,15 +20,16 @@ describe('CPU opponent', () => {
     expect(matchup('DEFENSE', 'DEFENSE')).toBe('EVEN');
   });
 
-  it('Hard beats Easy in an Attack mirror (seats swapped)', async () => {
+  it('Hard beats Easy in a Stamina mirror (seats swapped)', async () => {
     let hardWins = 0, decisive = 0;
     for (let seed = 1; seed <= 40; seed++) {
       const hardSeat = seed % 2;
       const diff: ['EASY' | 'HARD', 'EASY' | 'HARD'] = hardSeat === 0 ? ['HARD', 'EASY'] : ['EASY', 'HARD'];
-      const { result } = await playMatch([buildBlade('ravok', { level: 3 }), buildBlade('ravok', { level: 3 })], { seed, difficulty: diff });
+      const { result } = await playMatch([buildBlade('phantom', { level: 3 }), buildBlade('phantom', { level: 3 })], { seed, difficulty: diff });
       if (result.winner >= 0) { decisive++; if (result.winner === hardSeat) hardWins++; }
     }
-    // measured ≈ 70% over 60 matches; the mirror is used because class matchups would drown out the skill signal
-    expect(hardWins / decisive).toBeGreaterThan(0.58);
+    // measured ≈ 80% over 60 matches; a mirror is used because class matchups would drown out the skill signal, and
+    // Stamina because Attack mirrors are decided by the first clash within ~10 s, before skill can show
+    expect(hardWins / decisive).toBeGreaterThan(0.62);
   }, 90000);
 });

@@ -241,3 +241,57 @@ export function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry | nul
   parts.forEach((g) => g.dispose());
   return m;
 }
+
+// ---------------------------------------------------------------------------------------------- planforms
+/** (x, z) of polar (radius, angle φ). φ increases clockwise on screen, the way blades spin. */
+export const polar = (r: number, a: number): [number, number] => [Math.cos(a) * r, Math.sin(a) * r];
+
+/**
+ * Extrude any flat outline, given as (x, z) points, into a bevelled slab standing on `y0`. This is the workhorse
+ * for the angular shapes (axe heads, teeth, castle blocks, boulders, claws) that the lofted fins can't make.
+ */
+export function prism(pts: Array<[number, number]>, depth: number, y0: number, bevelK = 0.28): THREE.BufferGeometry {
+  const sh = new THREE.Shape();
+  pts.forEach(([x, z], i) => (i ? sh.lineTo(x, -z) : sh.moveTo(x, -z)));
+  sh.closePath();
+  const bevel = Math.min(depth * bevelK, 0.06);
+  let g: THREE.BufferGeometry = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.002, depth - bevel * 2), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: [1, 2, 3][D()], curveSegments: 3 });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y0 + bevel, 0);
+  g = mergeVertices(sub(g), 1e-4);
+  g.computeVertexNormals();
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2).map((_, i) => ((i % 2 === 0 ? g.attributes.position.getX(i >> 1) : g.attributes.position.getZ(i >> 1)) * 0.6)), 2));
+  return g;
+}
+
+/**
+ * Outline of a curved blade: root at r0, tip at r1, the centre line sweeping `sweep` radians ahead of `a`.
+ * `w(t)` is the half-width (world units) at t = 0 (root) … 1 (tip); `lead` > 0 pushes the leading edge out (a hook).
+ */
+export function bladeOutline(a: number, r0: number, r1: number, sweep: number, curl: number, w: (t: number) => number, lead = 0, n = 12): Array<[number, number]> {
+  const centre = (t: number): { r: number; phi: number } => ({ r: r0 + (r1 - r0) * t, phi: a + sweep * Math.pow(t, curl) });
+  const edge = (t: number, side: 1 | -1): [number, number] => {
+    const c = centre(t);
+    const eps = 0.01;
+    const c2 = centre(Math.min(1, t + eps)), c1 = centre(Math.max(0, t - eps));
+    const [x2, z2] = polar(c2.r, c2.phi), [x1, z1] = polar(c1.r, c1.phi);
+    const l = Math.hypot(x2 - x1, z2 - z1) || 1;
+    const nx = -(z2 - z1) / l, nz = (x2 - x1) / l;
+    const [cx, cz] = polar(c.r, c.phi);
+    const off = w(t) * (side > 0 ? 1 + lead * Math.sin(Math.PI * Math.min(1, t * 1.15)) : 1);
+    return [cx + nx * off * side, cz + nz * off * side];
+  };
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i <= n; i++) pts.push(edge(i / n, 1));
+  for (let i = n; i >= 0; i--) pts.push(edge(i / n, -1));
+  return pts;
+}
+
+/** A cone (spike) standing at radius r, angle a, pointing out along the radius. */
+export function spike(r: number, a: number, len: number, rad: number, y: number, up = 0): THREE.BufferGeometry {
+  const g = new THREE.ConeGeometry(rad, len, 10, 1).rotateZ(-Math.PI / 2 + up).translate(len / 2, 0, 0);
+  g.rotateY(-a);
+  const [x, z] = polar(r, a);
+  g.translate(x, y, z);
+  return g;
+}

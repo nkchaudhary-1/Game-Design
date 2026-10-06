@@ -7,6 +7,7 @@
 //   5. spin, KO, result                     (consequences)
 
 import { TUNING, lowSpinFactor, spinOmega } from '../core/Balance';
+import { clamp } from '../core/types';
 import type { BladeRuntime } from '../blades/Blade';
 import { GHOST_GROUPS } from '../core/Physics';
 import { updateAbilities } from './AbilitySystem';
@@ -116,7 +117,10 @@ function applyForces(m: Match, b: BladeRuntime, dt: number): void {
     const sl = Math.hypot(b.smX, b.smZ), push = Math.min(1, sl);
     if (sl > 0.001) {
       const dx = b.smX / sl, dz = b.smZ / sl;
-      const accel = c.accel * b.mod('accel') * lowSpinFactor(b.spin) * push;
+      const along0 = vx * dx + vz * dz;
+      const human = b.control === 'human';
+      const kick = human ? 1 + TUNING.KICK * clamp(1 - along0 / TUNING.KICK_SPEED, 0, 1.5) : 1;
+      const accel = c.accel * (human ? TUNING.HUMAN_CTRL : 1) * b.mod('accel') * lowSpinFactor(b.spin) * push * kick;
       ax += dx * accel; az += dz * accel;
       const along = vx * dx + vz * dz;
       const px = vx - along * dx, pz = vz - along * dz;
