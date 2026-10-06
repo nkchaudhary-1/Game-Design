@@ -31,9 +31,13 @@ export const TUNING = {
   CLASH_TAN: 0.27,         // …and partly sideways: spinning surfaces deflect instead of just bouncing
   DAMAGE_JITTER: 0.15,     // contact-angle variance
   // -- spin
-  DECAY_BASE: 3.0,         // passive spin lost per second at Stamina 5…
-  DECAY_PER_STAMINA: 0.06, // …less this much per point of Stamina above 5
+  PACE: 0.247,             // multiplier on passive spin decay: sets how long a blade left alone keeps spinning (Phantom, Stamina 10 ≈ 3:00; see spinSeconds)
+  SUPER_DECAY: 0.6,        // how much of a Super's decay change (×1.8 Rage Mode, ×0.5 Spin Burst…) is applied on the unscaled rate
+  ECON: 1,                 // multiplier on spin gained/lost to hits, moves, Supers and drains: how fast hits decide a fight
+  DECAY_BASE: 3.0,         // passive spin lost per second at Stamina 5 (before PACE)…
+  DECAY_PER_STAMINA: 0.15, // …less this much per point of Stamina above 5: Stamina is how long you spin
   MOVE_COST: 0.005 / L,    // spin/s lost per unit of speed (floor friction)
+  STEER_SMOOTH: 0.075,     // seconds for steering input to ease in/out: no step changes in the push on the blade
   STEER_COST: 0.36,        // spin/s lost at full steering — the price of agency
   WOBBLE_BELOW: 22,        // spin % under which a blade wobbles…
   WOBBLE_ACCEL: 34 * L,    // …and gets pushed around
@@ -52,9 +56,9 @@ export const TUNING = {
   LAUNCH_MAX: 5.6,         // a full-power shot straight out must never ring itself out
   SPAWN_R: 50 * L,
   MAX_SPEED: 230 * L,
-  TIMEOUT: 60,             // [PRD open item → proposed default] higher spin wins after this long
+  TIMEOUT: 180,            // [PRD open item → proposed default] 3:00, then higher spin wins
   SIMUL_WINDOW: 0.1,       // after a ring-out, a second KO inside this window is a double KO
-  DECAY_JITTER: 0.09,      // per-match variance in how long a blade spins (±9%): without it a small, steady edge wins every time
+  DECAY_JITTER: 0.22,      // per-match variance in how long a blade spins (±22%): without it a small, steady edge wins every time
   // -- ability scale: dash speeds and radial impulses in the data are written in "design units"
   DASH_SCALE: 0.5,
   IMPULSE_SCALE: 0.5,
@@ -100,13 +104,18 @@ export function deriveCombat(s: StatRatings): CombatParams {
     linearDamping: 1.2,
     restitution: TUNING.RESTITUTION,
     friction: TUNING.FRICTION,
-    spinDecay: Math.max(0.9, TUNING.DECAY_BASE - TUNING.DECAY_PER_STAMINA * (s.stamina - 5)),
+    spinDecay: Math.max(0.9, TUNING.DECAY_BASE - TUNING.DECAY_PER_STAMINA * (s.stamina - 5)), // × TUNING.PACE in tickSpin
     atkMul: 0.3 + 0.13 * (0.6 * s.attack + 0.4 * s.spinDamage),
     defMul: TUNING.DEF_BASE + TUNING.DEF_PER * s.defense,
     kbDealt: 0.55 + 0.09 * s.knockback,
     spinLossTaken: 1.25 - 0.05 * s.spinRetention,
     external: clamp(1.2 - 0.1 * s.stability, 0.15, 1),
   };
+}
+
+/** Seconds a blade left alone (no hits, no moves, no steering) keeps spinning, from its Stamina rating. For the UI and the tests. */
+export function spinSeconds(stamina: number): number {
+  return 100 / (Math.max(0.9, TUNING.DECAY_BASE - TUNING.DECAY_PER_STAMINA * (stamina - 5)) * TUNING.PACE);
 }
 
 /** Low spin: weaker movement and impact, more vulnerable (spec §8). 1 at full spin → LOW_SPIN_FLOOR at 0. */

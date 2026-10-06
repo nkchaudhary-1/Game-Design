@@ -30,7 +30,9 @@ export class BattleScreen implements Screen {
   private paused = false;
   private resultShown = false;
   private slow = 0;
+  private frames = 0;
   private acc = 0;
+  private warmup = 2.5;
 
   constructor(private readonly ctx: Ctx) {
     const s = ctx.session;
@@ -132,6 +134,13 @@ export class BattleScreen implements Screen {
           h('button.btn.secondary', { type: 'button', onclick: () => this.ctx.go('battle') }, 'Restart round'),
           h('button.btn.ghost', { type: 'button', onclick: () => this.ctx.go('lobby') }, 'Quit to lobby'),
         ),
+        h('p.why', null, h('b', null, 'Graphics'), ' — choppy? Pick a lighter setting (restarts the round).'),
+        h('div.btns', null,
+          ...(['high', 'medium', 'low'] as const).map((t) => h(`button.btn.${GFX.tier === t ? 'primary' : 'secondary'}`, {
+            type: 'button', 'aria-pressed': String(GFX.tier === t),
+            onclick: () => { setTier(t); this.ctx.go('battle'); },
+          }, t.charAt(0).toUpperCase() + t.slice(1))),
+        ),
       );
     } else {
       this.overlay?.remove(); this.overlay = null;
@@ -194,11 +203,13 @@ export class BattleScreen implements Screen {
   /** Lower the render scale, then the graphics tier, if frames run long (never raised again within a session). */
   private watchPerformance(dt: number): void {
     if (this.paused) return;
-    this.acc += dt; this.slow += dt > 0.026 ? 1 : 0;
-    if (this.acc < 1.5) return;
+    // shader compiles and texture uploads at the start are not the steady state
+    if (this.warmup > 0) { this.warmup -= dt; return; }
+    this.acc += dt; this.frames++; this.slow += dt > 0.026 ? 1 : 0;
+    if (this.acc < 1.2) return;
     const rr = this.ctx.battleRenderer();
-    const frames = Math.max(1, Math.round(this.acc / 0.0167));
-    if (this.slow / frames > 0.5) {
+    const avgMs = (this.acc / this.frames) * 1000;
+    if (avgMs > 23 || this.slow / this.frames > 0.35) {
       if (rr.quality > 0.6) rr.setQuality(Math.max(0.6, rr.quality - 0.2));
       else if (GFX.tier !== 'low') {
         // still struggling at the lowest render scale: drop a graphics tier (shadows, bloom, lighter geometry on the next battle)
@@ -206,7 +217,7 @@ export class BattleScreen implements Screen {
         rr.applyTier(this.battle.view.scene);
       }
     }
-    this.acc = 0; this.slow = 0;
+    this.acc = 0; this.slow = 0; this.frames = 0;
   }
 
   dispose(): void {

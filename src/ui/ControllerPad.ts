@@ -18,8 +18,8 @@ export interface PadOptions {
 
 const FORWARD_MIN = -Math.PI + 0.12;
 const FORWARD_MAX = -0.12;
-const STICK_R = 48;
-const DEADZONE = 0.14;
+const STICK_R = 66;      // a longer throw gives finer control over how hard to steer
+const DEADZONE = 0.1;
 
 interface Drag { id: number; sx: number; sy: number; x: number; y: number }
 

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { Match } from '../combat/Match';
 import type { MatchResult } from '../combat/events';
 import { TEAM_COLORS } from '../render/BattleView';
+import { TUNING } from '../core/Balance';
 import { CLASS_COLORS, clamp } from '../core/types';
 import { h } from './dom';
 
@@ -115,6 +116,16 @@ export class HUD {
     b.classList.add('show');
   }
 
+  /** Write text only when it changed: re-setting identical text every frame still invalidates layout. */
+  private readonly memo = new WeakMap<Element, string>();
+  private put(el: HTMLElement, text: string, cls?: string): void {
+    const key = cls === undefined ? text : `${cls}|${text}`;
+    if (this.memo.get(el) === key) return;
+    this.memo.set(el, key);
+    if (cls !== undefined) el.className = cls;
+    el.textContent = text;
+  }
+
   update(): void {
     const { match, names } = this.o;
     const t = match.t;
@@ -129,22 +140,22 @@ export class HUD {
     match.blades.forEach((b, i) => {
       const c = this.cards[i];
       const sp = clamp(b.spin, 0, 100);
-      c.bar.style.width = `${sp}%`;
-      c.num.textContent = String(Math.round(sp));
+      c.bar.style.width = `${sp.toFixed(1)}%`;
+      this.put(c.num, String(Math.round(sp)));
       c.spin.classList.toggle('low', sp < 22 && !b.out);
       const sb = c.sup;
-      if (!b.built.equippedSuper) { sb.textContent = 'No Super'; sb.className = 'sstate'; return; }
+      if (!b.built.equippedSuper) { this.put(sb, 'No Super', 'sstate'); return; }
       const st = b.superState;
-      sb.className = `sstate ${st}`;
-      sb.textContent = st === 'READY' ? 'Super ready' : st === 'ACTIVE' ? `Super ${b.superT.toFixed(1)}s` : `Super ${Math.ceil(b.superT)}s`;
+      this.put(sb, st === 'READY' ? 'Super ready' : st === 'ACTIVE' ? `Super ${b.superT.toFixed(1)}s` : `Super ${Math.ceil(b.superT)}s`, `sstate ${st}`);
     });
 
     // status line
-    if (match.phase === 'ready') this.status.textContent = 'Launch';
+    if (match.phase === 'ready') this.put(this.status, 'Launch');
     else if (match.phase === 'live') {
       const el = Math.max(0, t - this.liveStart);
-      this.status.textContent = `${Math.floor(el / 60)}:${String(Math.floor(el % 60)).padStart(2, '0')}`;
-    } else this.status.textContent = 'Round over';
+      const clock = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+      this.put(this.status, `${clock(el)} / ${clock(TUNING.TIMEOUT)}`);
+    } else this.put(this.status, 'Round over');
 
     // floating tags follow the blades
     const cam = this.o.camera();
@@ -155,8 +166,8 @@ export class HUD {
       this.v.copy(this.o.anchor(i));
       this.v.y += b.radius * 0.9 + 0.6;
       this.v.project(cam);
-      tag.style.left = `${(this.v.x * 0.5 + 0.5) * w}px`;
-      tag.style.top = `${(-this.v.y * 0.5 + 0.5) * hh - 14}px`;
+      // transform, not left/top: moving a tag every frame must not trigger layout
+      tag.style.transform = `translate(${((this.v.x * 0.5 + 0.5) * w).toFixed(1)}px, ${((-this.v.y * 0.5 + 0.5) * hh - 14).toFixed(1)}px) translate(-50%, -50%)`;
       const live = match.phase === 'live' ? clamp(1 - (t - this.liveStart - 3.5) / 1.5, 0.35, 1) : 1;
       tag.style.opacity = gone || this.v.z > 1 ? '0' : String(live);
     });

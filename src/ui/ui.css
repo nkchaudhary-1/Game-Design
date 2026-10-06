@@ -356,7 +356,7 @@ select.sel option { background: var(--navy-2); }
 .hud-round .status { font: 800 13px/1 var(--f-display); letter-spacing: .24em; text-transform: uppercase; color: var(--dim); }
 @media (max-width: 880px), (max-aspect-ratio: 1/1) { .hud-card { width: 38%; } .hud-round { top: auto; bottom: 8px; } }
 @media (max-width: 520px) { .hud-card { width: 42%; padding: 6px 12px 8px; } .hud-card .nm { font-size: 20px; } }
-.tagfloat { position: absolute; transform: translate(-50%, -50%); padding: 2px 8px; font: 800 13px/1.2 var(--f-display); letter-spacing: .14em; color: var(--ink); pointer-events: none; transition: opacity .2s; white-space: nowrap; clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); }
+.tagfloat { position: absolute; left: 0; top: 0; will-change: transform; transform: translate(-50%, -50%); padding: 2px 8px; font: 800 13px/1.2 var(--f-display); letter-spacing: .14em; color: var(--ink); pointer-events: none; transition: opacity .2s; white-space: nowrap; clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); }
 .tagfloat.p0 { background: var(--you); } .tagfloat.p1 { background: var(--cpu); }
 .banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; opacity: 0; white-space: nowrap; font: 800 clamp(48px, 9vw, 112px)/.9 var(--f-display); letter-spacing: .04em; text-transform: uppercase; font-style: italic; }
 .banner small { display: block; margin-top: 12px; font: 800 clamp(14px, 2.4vw, 22px)/1.1 var(--f-display); letter-spacing: .3em; color: var(--text); font-style: normal; }

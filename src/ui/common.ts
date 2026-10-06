@@ -41,6 +41,7 @@ export function levelStepper(level: number, onChange: (l: number) => void, note 
 
 // ------------------------------------------------------------------------------------------ stat widgets
 import type { BuiltBlade } from '../blades/BladeFactory';
+import { spinSeconds } from '../core/Balance';
 import { STAT_KEYS, STAT_LABELS, type StatRatings } from '../core/types';
 
 /** The nine design ratings as bars, with green/red deltas where parts changed them. */
@@ -58,6 +59,9 @@ export function statsGrid(b: BuiltBlade): HTMLElement {
       h('span.val', null, String(v), d !== 0 ? h('small', { class: d > 0 ? 'up' : 'down' }, `${d > 0 ? '+' : '−'}${Math.abs(d)}`) : null),
     );
   }
+  // what Stamina means in play: how long the blade keeps spinning if nothing touches it
+  const secs = Math.round(spinSeconds(b.stats.stamina));
+  g.append(h('span.lbl', null, 'Spin time'), h('span', { style: 'grid-column: 2 / 4; font-weight: 700' }, `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} left alone`));
   return g;
 }
 

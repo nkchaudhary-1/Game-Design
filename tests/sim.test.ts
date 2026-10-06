@@ -50,7 +50,7 @@ describe('match rules', () => {
   it('the class triangle shows up in aggregate (Attack > Stamina > Defense > Attack)', async () => {
     const wins = async (a: string, b: string): Promise<number> => {
       let w = 0, n = 0;
-      for (let seed = 1; seed <= 12; seed++) {
+      for (let seed = 1; seed <= 40; seed++) {
         // swap seats every other match so seat bias cannot hide in the average
         const swap = seed % 2 === 0;
         const bl = swap ? [buildBlade(b, { level: 3 }), buildBlade(a, { level: 3 })] : [buildBlade(a, { level: 3 }), buildBlade(b, { level: 3 })];
@@ -61,10 +61,11 @@ describe('match rules', () => {
       }
       return w / Math.max(1, n);
     };
+    // seeds are fixed, so this is deterministic; 40 battles per pair keeps it from hanging on one lucky seed
     expect(await wins('ravok', 'phantom')).toBeGreaterThan(0.6);   // Attack > Stamina
     expect(await wins('phantom', 'gravion')).toBeGreaterThan(0.6); // Stamina > Defense
     expect(await wins('gravion', 'ravok')).toBeGreaterThan(0.6);   // Defense > Attack
-  }, 120000);
+  }, 240000);
 });
 
 describe('Super cycle: READY → 6–8 s ACTIVE → 10 s RECHARGING → READY', () => {

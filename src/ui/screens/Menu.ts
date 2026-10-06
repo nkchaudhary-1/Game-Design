@@ -1,6 +1,7 @@
 // Main menu: logo, the two entry points, a 3D hero of the playable blades, and a one-screen "how to play".
 
 import { MVP_BLADES } from '../../blades/bladeData';
+import { TUNING } from '../../core/Balance';
 import { emblemSvg } from '../../render/emblem';
 import { canvasEl, h, icon } from '../dom';
 import { muteButton } from '../common';
@@ -60,7 +61,7 @@ export class MenuScreen implements Screen {
           item('2', 'Steer', 'Drag on the pad to steer. Steering and moves cost spin, so spend it on purpose.'),
           item('3', 'Moves', 'Hold Move 1 to charge, release to hit. Charging drains spin. Move 2 defends, Move 3 repositions.'),
           item('4', 'Super', 'When it reads READY, fire it: 6–8 seconds of power, then 10 seconds to recharge.'),
-          item('5', 'Win', 'RING-OUT: knock them over the rim. SPIN-OUT: drain their spin to zero. At 60 s, higher spin wins.'),
+          item('5', 'Win', `RING-OUT: knock them over the rim. SPIN-OUT: drain their spin to zero. If the clock reaches ${Math.round(TUNING.TIMEOUT / 60)}:00, higher spin wins.`),
           item('6', 'Triangle', 'Attack beats Stamina. Stamina beats Defense. Defense beats Attack.'),
         ),
         h('button.btn.primary', { type: 'button', onclick: close }, 'Got it'),

@@ -155,6 +155,8 @@ export class BladeView {
   private time = 0;
   /** Height of the model's centre above its floor contact, for shadow/halo placement. */
   private halfH = 0.17;
+  /** How many times the fin pattern repeats round the blade: the rotation per frame is capped against it (no wagon-wheel strobing). */
+  symmetry = 8;
 
   constructor(spec: BladeVisualSpec, teamColor: string | null) {
     this.spec = spec;
@@ -246,9 +248,9 @@ export class BladeView {
     // ---- the fin / plate stack (class silhouette)
     const L = layers();
     let top: number;
-    if (s.profile.ringStyle === 'spikes') top = attackStack(R, n * 2, reach, thick, L);
-    else if (s.profile.ringStyle === 'plates') top = defenseStack(R, n + 3, reach, thick, L);
-    else top = staminaStack(R, n + 1, reach, thick, L);
+    if (s.profile.ringStyle === 'spikes') { this.symmetry = n * 2; top = attackStack(R, n * 2, reach, thick, L); }
+    else if (s.profile.ringStyle === 'plates') { this.symmetry = n + 3; top = defenseStack(R, n + 3, reach, thick, L); }
+    else { this.symmetry = n + 1; top = staminaStack(R, n + 1, reach, thick, L); }
 
     const y0 = -0.08 * R;
     this.add(merge(L.dark), M.dark, y0);

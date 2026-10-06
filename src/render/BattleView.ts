@@ -4,11 +4,12 @@
 import * as THREE from 'three';
 import { ArenaView } from '../arenas/ArenaView';
 import { BladeView, visualSpecFor } from '../blades/BladeMesh';
-import { TUNING, spinOmega } from '../core/Balance';
+import { TUNING } from '../core/Balance';
 import { CLASS_COLORS, clamp, lerp, TAU } from '../core/types';
 import type { Match } from '../combat/Match';
 import type { SimEvent } from '../combat/events';
 import { CameraRig } from '../vfx/CameraRig';
+import { frameTurn } from '../vfx/motion';
 import { ImpactFX } from '../vfx/ImpactFX';
 import { SuperFX } from '../vfx/SuperFX';
 import { Trail } from '../vfx/Trails';
@@ -35,6 +36,9 @@ export class BattleView {
   private readonly angles: number[] = [];
   private readonly omegas: number[] = [];
   private readonly boost: number[] = [];
+  private readonly leanXs: number[] = [];
+  private readonly leanZs: number[] = [];
+  private lastHitStop = -9;
   private readonly aim: THREE.Group;
   private readonly aimMat: THREE.MeshBasicMaterial;
   private readonly aimShaft: THREE.Mesh;
@@ -78,6 +82,8 @@ export class BattleView {
       this.angles.push(Math.random() * TAU);
       this.omegas.push(8);
       this.boost.push(0);
+      this.leanXs.push(0);
+      this.leanZs.push(0);
     });
     this.superFx = new SuperFX(this.fx, (slot) => match.blades[slot].built.def.class, match.blades.length);
     this.scene.add(this.superFx.root);
@@ -132,7 +138,11 @@ export class BattleView {
         const a = this.match.blades[e.a], b = this.match.blades[e.b];
         this.fx.hit(e.x, this.yAt(e.x, e.z), e.z, e.nx, e.nz, e.strength, a.built.def.class, b.built.def.class);
         this.rig.shake(e.strength);
-        if (!this.reduced && e.strength > 0.4) r.hitStop = Math.max(r.hitStop, 0.02 + 0.045 * e.strength);
+        // hit-stop is for the big hits only, and never back-to-back: a clash that keeps re-contacting must not stutter the whole fight
+        if (!this.reduced && e.strength > 0.6 && this.time - this.lastHitStop > 0.45) {
+          r.hitStop = Math.max(r.hitStop, 0.014 + 0.03 * e.strength);
+          this.lastHitStop = this.time;
+        }
       } else if (e.type === 'super' && e.state === 'activate') {
         this.rig.zoomPunch(0.06);
         this.rig.shake(0.35);
@@ -167,19 +177,23 @@ export class BattleView {
       const ty = b.bb.body.translation().y;
       const y = ty + this.arena.dishY(r);
 
-      // spin: rotation rate follows spin; a spun-out blade coasts to a stop. Capped so it never strobes.
-      const target = b.out === 'spin' ? 0 : lerp(1.4, 15, Math.pow(clamp(b.spin / 100, 0, 1), 0.7));
-      const idle = this.match.phase === 'ready' ? spinOmega(100) * 0.55 : target;
-      this.omegas[i] += (idle - this.omegas[i]) * (1 - Math.exp(-dt * (b.out === 'spin' ? 1.8 : 6)));
-      this.angles[i] -= this.omegas[i] * dt;
+      // spin: rotation rate follows spin; a spun-out blade coasts to a stop.
+      const target = b.out === 'spin' ? 0 : lerp(1.4, 13, Math.pow(clamp(b.spin / 100, 0, 1), 0.7));
+      const idle = this.match.phase === 'ready' ? 10 : target;
+      this.omegas[i] += (idle - this.omegas[i]) * (1 - Math.exp(-dt * (b.out === 'spin' ? 1.8 : 4)));
+      this.angles[i] -= frameTurn(this.omegas[i], dt, v.symmetry); // capped per frame: no wagon-wheel strobing
 
       // lean into the motion, and tilt with the dish slope
       const vx = b.vx, vz = b.vz;
       const slope = Math.atan(((0.9 * 2) / arena.radius) * (r / arena.radius));
       const inv = r > 0.01 ? 1 / r : 0;
       const k = 0.022;
-      const leanX = clamp(vx * k, -0.2, 0.2) + -x * inv * slope;
-      const leanZ = clamp(vz * k, -0.2, 0.2) + -z * inv * slope;
+      // the lean eases (collisions change velocity in one step; the tilt must not snap with it)
+      const ease = 1 - Math.exp(-dt * 8);
+      this.leanXs[i] += (clamp(vx * k, -0.2, 0.2) - this.leanXs[i]) * ease;
+      this.leanZs[i] += (clamp(vz * k, -0.2, 0.2) - this.leanZs[i]) * ease;
+      const leanX = this.leanXs[i] + -x * inv * slope;
+      const leanZ = this.leanZs[i] + -z * inv * slope;
       const lowSpin = b.out === 'spin' ? 1 : clamp(1 - b.spin / TUNING.WOBBLE_BELOW, 0, 1) * (b.out ? 0 : 1);
 
       const stealth = b.hasFlag('stealth') ? 0.35 : 1;

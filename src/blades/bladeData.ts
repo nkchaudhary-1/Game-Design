@@ -127,7 +127,7 @@ add({
 // ======================================================================================= DEFENSE (7)
 add({
   id: 'gravion', name: 'Gravion', cls: 'DEFENSE', role: 'Heavy Tank', fantasy: 'Nothing moves it.', difficulty: 'EASY', rarity: 'COMMON',
-  stats: st(5, 9, 7, 9, 3, 10, 4, 4, 8), moves: ['Bash', 'Block', 'Brace'], supers: [],
+  stats: st(5, 9, 8, 9, 3, 10, 4, 4, 8), moves: ['Bash', 'Block', 'Brace'], supers: [],
   hints: ['Heavy ring', 'Stability core', 'Defensive tip'],
   recommended: { ring: 'ring.heavy', core: 'core.stability', tip: 'tip.defensive' },
   visual: plates(6, '#38d6b8', '#222c45'), implemented: true,
@@ -185,7 +185,7 @@ add({
 // ======================================================================================= STAMINA (7)
 add({
   id: 'phantom', name: 'Phantom', cls: 'STAMINA', role: 'Evasive Spinner', fantasy: 'You can’t hit what you can’t find.', difficulty: 'HARD', rarity: 'COMMON',
-  stats: st(5, 4, 10, 4, 10, 4, 5, 6, 10), moves: ['Spin Attack', 'Dodge', 'Drift'], supers: [],
+  stats: st(5, 4, 10, 4, 10, 7, 5, 6, 10), moves: ['Spin Attack', 'Dodge', 'Drift'], supers: [],
   hints: ['Light ring', 'Agility core', 'Spin tip'],
   recommended: { ring: 'ring.light', core: 'core.agility', tip: 'tip.spin' },
   visual: fins(3, '#27e0ff', '#2a1650'), implemented: true,

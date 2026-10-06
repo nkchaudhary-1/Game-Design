@@ -43,8 +43,8 @@ export class CameraRig {
     let spread = 0;
     for (const f of focus) spread = Math.max(spread, Math.hypot(f.x - cx, f.z - cz));
     // follow gently: the arena stays centred-ish so it always reads, with a bias towards the action
-    const x = cx * 0.45, z = cz * 0.45;
-    const d = clamp(this.fit(spread + 5.4), all * 0.74, all);
+    const x = cx * 0.35, z = cz * 0.35;
+    const d = clamp(this.fit(spread + 5.4), all * 0.84, all);
     return { x, z, d };
   }
 
@@ -57,7 +57,7 @@ export class CameraRig {
 
   update(dt: number, focus: Array<{ x: number; z: number }>, reduced: boolean): void {
     const t = this.desired(focus);
-    const k = 1 - Math.exp(-dt * 2.4);
+    const k = 1 - Math.exp(-dt * 1.8);
     this.target.x += (t.x - this.target.x) * k;
     this.target.z += (t.z - this.target.z) * k;
     this.dist += (t.d - this.dist) * k;
@@ -76,7 +76,7 @@ export class CameraRig {
   }
 
   /** Micro-shake. `s` is 0–1. */
-  shake(s: number): void { this.shakeMag = Math.max(this.shakeMag, 0.06 + 0.3 * s); }
+  shake(s: number): void { this.shakeMag = Math.max(this.shakeMag, 0.04 + 0.22 * s); }
   /** Subtle zoom-in for Super activation. */
   zoomPunch(p = 0.07): void { this.punch = Math.max(this.punch, p); }
   /** Convert a screen position to the floor (y = 0) for aim UI. */

@@ -165,7 +165,7 @@ export function applyEffect(m: Match, src: BladeRuntime, e: EffectDef, ctx: Effe
       break;
     }
     case 'spin': {
-      const got = gainSpin(src, e.amount * ctx.strength);
+      const got = gainSpin(src, e.amount * ctx.strength * TUNING.ECON);
       if (got > 0) m.emit({ type: 'fx', kind: 'spinGain', slot: src.slot, x: src.x, z: src.z, power: got });
       break;
     }
@@ -223,7 +223,7 @@ export function updateWorldEffects(m: Match, dt: number): void {
         addVelocity(b, nx * pull * dt, nz * pull * dt);
         if (z.kind === 'well') { const k = Math.exp(-1.1 * dt); const v = b.bb.body.linvel(); b.bb.body.setLinvel({ x: v.x * k, y: 0, z: v.z * k }, true); }
         if (z.kind === 'blackhole' && owner && owner.alive) {
-          const amt = Math.min(Math.max(0, b.spin), 4.5 * dt);
+          const amt = Math.min(Math.max(0, b.spin), 4.5 * dt * TUNING.ECON);
           b.spin -= amt; b.stats.lostToHits += amt; gainSpin(owner, amt * 0.7);
         }
       }
@@ -255,7 +255,7 @@ export function updateWorldEffects(m: Match, dt: number): void {
     for (const b of m.blades) {
       if (b === owner || !b.alive || b.fallen || b.hasFlag('invuln')) continue;
       if (Math.hypot(owner.x - b.x, owner.z - b.z) > dr.radius + b.radius) continue;
-      const amt = Math.min(Math.max(0, b.spin), dr.rate * dt);
+      const amt = Math.min(Math.max(0, b.spin), dr.rate * dt * TUNING.ECON);
       b.spin -= amt; b.stats.lostToHits += amt; owner.stats.damageDealt += amt;
       gainSpin(owner, amt * 0.8);
     }

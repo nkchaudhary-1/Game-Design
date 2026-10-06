@@ -6,6 +6,7 @@
 //   npm run balance -- --level 7             # all Supers unlocked
 //   npm run balance -- --difficulty HARD
 //   npm run balance -- --set KB_EXP=0.7      # try a tuning override without editing code
+//   npm run balance -- --stat ravok.knockback=8   # try a rating change without editing the roster
 //   npm run balance -- --brief               # one-line summary for sweeps
 
 import { buildBlade } from '../src/blades/BladeFactory';
@@ -26,6 +27,14 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === '--set') {
     const [k, v] = args[i + 1].split('=');
     (TUNING as Record<string, number>)[k] = parseFloat(v);
+  }
+}
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--stat') {
+    const [path, v] = args[i + 1].split('=');
+    const [id, key] = path.split('.');
+    (getBlade(id).stats as unknown as Record<string, number>)[key] = parseFloat(v);
   }
 }
 
@@ -100,7 +109,7 @@ for (const [a, b] of tri) {
   checks.push([`${a} beats ${b}: 65–88% overall, 55–95% from either seat`, rate(a, b) >= 0.65 && rate(a, b) <= 0.88 && Math.min(x, y) >= 0.55 && Math.max(x, y) <= 0.95]);
 }
 for (const i of ids) checks.push([`${i} mirror is seat-neutral (bottom seat 40–60%)`, rate(i, i) > 0.4 && rate(i, i) < 0.6]);
-checks.push(['mean battle 12–45s', dur / total >= 12 && dur / total <= 45]);
+checks.push(['mean battle 25–110s', dur / total >= 25 && dur / total <= 110]);
 // a heavy Attack blade ringing out a light one on the first clash is the Attack fantasy; it just must not be most fights
 checks.push(['battles under 6s < 20%', early / total < 0.2]);
 checks.push(['timeouts < 3%', timeouts / total < 0.03]);

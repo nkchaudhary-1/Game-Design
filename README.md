@@ -18,7 +18,7 @@ npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve the production build
 npm run build:single   # ONE self-contained html file (dist-single/spinblade-arena.html) to open or host anywhere
-npm test           # 80 unit/simulation tests (Vitest)
+npm test           # 86 unit/simulation tests (Vitest)
 npm run balance    # headless CPU-vs-CPU balance check (see "Balance")
 ```
 
@@ -46,7 +46,7 @@ with a running session score. The Hangar (all 21 blades) and Workshop (customiza
 | **Two-tab mode** | In battle, the phone icon opens the controller in a second tab. It talks to the arena tab over a `BroadcastChannel` — the Phase 2 shape (phone = controller, big screen = display) with the browser standing in for the relay. |
 | `?latency=80` | Adds artificial controller→display latency (ms) to feel-test responsiveness. |
 | `?reduced=1` | Reduced effects (no hit-stop, calmer camera). Also follows the OS “reduce motion” setting. |
-| `?quality=high\|medium\|low` | Force a graphics tier (see "Graphics tiers"). Default is auto-detected, then steps down if the frame rate drops. |
+| `?quality=high\|medium\|low` | Force a graphics tier (see "Graphics tiers"). Default is picked from the GPU, then steps down if the frame rate drops. The pause menu has the same switch (it restarts the round). |
 | `?shot` | Keeps the WebGL drawing buffer so headless screenshots aren't blank (test aid only). |
 | `?screen=hangar&blade=gravion` | Deep-link a screen (`menu`, `hangar`, `workshop`, `lobby`, `battle`). |
 
@@ -96,7 +96,7 @@ Built and checked in a software-rendered browser only: **frame rate on a real GP
    spec: gameplay is planar, the camera is a fixed top-down angle, so the 2D design intent holds. **DL-1 in the PRD needs updating.**
 2. **Level is a dial, not progression.** No persistence means no XP. Level (default 3) is a stepper that unlocks parts/Supers so
    the customization and Super-gating rules can be tested. The CPU gets a stock build at your level.
-3. **Time-out rule (PRD open item).** After 60 s, higher spin wins. Rare in practice (see Balance).
+3. **Time-out rule (PRD open item).** At 3:00, higher spin wins. Rare in practice (see Balance).
 4. **Move slots.** Move 1 is the chargeable attack (the PRD’s charge-and-release), Move 2 defensive, Move 3 movement/stance.
 5. **Nothing is persisted** — not even mute. Reload = clean state.
 6. **Success metrics need a decision.** PRD v2 asks for “responsive < 100 ms, readable, replayable” but Phase 1 has no
@@ -128,33 +128,70 @@ tools/       balance.ts
   replies with light `PadFeedback`. Phase 2 swaps the transport (`LocalBus` → WebSocket) and nothing else.
 * **No universally best part.** Every non-stock part trades something away; a test enforces it.
 
+## Pace and feel
+
+**Spin time.** A blade left alone keeps spinning for up to three minutes, and the round clock stops a match at 3:00 (the HUD shows
+`0:42 / 3:00`). How long depends on the blade's Stamina rating, and the Hangar shows it as *Spin time*:
+
+| Blade | Stamina | Left alone | Typical fight (CPU Normal) |
+|---|---|---|---|
+| Phantom (Stamina) | 10 | 3:00 | 10 s vs Ravok, 55 s vs Gravion, 65 s mirror |
+| Gravion (Defense) | 8 | 2:39 | 50 s vs Ravok, 55 s vs Phantom, 95 s mirror |
+| Ravok (Attack) | 5 | 2:15 | 10 s vs Phantom, 50 s vs Gravion, 16 s mirror |
+
+Hits, moves, steering and ring-outs end fights well before the clock does (mean battle ≈ 45 s, was ≈ 19 s; spin lost: decay 35%, moves and
+steering 39%, hits 27%). Knobs, all in `core/Balance.ts`: `PACE` (decay speed), `DECAY_PER_STAMINA` (how much Stamina matters),
+`ECON` (how hard hits and moves land), `TIMEOUT`, `SUPER_DECAY` (keeps Rage Mode's cost real at the slower pace).
+
+*Why not 3:00 for every blade?* I tried. Slow decay alone made every Attack-vs-Stamina fight a ring-out (97% Ravok), because Phantom's
+only trump, outlasting, now lives minutes away while Ravok keeps its pressure the whole time. The counters stay real only when Stamina
+decides how long you spin, so the longest spin is Stamina 10. If you want every blade at 3:00, the Attack/Stamina matchup needs a design
+decision (weaker first clash, or a real evasion mechanic) rather than a number.
+
+**Smoothness.** What changed and why:
+
+* *Rotation* is capped per frame at a third of the gap between two fins (`vfx/motion.ts`), so a fast spin or a slow frame can never
+  look like the blade turning backwards (wagon-wheel strobing). Tilt, camera follow and zoom are eased instead of snapping.
+* *Steering* is eased over about 75 ms in the simulation (`STEER_SMOOTH`), so a key press or a stick flick isn't a step change in the
+  push on the blade. The pad stick has a longer throw (66 px) and a smaller dead zone.
+* *Hit-stop* only fires on big hits and never twice within 0.45 s; before, a clash that kept re-contacting froze the game over and over.
+* *Frame cost*: the first-battle tier is picked from the GPU (discrete or Apple-silicon GPUs get High, integrated GPUs get Medium,
+  software rendering gets Low), High renders at up to 1.5× pixel ratio, the HUD no longer rewrites unchanged text every frame, and the
+  game steps down a tier within about 1.2 s of sustained slow frames. Not measured on a real GPU yet.
+
 ## Balance
 
 `npm run balance` plays the real simulation CPU-vs-CPU from both seats and checks design targets (triangle strength,
 seat neutrality, battle length, ring-out/spin-out mix). Run it after touching any rating, part, move, Super or tuning value.
 
-Latest run (`npm run balance -- -n 100`, CPU Normal, both seats, 900 battles per level):
+Latest run (`npm run balance`, CPU Normal, both seats; Level 1 and 7 at 60 battles per pair, Level 3 at 120):
 
 | Row beats column | Level 1 | Level 3 | Level 7 |
 |---|---|---|---|
-| Ravok (Attack) → Phantom (Stamina) | 71% | 84% | 86% |
-| Phantom (Stamina) → Gravion (Defense) | 83% | 82% | 81% |
-| Gravion (Defense) → Ravok (Attack) | 68% | 69% | 75% |
+| Ravok (Attack) → Phantom (Stamina) | 80% | 84% | 90% |
+| Phantom (Stamina) → Gravion (Defense) | 77% | 70% | 83% |
+| Gravion (Defense) → Ravok (Attack) | 80% | 68% | 93% |
 
-* Every counter is a **real edge, not a lock** (65–88% target, both seats ≥ 55%). The first version of the triangle was 100%/0%:
-  a steady stat edge in passive spin decay beat the other blade every time. It was fixed with three global knobs (a flatter defence
-  curve, a flatter stamina-decay curve, ±9% match-to-match spin variance), not per-blade hacks.
-* Mirrors are seat-neutral (44–55% for the bottom seat). Mean battle ≈ 19 s; time-outs ≈ 0%; ring-out ≈ 22% of results, spin-out ≈ 78%.
-* At **Hard**, a Phantom CPU evades an Attack blade to ~50%: skill can beat the counter, which is what we want.
-* **Win-condition mix depends on the matchup.** Attack blades ring things out (Ravok vs Phantom: ~80% ring-outs). **Gravion never
-  rings anyone out in CPU play** (0%) — Defense wins by outlasting. A human can shove with a charged Bash, but expect Defense games to end on spin-out.
+* At the default Level 3 **every target passes**; Level 1 passes too. At **Level 7** (all Supers unlocked) the counters swing wider
+  (53–93% by seat) and two mirrors drift to 60–62%: Level 7 is not tuned, so expect Supers to move results there.
+* Every counter is a **real edge, not a lock** (65–88% target, both seats ≥ 55%). The first version of the triangle was 100%/0%,
+  and it came back at the slower pace: a steady stat edge in passive decay beats the other blade every time once fights are long.
+  Fixed with global knobs (wider but still modest Stamina spread, ±22% match-to-match spin variance) plus two rating nudges
+  (Phantom Stability 4 → 7, Gravion Stamina 7 → 8), not per-blade code.
+* Mirrors are seat-neutral (52–56% for the bottom seat at Level 3). Mean battle ≈ 45 s; time-outs ≈ 0%; ring-out ≈ 23% of results,
+  spin-out ≈ 77%.
+* At **Hard**, the CPU Phantom beats Ravok 77% of the time (Normal: 16%). Hard evades much better than Normal, so the Attack counter
+  does not hold there; Hard needs its own pass if you want it to.
+* **Win-condition mix depends on the matchup.** Attack blades ring things out (Ravok vs Phantom: ~82% ring-outs, ≈ 10 s). **Gravion
+  never rings anyone out in CPU play** (0%): Defense wins by outlasting (Gravion mirror ≈ 95 s). A human can shove with a charged Bash,
+  but expect Defense games to end on spin-out.
 * Fights under 6 s are ~17% (mostly Attack-vs-light-blade first-clash ring-outs); the target is < 20%.
-* Passive spin decay is still ~65% of all spin lost; hits are ~15–20%. If playtests say fights feel clock-driven, raise `SPIN_DMG` and lower `DECAY_BASE` together.
 
 ## Tests
 
 * `npm test` — data rules (roster, Supers ≤ 8 s / 10 s recharge, no dominant parts), Balance mapping, build/lock logic,
-  every one of the 22 Supers through its READY → ACTIVE → RECHARGING → READY cycle, determinism, bus, result copy.
+  every one of the 22 Supers through its READY → ACTIVE → RECHARGING → READY cycle, determinism, bus, result copy,
+  the 3:00 spin time, steering easing and the per-frame rotation cap.
 * `node tests/e2e/flow.mjs` / `two-tab.mjs` — real-browser checks (needs `npm i -D playwright`): slingshot, steering,
   charge, Super, result, rematch, and controller-in-another-tab. They also save screenshots.
 

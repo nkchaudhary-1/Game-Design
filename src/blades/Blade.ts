@@ -47,6 +47,9 @@ export class BladeRuntime {
   // controller input
   steerX = 0;
   steerZ = 0;
+  /** Steering as applied: eased towards steerX/Z so a key press or a stick flick isn't a step change. */
+  smX = 0;
+  smZ = 0;
   readonly queue: InputAction[] = [];
   /** Unit heading: steer direction, else velocity direction. */
   headX = 0;

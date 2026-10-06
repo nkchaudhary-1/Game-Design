@@ -9,7 +9,10 @@ import type { Match } from './Match';
 export function tickSpin(m: Match, b: BladeRuntime, dt: number): void {
   if (!b.launched || b.out === 'ring' || b.spin <= 0) return;
   const c = b.built.combat;
-  const decay = c.spinDecay * b.decayMul * b.mod('spinDecay');
+  // Passive decay runs at the slow match pace. A Super that speeds decay up (Rage Mode) or slows it down changes it by a
+  // fixed share of the *unscaled* rate, so its price stays real instead of shrinking with the pace.
+  const base = c.spinDecay * b.decayMul;
+  const decay = Math.max(0, base * TUNING.PACE + base * (b.mod('spinDecay') - 1) * TUNING.SUPER_DECAY);
   const moves = TUNING.MOVE_COST * b.speed + TUNING.STEER_COST * b.steerMag;
   const total = (decay + moves) * dt;
   b.spin -= total;
@@ -22,7 +25,8 @@ export function tickSpin(m: Match, b: BladeRuntime, dt: number): void {
 }
 
 /** Spend spin on a move. Never lethal: a blade can't spin itself out with a button. */
-export function spendSpin(b: BladeRuntime, amount: number): void {
+export function spendSpin(b: BladeRuntime, raw: number): void {
+  const amount = raw * TUNING.ECON;
   b.spin = Math.max(Math.min(b.spin, 2), b.spin - amount);
   b.stats.lostToMoves += amount;
 }
@@ -56,7 +60,7 @@ export function hurt(m: Match, victim: BladeRuntime, o: HurtOptions): number {
   }
   const c = victim.built.combat;
   const vuln = 1 + TUNING.LOW_SPIN_VULN * (1 - lowSpinFactor(victim.spin));
-  let dmg = o.amount * victim.mod('dmgTaken') * c.spinLossTaken * vuln;
+  let dmg = o.amount * TUNING.ECON * victim.mod('dmgTaken') * c.spinLossTaken * vuln;
   dmg = Math.min(dmg, 40);
   const lost = Math.min(dmg, Math.max(0, victim.spin));
   victim.spin -= dmg;

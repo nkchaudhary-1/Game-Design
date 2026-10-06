@@ -109,16 +109,18 @@ function applyForces(m: Match, b: BladeRuntime, dt: number): void {
 
   // steering: momentum-based, with turning authority from agility
   let sMag = 0;
+  const ease = 1 - Math.exp(-dt / TUNING.STEER_SMOOTH);
+  b.smX += (b.steerX - b.smX) * ease; b.smZ += (b.steerZ - b.smZ) * ease;
   if (b.spin > 0) {
-    const sl = Math.hypot(b.steerX, b.steerZ);
-    sMag = Math.min(1, sl);
+    sMag = Math.min(1, Math.hypot(b.steerX, b.steerZ));
+    const sl = Math.hypot(b.smX, b.smZ), push = Math.min(1, sl);
     if (sl > 0.001) {
-      const dx = b.steerX / sl, dz = b.steerZ / sl;
-      const accel = c.accel * b.mod('accel') * lowSpinFactor(b.spin) * sMag;
+      const dx = b.smX / sl, dz = b.smZ / sl;
+      const accel = c.accel * b.mod('accel') * lowSpinFactor(b.spin) * push;
       ax += dx * accel; az += dz * accel;
       const along = vx * dx + vz * dz;
       const px = vx - along * dx, pz = vz - along * dz;
-      const k = 1 - Math.exp(-c.lateralGrip * b.mod('grip') * sMag * dt);
+      const k = 1 - Math.exp(-c.lateralGrip * b.mod('grip') * push * dt);
       vx -= px * k; vz -= pz * k;
     }
   }
