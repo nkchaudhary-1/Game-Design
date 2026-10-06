@@ -1,0 +1,29 @@
+{
+  "name": "spinblade-arena",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Spinblade Arena — 3D top-down spinning-blade arena battler (PRD v2 Phase 1 + build spec MVP)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "balance": "tsx tools/balance.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@fontsource/chakra-petch": "^5.3.0",
+    "@fontsource/rajdhani": "^5.3.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/three": "^0.186.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  }
+}
