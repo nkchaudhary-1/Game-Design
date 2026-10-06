@@ -73,3 +73,21 @@ export function disposeMaterials(): void {
   basicCache.forEach((m) => m.dispose());
   toonCache.clear(); basicCache.clear();
 }
+
+// ------------------------------------------------------------------------------- v2: faceted PBR + glow
+/** Flat-shaded standard material: crisp facets, glossy highlights from the environment. */
+export function facet(color: string | number, o: { metal?: number; rough?: number; env?: number; emissive?: string | number; glowK?: number; opacity?: number } = {}): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({
+    color, metalness: o.metal ?? 0.35, roughness: o.rough ?? 0.38, flatShading: true, envMapIntensity: o.env ?? 0.75,
+  });
+  if (o.emissive !== undefined) { m.emissive = new THREE.Color(o.emissive); m.emissiveIntensity = o.glowK ?? 1; }
+  if (o.opacity !== undefined && o.opacity < 1) { m.transparent = true; m.opacity = o.opacity; }
+  return m;
+}
+
+/** Unlit HDR colour: values above 1 are what the bloom pass picks up. */
+export function hdr(color: string | number, k = 2.4): THREE.MeshBasicMaterial {
+  const m = new THREE.MeshBasicMaterial({ toneMapped: false });
+  m.color.set(color).multiplyScalar(k);
+  return m;
+}

@@ -25,8 +25,8 @@ export type Build = Record<PartSlot, string>;
 export interface V2 { x: number; z: number }
 
 export const CLASS_COLORS: Record<BladeClass, { main: string; dark: string; light: string; label: string }> = {
-  ATTACK: { main: '#ff5a36', dark: '#a82d12', light: '#ffb199', label: 'Attack' },
-  DEFENSE: { main: '#2f86ff', dark: '#14409a', light: '#a6cdff', label: 'Defense' },
+  ATTACK: { main: '#fc2c33', dark: '#8a1018', light: '#ff8a85', label: 'Attack' },
+  DEFENSE: { main: '#2f7bff', dark: '#0b3aa8', light: '#9cc4ff', label: 'Defense' },
   STAMINA: { main: '#a05cff', dark: '#5a22b0', light: '#27e0ff', label: 'Stamina' },
 };
 

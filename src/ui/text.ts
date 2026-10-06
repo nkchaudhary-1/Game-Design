@@ -74,8 +74,10 @@ export function explainResult(r: MatchResult, you: BuiltBlade, cpu: BuiltBlade):
       out.cause = { kind: 'spin', label: 'Spin-out', icon: 'spin' };
       out.line = w === 0 ? `${loser} ran out of spin.` : 'You ran out of spin.';
       const s = r.stats[l];
-      const total = Math.max(1, s.lostToHits + s.lostToDecay + s.lostToMoves);
-      const parts: Array<[string, number]> = [['hits', s.lostToHits], ['natural decay', s.lostToDecay], ['moves and steering', s.lostToMoves]];
+      // spin cannot go below zero, so scale the breakdown to the 100 that was actually there
+      const raw = Math.max(1, s.lostToHits + s.lostToDecay + s.lostToMoves);
+      const total = Math.min(100, raw), k = total / raw;
+      const parts: Array<[string, number]> = [['hits', s.lostToHits * k], ['natural decay', s.lostToDecay * k], ['moves and steering', s.lostToMoves * k]];
       parts.sort((a, b) => b[1] - a[1]);
       out.why.push(`${l === 0 ? 'You' : loser} lost ${Math.round(total)} spin: ${parts.map(([n, v]) => `${Math.round(v)} to ${n}`).join(', ')}.`);
       if (r.tieSpins) out.why.push(`Both ran dry on the same tick — the one with more spin going in (${names[w]}) wins.`);

@@ -51,7 +51,7 @@ export function statsGrid(b: BuiltBlade): HTMLElement {
     const lo = Math.min(base, v);
     g.append(
       h('span.lbl', null, STAT_LABELS[k]),
-      h('div.bar', { role: 'img', 'aria-label': `${STAT_LABELS[k]} ${v} of 10` },
+      h('div.bar', { class: v >= 8 ? 'hi' : null, role: 'img', 'aria-label': `${STAT_LABELS[k]} ${v} of 10` },
         h('i', { style: `width:${lo * 10}%` }),
         d !== 0 ? h('b', { class: d > 0 ? 'up' : 'down', style: `left:${lo * 10}%;width:${Math.abs(d) * 10}%` }) : null,
       ),

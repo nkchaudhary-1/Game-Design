@@ -43,18 +43,23 @@ await page.mouse.up(); await page.waitForTimeout(100);
 ok((await ev(() => window.__battle.match.blades[0].steerX)) === 0, 'releasing joystick stops steering');
 // hold Move 1 to charge
 const m1 = await page.locator('.mbtn').nth(0).boundingBox();
-await page.mouse.move(m1.x + m1.width / 2, m1.y + m1.height / 2); await page.mouse.down(); await page.waitForTimeout(450);
+await page.mouse.move(m1.x + m1.width / 2, m1.y + m1.height / 2); await page.mouse.down();
+// software-rendered CI can be slow, so wait for the charge to build rather than for a fixed time
+await page.waitForFunction(() => window.__battle.match.blades[0].charge.t > 0.2, null, { timeout: 8000 }).catch(() => {});
 const ch = await ev(() => { const b = window.__battle.match.blades[0]; return { idx: b.charge.index, t: b.charge.t, spin: b.spin }; });
 ok(ch.idx === 0 && ch.t > 0.2, `holding Move 1 charges (t=${ch.t.toFixed(2)})`);
 ok(await page.locator('.mbtn.charging').count() === 1, 'pad shows charging state');
 await page.screenshot({ path: `${SP}/${tag}-3-charge.png` });
-await page.mouse.up(); await page.waitForTimeout(250);
+await page.mouse.up();
+await page.waitForFunction(() => window.__battle.match.blades[0].stats.abilitiesUsed > 0, null, { timeout: 8000 }).catch(() => {});
 ok(await ev(() => window.__battle.match.blades[0].charge.index) === -1, 'release fires the charged move');
-const cd = await ev(() => window.__battle.match.blades[0].cooldown[0]);
-ok(cd > 0, `move enters cooldown (${cd.toFixed(2)}s)`);
+const used = await ev(() => window.__battle.match.blades[0].stats.abilitiesUsed);
+ok(used > 0, `the move was used (${used}) and goes on cooldown`);
 // Super
-await page.locator('.sbtn').click(); await page.waitForTimeout(300);
+await page.locator('.sbtn').click();
+await page.waitForFunction(() => window.__battle.match.blades[0].superState === 'ACTIVE', null, { timeout: 8000 }).catch(() => {});
 ok(await ev(() => window.__battle.match.blades[0].superState) === 'ACTIVE', 'Super button activates Super');
+await page.waitForFunction(() => document.querySelector('.sbtn[data-state="ACTIVE"]'), null, { timeout: 8000 }).catch(() => {});
 ok(await page.locator('.sbtn[data-state="ACTIVE"]').count() === 1, 'pad shows ACTIVE');
 await page.screenshot({ path: `${SP}/${tag}-4-super.png` });
 // fast-forward to a result

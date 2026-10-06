@@ -5,8 +5,9 @@ import { BLADE_ORDER, BLADES } from '../../blades/bladeData';
 import { recommendedBuild, defaultBuild, type BuiltBlade } from '../../blades/BladeFactory';
 import { getPart } from '../../blades/parts';
 import { CLASS_BEATS, CLASS_COLORS, PART_SLOTS, type BladeClass, type Rarity } from '../../core/types';
-import { classChip, levelStepper, modSpans, statsGrid, topBar } from '../common';
-import { canvasEl, cap, h, icon } from '../dom';
+import { levelStepper, modSpans, statsGrid, topBar } from '../common';
+import { BLADE_ART } from '../art';
+import { canvasEl, cap, h, icon, pad2 } from '../dom';
 import { BladeStage, type StageView } from '../Previews';
 import type { Ctx, Screen } from './types';
 
@@ -21,9 +22,10 @@ export class HangarScreen implements Screen {
   private readonly grid = h('div.card-grid');
   private readonly filters = h('div.filters');
   private readonly detail = h('div.detail');
+  private readonly head = h('div.sheet-head');
   private readonly dyn = h('div.dyn', { style: 'display:grid;gap:12px' });
   private readonly canvas = canvasEl();
-  private readonly stage = new BladeStage();
+  private readonly stage = new BladeStage(1.6, true);
   private readonly viewBtns: Record<StageView, HTMLButtonElement>;
   private readonly detach: () => void;
   private selected: string;
@@ -45,7 +47,7 @@ export class HangarScreen implements Screen {
       h('div.views', null, this.viewBtns.free, this.viewBtns.top, this.viewBtns.side),
       h('div.hint', null, 'Drag to rotate · scroll or pinch to zoom'),
     );
-    this.detail.append(preview, this.dyn);
+    this.detail.append(this.head, preview, this.dyn);
     this.list.append(this.filters, this.grid);
     this.body.append(this.list, this.detail);
     this.body.classList.toggle('detail-open', false);
@@ -109,15 +111,19 @@ export class HangarScreen implements Screen {
   private card(id: string): HTMLElement {
     const b = this.ctx.session.built(id);
     const d = b.def;
-    const img = h('img', { alt: '', width: 96, height: 96 }) as HTMLImageElement;
-    this.thumbQueue.push([img, b]);
+    const art = BLADE_ART[id];
+    const img = h('img', { alt: '', width: 112, height: 112, class: art ? 'art' : null }) as HTMLImageElement;
+    if (art) img.src = art; else this.thumbQueue.push([img, b]);
+    const clsIcon = icon(`class${d.class}` as 'classATTACK');
     const el = h('button.bcard', { type: 'button', 'data-class': d.class, 'aria-pressed': String(id === this.selected), 'data-id': id, class: d.implemented ? null : 'locked', onclick: () => this.select(id) },
+      h('span.numtab', null, pad2(BLADE_ORDER.indexOf(id) + 1)),
+      h('span.cls', null, clsIcon),
       h('div.thumb', null, img),
       d.implemented ? null : h('span.chip.muted.soon', null, 'Soon'),
       h('div.nm', null, d.name),
       h('div.rl', null, d.role),
       h('div.row', null, h('span.chip', { class: `rarity-${d.rarity}` }, cap(d.rarity)), h('span.lv', null, `LV ${b.level}`)),
-      h('div.keystat', null, 'ATK ', h('b', null, String(b.stats.attack)), ' DEF ', h('b', null, String(b.stats.defense)), ' STA ', h('b', null, String(b.stats.stamina))),
+      h('div.keystat', null, 'ATK ', h('b', null, String(b.stats.attack)), 'DEF ', h('b', null, String(b.stats.defense)), 'STA ', h('b', null, String(b.stats.stamina))),
     );
     return el;
   }
@@ -143,16 +149,20 @@ export class HangarScreen implements Screen {
 
     const content = this.tab === 'overview' ? this.overview(b) : this.tab === 'customize' ? this.customize(b) : this.supers(b);
 
-    this.dyn.replaceChildren(
-      h('div.dhead', null,
-        h('div.nm', null, d.name),
+    this.head.replaceChildren(
+      h('div.ribbon', null, h('span.numtab', null, pad2(BLADE_ORDER.indexOf(d.id) + 1)), h('div.nm', null, d.name)),
+      h('div.dsub', null,
         h('div.fantasy', null, `“${d.fantasy}”`),
-        h('div.meta', null,
-          classChip(d.class), h('span.chip', { class: `rarity-${d.rarity}` }, cap(d.rarity)),
-          h('span.chip.muted', null, d.role), h('span.chip.muted', null, `Difficulty ${cap(d.difficulty)}`),
-          d.implemented ? null : h('span.chip.muted', null, 'Not playable yet'),
-        ),
+        h('div.badge', null, icon(`class${d.class}` as 'classATTACK'), CLASS_COLORS[d.class].label, h('span.role', null, d.role)),
       ),
+      h('div.dmeta', null,
+        h('span.chip', { class: `rarity-${d.rarity}` }, cap(d.rarity)),
+        h('span.chip.muted', null, `Difficulty ${cap(d.difficulty)}`),
+        d.implemented ? null : h('span.chip.muted', null, 'Not playable yet'),
+      ),
+    );
+
+    this.dyn.replaceChildren(
       h('div.tabs', { role: 'tablist' }, tabBtn('overview', 'Overview'), tabBtn('customize', 'Customize'), tabBtn('supers', 'Supers')),
       content,
       h('div.actions', null,
@@ -176,7 +186,7 @@ export class HangarScreen implements Screen {
     const d = b.def;
     return h('div', { style: 'display:grid;gap:12px' },
       this.levelRow(),
-      h('p', { style: 'color:var(--dim)' }, b.description.summary),
+      h('p', { style: 'color:var(--ink-2)' }, b.description.summary),
       statsGrid(b),
       h('div.eyebrow', null, 'Basic moves'),
       h('div.moves', null, ...b.moves.map((m, i) =>
@@ -185,6 +195,8 @@ export class HangarScreen implements Screen {
           h('div', null, h('div.nm', null, m.name), h('div.ds', null, m.description)),
           h('span.tg', null, m.charge ? 'Hold' : cap(m.type)),
         ))),
+      h('div.eyebrow', null, 'Parts'),
+      h('div.partgrid', null, ...PART_SLOTS.map((slot) => h('div.partcell', null, h('div.sl', null, slot), h('div.pn', null, getPart(b.build[slot]).name)))),
       h('div.matchup', null,
         h('span.tag.adv', null, 'Beats'), h('span', null, CLASS_COLORS[CLASS_BEATS[d.class]].label),
         h('span.tag.dis', null, 'Loses to'), h('span', null, CLASS_COLORS[CLASSES.find((c) => CLASS_BEATS[c] === d.class)!].label),
@@ -204,7 +216,7 @@ export class HangarScreen implements Screen {
           h('span.tg', null, cap(p.rarity)),
         );
       })),
-      h('p', { style: 'color:var(--dim)' }, `Suggested: ${d.customizationProfile.hints.join(' · ')}.`),
+      h('p', { style: 'color:var(--ink-2)' }, `Suggested: ${d.customizationProfile.hints.join(' · ')}.`),
       h('div.cta', null,
         h('button.btn.secondary.small', { type: 'button', onclick: () => { s.setBuild(d.id, recommendedBuild(d.id, s.level)); this.renderGrid(); this.renderDetail(); } }, 'Apply recommended build'),
         h('button.btn.ghost.small', { type: 'button', onclick: () => { s.setBuild(d.id, defaultBuild()); this.renderGrid(); this.renderDetail(); } }, 'Reset to stock'),
@@ -216,7 +228,7 @@ export class HangarScreen implements Screen {
     const s = this.ctx.session;
     return h('div', { style: 'display:grid;gap:12px' },
       this.levelRow(),
-      h('p', { style: 'color:var(--dim)' }, 'Equip one Super. Each runs 6–8 seconds, then recharges for 10 seconds. Some need part stats or a higher level.'),
+      h('p', { style: 'color:var(--ink-2)' }, 'Equip one Super. Each runs 6–8 seconds, then recharges for 10 seconds. Some need part stats or a higher level.'),
       h('div.supers', null, ...b.supers.map((st) => {
         const eq = st.def.id === b.equippedSuper;
         const el = h('button.sup', { type: 'button', 'aria-pressed': String(eq), disabled: !st.unlocked, onclick: () => { s.setSuper(b.def.id, st.def.id); this.renderDetail(); } },

@@ -6,6 +6,7 @@ import { ARENA_ORDER, ARENAS } from '../../arenas/arenaData';
 import { MVP_BLADES } from '../../blades/bladeData';
 import { CLASS_COLORS } from '../../core/types';
 import { classChip, levelStepper, topBar } from '../common';
+import { BLADE_ART, ARENA_ART } from '../art';
 import { cap, h } from '../dom';
 import { matchupInfo } from '../text';
 import type { Ctx, Screen } from './types';
@@ -35,12 +36,12 @@ export class LobbyScreen implements Screen {
     const cls = b.def.class;
     const card = h('div.slotcard', { 'data-class': cls },
       h('div.who', null,
-        h('span.tagc', { style: `background:${slot === 0 ? 'var(--you)' : 'var(--cpu)'}` }, slot === 0 ? 'YOU' : 'CPU'),
+        h('span.tagc', { style: slot === 0 ? 'background:var(--ink);color:#fff' : 'background:var(--cpu);color:var(--ink)' }, slot === 0 ? 'YOU' : 'CPU'),
         classChip(cls),
         h('span.chip.muted', null, `Lv ${b.level}`),
         slot === 1 ? h('span.chip.muted', null, cap(s.difficulty)) : null,
       ),
-      h('div.thumb', null, h('img', { src: this.ctx.thumbs.get(b), alt: '' })),
+      h('div.thumb', null, h('img', { src: BLADE_ART[b.def.id] ?? this.ctx.thumbs.get(b), alt: '', class: BLADE_ART[b.def.id] ? 'art' : null })),
       h('div.nm', null, b.def.name),
       h('div.role', null, `${b.def.role} — ${b.def.fantasy}`),
       h('div.sum', null, slot === 0 ? b.description.summary : 'Stock build, same level as you.'),
@@ -74,9 +75,15 @@ export class LobbyScreen implements Screen {
         ...DIFFS.map((d) => h('button', { type: 'button', 'aria-pressed': String(s.difficulty === d), onclick: () => { s.difficulty = d; this.render(); } }, cap(d))),
       ),
     );
-    const arenaRow = h('div.pickrow', null, h('span.lbl', null, 'Arena'),
-      ...ARENA_ORDER.slice(0, 1).map((id) => h('button.mini', { type: 'button', 'aria-pressed': 'true' }, ARENAS[id].name)),
-      h('span.chip.muted', { title: ARENA_ORDER.slice(1).map((id) => ARENAS[id].name).join(', ') }, `${ARENA_ORDER.length - 1} more arenas in later phases`),
+    const arenaRow = h('div', { style: 'display:grid;gap:8px' },
+      h('span.lbl', { style: 'font:800 15px var(--f-display);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)' }, 'Arena'),
+      h('div.arenas', null, ...ARENA_ORDER.map((id) => {
+        const a = ARENAS[id];
+        return h('button.acard', { type: 'button', class: a.implemented ? null : 'locked', 'aria-pressed': String(id === s.arenaId), disabled: !a.implemented, title: `${a.mechanic} Favours: ${a.favours ?? 'nobody'}.`, onclick: () => { if (a.implemented) { s.arenaId = id; this.render(); } } },
+          h('img', { src: ARENA_ART[id], alt: '', loading: 'lazy' }),
+          h('div.an', null, a.name, h('span.as', null, a.tagline)),
+        );
+      })),
     );
 
     this.body.replaceChildren(

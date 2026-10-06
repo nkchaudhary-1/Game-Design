@@ -110,8 +110,8 @@ export class WorkshopScreen implements Screen {
       const eq = b.build[this.slot] === p.id;
       return h('button.part', { type: 'button', role: 'option', 'aria-selected': String(eq), 'aria-pressed': String(eq), disabled: !!why, onclick: () => this.choose(p) },
         h('span.nm', null, p.name),
-        h('span.mods', null, ...(modSpans(p.mods).length ? modSpans(p.mods) : [h('span', { style: 'color:var(--dim)' }, 'No trade-offs')])),
-        h('span', { style: 'color:var(--dim);font-size:13px' }, p.description),
+        h('span.mods', null, ...(modSpans(p.mods).length ? modSpans(p.mods) : [h('span', { style: 'color:var(--ink-2)' }, 'No trade-offs')])),
+        h('span', { style: 'color:var(--ink-2);font-size:14px' }, p.description),
         why ? h('span.why', null, why) : h('span.chip', { class: `rarity-${p.rarity}`, style: 'justify-self:start' }, cap(p.rarity)),
       );
     }), hidden > 0 ? h('div', { style: 'flex:none;align-self:center;color:var(--faint);font-size:13px;padding:0 8px;max-width:140px' }, `${hidden} part${hidden > 1 ? 's' : ''} for other classes hidden`) : '');

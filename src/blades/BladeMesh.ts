@@ -1,15 +1,16 @@
-// Procedural low-poly blades. Silhouette over detail: every blade is a ring + core + weight disc + tip, and the
-// ring is drawn in its class's visual language (build spec §14–15):
-//   ATTACK  — sharp hooked spikes, red/orange
-//   DEFENSE — thick shield plates, blue
-//   STAMINA — thin ring with curved fins, purple/cyan
-// Each blade also carries its own secondary palette. Parts change the model (ring scale/spikes, core shape,
-// disc size, tip shape), so customization is visible from the top and from the side.
+// Procedural blade models, v2. The reference renders show armoured turbines: layered, spiral-swept fins in
+// faceted metal, a dark core cap carrying the chevron emblem, and glowing seams between the layers.
+// Silhouette follows class (spec §14–15):
+//   ATTACK  — many swept, hooked fins (black base layer, class-colour top layer, silver accents)
+//   DEFENSE — thick segmented armour plates (class blue / white, gold studs, dark gaps)
+//   STAMINA — a thin hub ring with long curved crescent fins
+// Parts still change the model: ring scale / thickness / reach, core shape + tint, weight disc, tip.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CLASS_COLORS, TAU, type BladeClass } from '../core/types';
-import { blobTexture, glow, toon } from '../render/materials';
+import { drawEmblem } from '../render/emblem';
+import { blobTexture, facet, hdr } from '../render/materials';
 import type { BuiltBlade } from './BladeFactory';
 import type { PartVisual } from './parts';
 import { getPart } from './parts';
@@ -39,122 +40,154 @@ export function visualSpecFor(b: BuiltBlade): BladeVisualSpec {
 }
 
 // ------------------------------------------------------------------------------------------ geometry
-const geoCache = new Map<string, THREE.BufferGeometry>();
-function cached(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
-  let g = geoCache.get(key);
-  if (!g) { g = make(); geoCache.set(key, g); }
-  return g;
-}
+type V2 = THREE.Vector2;
+const polar = (r: number, a: number): V2 => new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r);
 
-/** Extrude a flat shape (in XY) so it lies on the XZ plane, centred vertically. */
-function flat(shape: THREE.Shape, depth: number): THREE.BufferGeometry {
-  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 });
+/**
+ * Extrude a flat outline (drawn in XY) so it lies on the XZ plane and grows upwards from y = 0.
+ * A small bevel catches the light on every edge: that is most of the "machined" look.
+ */
+function slab(pts: V2[], depth: number, hole?: V2[]): THREE.BufferGeometry {
+  const s = new THREE.Shape(pts);
+  if (hole) s.holes.push(new THREE.Path(hole));
+  const bev = Math.min(depth * 0.25, 0.06);
+  const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.001, depth - bev * 2), bevelEnabled: true, bevelThickness: bev, bevelSize: bev * 0.8, bevelSegments: 1, curveSegments: 6 });
   g.rotateX(-Math.PI / 2);
-  g.translate(0, 0, 0);
+  g.translate(0, bev, 0);
   return g;
 }
 
-function spikeRing(R: number, n: number, thick: number, spikeScale: number): THREE.BufferGeometry {
-  return cached(`spikes|${R.toFixed(3)}|${n}|${thick.toFixed(3)}|${spikeScale}`, () => {
-    const step = TAU / n;
-    const valley = R * 0.58;
-    const tip = R * Math.min(1.14, 1.0 + 0.05 * spikeScale);
-    const shape = new THREE.Shape();
-    for (let i = 0; i < n; i++) {
-      const a0 = i * step;
-      const v = new THREE.Vector2(Math.cos(a0) * valley, Math.sin(a0) * valley);
-      const t = new THREE.Vector2(Math.cos(a0 + step * 0.78) * tip, Math.sin(a0 + step * 0.78) * tip);
-      if (i === 0) shape.moveTo(v.x, v.y); else shape.lineTo(v.x, v.y);
-      shape.lineTo(t.x, t.y);
-    }
-    shape.closePath();
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, R * 0.36, 0, TAU, true);
-    shape.holes.push(hole);
-    return flat(shape, thick);
-  });
+function ringPts(r: number, n = 28, dir = 1): V2[] {
+  const p: V2[] = [];
+  for (let i = 0; i < n; i++) p.push(polar(r, (dir * i * TAU) / n));
+  return p;
 }
 
-function plateRing(R: number, n: number, thick: number): THREE.BufferGeometry {
-  return cached(`plates|${R.toFixed(3)}|${n}|${thick.toFixed(3)}`, () => {
-    const step = TAU / n;
-    const w = step / 2 - 0.07;
-    const ri = R * 0.58, ro = R;
-    const parts: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < n; i++) {
-      const a = i * step;
-      const s = new THREE.Shape();
-      s.moveTo(Math.cos(a - w) * ri, Math.sin(a - w) * ri);
-      s.lineTo(Math.cos(a - w * 0.82) * ro, Math.sin(a - w * 0.82) * ro);
-      s.lineTo(Math.cos(a + w * 0.82) * ro, Math.sin(a + w * 0.82) * ro);
-      s.lineTo(Math.cos(a + w) * ri, Math.sin(a + w) * ri);
-      s.closePath();
-      parts.push(flat(s, thick));
-    }
-    return mergeGeometries(parts, false)!;
-  });
+const lift = (g: THREE.BufferGeometry, y: number): THREE.BufferGeometry => { g.translate(0, y, 0); return g; };
+const merge = (parts: THREE.BufferGeometry[]): THREE.BufferGeometry | null => (parts.length ? mergeGeometries(parts, false) : null);
+
+/** Direction of travel: fins sweep clockwise on screen, the way the blade spins (shape y maps to world −z). */
+const FWD = -1;
+
+interface Layers { main: THREE.BufferGeometry[]; mid: THREE.BufferGeometry[]; dark: THREE.BufferGeometry[]; steel: THREE.BufferGeometry[]; accent: THREE.BufferGeometry[] }
+const layers = (): Layers => ({ main: [], mid: [], dark: [], steel: [], accent: [] });
+
+function attackFins(R: number, n: number, T: number, reach: number, L: Layers): number {
+  const step = TAU / n;
+  const Ro = R * reach;
+  const fin = (a: number, rin: number, ro: number, u0: number): V2[] => {
+    const P = (r: number, u: number) => polar(r, a + FWD * (u0 + u) * step);
+    return [P(rin, 0), P(ro * 0.8, 0.55), P(ro, 1.55), P(ro * 0.72, 1.05), P(rin + R * 0.04, 0.95)];
+  };
+  for (let i = 0; i < n; i++) {
+    const a = i * step;
+    // three staggered layers: black body, deep-red mid, bright top (every third fin silver)
+    L.dark.push(lift(slab(fin(a, R * 0.36, Ro * 0.9, 0.66), T * 1.3), 0));
+    L.mid.push(lift(slab(fin(a, R * 0.38, Ro * 0.96, 0.33), T), T * 0.6 + (i % 2) * R * 0.015));
+    const top = lift(slab(fin(a, R * 0.42, Ro, 0), T), T * 1.2 + (i % 3) * R * 0.012);
+    (i % 3 === 1 ? L.steel : L.main).push(top);
+  }
+  // a small counter-rotating claw ring round the core
+  const m = Math.max(5, Math.round(n * 0.6)), ms = TAU / m;
+  for (let i = 0; i < m; i++) {
+    const a = i * ms;
+    const P = (r: number, u: number) => polar(r, a - FWD * u * ms);
+    L.dark.push(lift(slab([P(R * 0.3, 0), P(R * 0.52, 0.5), P(R * 0.56, 1.1), P(R * 0.38, 0.78)], T * 0.9), T * 2.0));
+  }
+  // heavy skirt so the side view has mass
+  L.dark.push(lift(slab(ringPts(R * 0.74, 14), T * 1.3, ringPts(R * 0.3, 14, -1)), -T * 0.9));
+  return T * 2.25;
 }
 
-function finRing(R: number, n: number, thick: number): THREE.BufferGeometry {
-  return cached(`fins|${R.toFixed(3)}|${n}|${thick.toFixed(3)}`, () => {
-    const parts: THREE.BufferGeometry[] = [];
-    const base = new THREE.Shape();
-    base.absarc(0, 0, R * 0.74, 0, TAU, false);
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, R * 0.56, 0, TAU, true);
-    base.holes.push(hole);
-    parts.push(flat(base, thick));
-    const step = TAU / n;
-    for (let i = 0; i < n; i++) {
-      const a = i * step;
-      const p = (r: number, da: number) => new THREE.Vector2(Math.cos(a + da) * r, Math.sin(a + da) * r);
-      const s = new THREE.Shape();
-      const b0 = p(R * 0.7, 0), tip = p(R * 1.02, step * 0.6), b1 = p(R * 0.7, step * 0.2);
-      s.moveTo(b0.x, b0.y);
-      const c0 = p(R * 1.0, step * 0.12);
-      s.quadraticCurveTo(c0.x, c0.y, tip.x, tip.y);
-      const c1 = p(R * 0.9, step * 0.42);
-      s.quadraticCurveTo(c1.x, c1.y, b1.x, b1.y);
-      s.closePath();
-      parts.push(flat(s, thick * 1.1));
+function defenseBlocks(R: number, n: number, T: number, reach: number, L: Layers, studs: boolean): number {
+  const step = TAU / n;
+  const Ro = R * reach;
+  // dark base annulus so the gaps read as depth, not holes
+  L.dark.push(slab(ringPts(R * 0.98, 32), T * 0.7, ringPts(R * 0.4, 32, -1)));
+  for (let i = 0; i < n; i++) {
+    const a = i * step, w = step * 0.4, ri = R * 0.5;
+    const pts = [polar(ri, a - w * 0.92), polar(Ro * 0.95, a - w), polar(Ro, a - w * 0.7), polar(Ro, a + w * 0.7), polar(Ro * 0.95, a + w), polar(ri, a + w * 0.92)];
+    const blk = lift(slab(pts, T * 1.5), T * 0.65);
+    (i % 2 === 0 ? L.main : L.steel).push(blk);
+    if (studs && i % 2 === 0) {
+      const sp = [polar(Ro * 0.72, a - w * 0.22), polar(Ro * 0.9, a - w * 0.22), polar(Ro * 0.9, a + w * 0.22), polar(Ro * 0.72, a + w * 0.22)];
+      L.accent.push(lift(slab(sp, T * 0.45), T * 2.12));
     }
-    return mergeGeometries(parts, false)!;
-  });
+  }
+  // inner studded ring, offset half a step
+  for (let i = 0; i < n; i++) {
+    const a = (i + 0.5) * step, w = step * 0.36;
+    const pts = [polar(R * 0.32, a - w * 0.8), polar(R * 0.5, a - w), polar(R * 0.5, a + w), polar(R * 0.32, a + w * 0.8)];
+    L.dark.push(lift(slab(pts, T * 1.1), T * 0.65));
+  }
+  return T * 2.15;
 }
 
-function starShape(r: number, n: number, depth: number): THREE.BufferGeometry {
-  return cached(`star|${r.toFixed(3)}|${n}|${depth.toFixed(3)}`, () => {
-    const s = new THREE.Shape();
-    for (let i = 0; i < n * 2; i++) {
-      const a = (i * Math.PI) / n;
-      const rr = i % 2 === 0 ? r : r * 0.5;
-      if (i === 0) s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+function staminaFins(R: number, n: number, T: number, reach: number, L: Layers): number {
+  const step = TAU / n;
+  const Ro = R * reach;
+  L.dark.push(slab(ringPts(R * 0.8, 36), T * 0.9, ringPts(R * 0.62, 36, -1)));
+  L.dark.push(slab(ringPts(R * 0.46, 24), T * 1.3));
+  const S = 9;
+  for (let i = 0; i < n; i++) {
+    const a = i * step;
+    const lead: V2[] = [], trail: V2[] = [];
+    for (let k = 0; k <= S; k++) {
+      const t = k / S;
+      const r = R * 0.5 + (Ro - R * 0.5) * Math.pow(t, 0.75);
+      const u = 1.9 * Math.pow(t, 0.9);
+      const wdt = 0.35 * (1 - t) + 0.7 * Math.pow(Math.sin(Math.PI * t), 0.9);
+      lead.push(polar(r, a + FWD * u * step));
+      trail.push(polar(r, a + FWD * (u - wdt) * step));
     }
-    s.closePath();
-    return flat(s, depth);
-  });
+    const pts = [...lead, ...trail.reverse().slice(1)];
+    const f = lift(slab(pts, T * 0.9), T * 0.8 + (i % 3) * R * 0.02);
+    (i % 2 === 0 ? L.main : L.accent).push(f);
+  }
+  return T * 1.9;
 }
 
-function coreGeometry(shape: PartVisual['shape'], r: number): THREE.BufferGeometry {
+function capGeometry(shape: PartVisual['shape'], r: number, h: number): THREE.BufferGeometry {
   switch (shape) {
-    case 'orb': return cached(`ico|${r.toFixed(3)}`, () => new THREE.IcosahedronGeometry(r, 0));
-    case 'disc': return cached(`cyl8|${r.toFixed(3)}`, () => new THREE.CylinderGeometry(r, r, r * 0.6, 8));
-    case 'hex': return cached(`cyl6|${r.toFixed(3)}`, () => new THREE.CylinderGeometry(r * 1.05, r * 1.05, r * 0.7, 6));
-    case 'star': return starShape(r * 1.15, 5, r * 0.7);
-    case 'gem':
-    default: return cached(`oct|${r.toFixed(3)}`, () => new THREE.OctahedronGeometry(r * 1.1, 0));
+    case 'orb': return new THREE.SphereGeometry(r, 14, 6, 0, TAU, 0, Math.PI / 2).scale(1, h / r * 1.4, 1);
+    case 'hex': return new THREE.CylinderGeometry(r * 0.9, r, h, 6);
+    case 'gem': return new THREE.CylinderGeometry(r * 0.7, r, h * 1.2, 8);
+    case 'star': return new THREE.CylinderGeometry(r * 0.85, r, h * 1.1, 5);
+    case 'disc':
+    default: return new THREE.CylinderGeometry(r * 0.92, r, h, 14);
   }
 }
 
 function tipGeometry(shape: PartVisual['shape'], R: number): THREE.BufferGeometry {
   switch (shape) {
-    case 'pin': return cached(`pin|${R.toFixed(3)}`, () => new THREE.ConeGeometry(R * 0.1, R * 0.36, 6).rotateX(Math.PI));
-    case 'ball': return cached(`ball|${R.toFixed(3)}`, () => new THREE.SphereGeometry(R * 0.17, 8, 6));
-    case 'flat': return cached(`flat|${R.toFixed(3)}`, () => new THREE.CylinderGeometry(R * 0.2, R * 0.26, R * 0.1, 8));
-    case 'stub': return cached(`stub|${R.toFixed(3)}`, () => new THREE.CylinderGeometry(R * 0.12, R * 0.17, R * 0.2, 8));
+    case 'pin': return new THREE.ConeGeometry(R * 0.1, R * 0.36, 6).rotateX(Math.PI);
+    case 'ball': return new THREE.SphereGeometry(R * 0.17, 8, 6);
+    case 'flat': return new THREE.CylinderGeometry(R * 0.2, R * 0.26, R * 0.1, 8);
+    case 'stub': return new THREE.CylinderGeometry(R * 0.12, R * 0.17, R * 0.2, 8);
     case 'cone':
-    default: return cached(`cone|${R.toFixed(3)}`, () => new THREE.ConeGeometry(R * 0.17, R * 0.3, 8).rotateX(Math.PI));
+    default: return new THREE.ConeGeometry(R * 0.17, R * 0.3, 8).rotateX(Math.PI);
   }
+}
+
+const emblemCache = new Map<string, THREE.CanvasTexture>();
+function emblemTexture(color: string): THREE.CanvasTexture {
+  let t = emblemCache.get(color);
+  if (!t) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#0b0e13';
+    g.beginPath(); g.arc(128, 128, 126, 0, TAU); g.fill();
+    g.strokeStyle = color; g.globalAlpha = 0.35; g.lineWidth = 6;
+    g.beginPath(); g.arc(128, 128, 112, 0, TAU); g.stroke();
+    g.globalAlpha = 1;
+    drawEmblem(g, 256, color, 0.6);
+    t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    emblemCache.set(color, t);
+  }
+  return t;
 }
 
 // ----------------------------------------------------------------------------------------------- view
@@ -181,6 +214,7 @@ export class BladeView {
   private readonly shadow: THREE.Mesh;
   private shieldMesh: THREE.Mesh | null = null;
   private fadeMats: THREE.Material[] = [];
+  private ownedGeo: THREE.BufferGeometry[] = [];
   private spec: BladeVisualSpec;
   private time = 0;
   /** Height of the model's centre above its floor contact, for shadow/halo placement. */
@@ -199,8 +233,8 @@ export class BladeView {
     this.root.add(this.shadow);
 
     this.halo = new THREE.Mesh(
-      new THREE.RingGeometry(1.1, 1.26, 40).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: teamColor ?? '#ffffff', transparent: true, opacity: 0.95, depthWrite: false }),
+      new THREE.RingGeometry(1.1, 1.2, 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: teamColor ?? '#ffffff', transparent: true, opacity: 0.9, depthWrite: false }),
     );
     this.halo.visible = teamColor !== null;
     this.halo.renderOrder = -1;
@@ -222,25 +256,21 @@ export class BladeView {
   }
 
   private clear(): void {
-    this.spinGroup.traverse((o) => { if (o instanceof THREE.Mesh && !geoCache.has('')) { /* geometry is cached/shared */ } });
     this.spinGroup.clear();
     this.fadeMats.forEach((m) => m.dispose());
     this.fadeMats = [];
+    this.ownedGeo.forEach((g) => g.dispose());
+    this.ownedGeo = [];
   }
 
-  private own<T extends THREE.Material>(m: T): T {
-    const c = m.clone() as T;
-    this.fadeMats.push(c);
-    return c;
-  }
+  private own<T extends THREE.Material>(m: T): T { this.fadeMats.push(m); return m; }
 
-  private mesh(geo: THREE.BufferGeometry, mat: THREE.Material, outlineThickness = 0.045): THREE.Mesh {
+  private add(geo: THREE.BufferGeometry | null, mat: THREE.Material, y = 0): THREE.Mesh | null {
+    if (!geo) return null;
+    this.ownedGeo.push(geo);
     const m = new THREE.Mesh(geo, this.own(mat));
-    if (outlineThickness > 0) {
-      const o = new THREE.Mesh(geo, this.own(new THREE.MeshBasicMaterial({ color: 0x070a16, side: THREE.BackSide })));
-      o.scale.setScalar(1 + outlineThickness);
-      m.add(o);
-    }
+    m.position.y = y;
+    this.spinGroup.add(m);
     return m;
   }
 
@@ -248,61 +278,74 @@ export class BladeView {
     const s = this.spec;
     const cc = CLASS_COLORS[s.cls];
     const R = s.radius * (s.ring.scale ?? 1);
-    const thick = R * 0.17 * (s.ring.thickness ?? 1) * (s.cls === 'DEFENSE' ? 1.35 : s.cls === 'STAMINA' ? 0.6 : 1);
+    const reach = Math.min(1.12, 0.98 + 0.03 * (s.ring.spikes ?? 1));
     const n = Math.max(3, Math.min(8, s.profile.count));
     const wScale = s.weight.scale ?? 1;
+    const glowCol = s.profile.accent2;
+    const tint = s.core.tint ?? cc.light;
 
-    // vertical layout (local, centre at 0): tip below, weight disc, ring on top
-    const discH = R * 0.13 * wScale;
-    const discY = -discH / 2 - 0.02;
-    const ringY = discY + discH / 2 + 0.005;
+    // ---- materials (class colours + the blade's own secondary palette)
+    const dark = new THREE.Color(s.profile.trim).multiplyScalar(0.5).getStyle();
+    const M = {
+      main: facet(cc.main, { metal: 0.18, rough: 0.42, env: 0.55 }),
+      mid: facet(cc.dark, { metal: 0.45, rough: 0.34 }),
+      dark: facet(dark, { metal: 0.6, rough: 0.36 }),
+      steel: facet(s.cls === 'DEFENSE' ? '#e6e9f0' : '#cfd4dc', { metal: 0.7, rough: 0.26 }),
+      accent: facet(s.cls === 'DEFENSE' ? '#e8b64a' : glowCol, { metal: 0.45, rough: 0.3, emissive: glowCol, glowK: s.cls === 'STAMINA' ? 0.35 : 0.2 }),
+      cap: facet('#0e1116', { metal: 0.65, rough: 0.3 }),
+      seam: hdr(glowCol, s.cls === 'STAMINA' ? 1.5 : 2.2),
+      rim: hdr(tint, 2.1),
+    };
 
-    // weight disc
-    const disc = this.mesh(
-      new THREE.CylinderGeometry(R * 0.6 * wScale, R * 0.62 * wScale, discH, 18),
-      toon(s.profile.trim), 0.04,
+    // ---- the fin / plate stack (class silhouette)
+    const L = layers();
+    const base = R * 0.115 * (s.ring.thickness ?? 1);
+    let top: number;
+    if (s.profile.ringStyle === 'spikes') top = attackFins(R, n * 2, base, reach, L);
+    else if (s.profile.ringStyle === 'plates') top = defenseBlocks(R, n + 3, base * 1.9, reach, L, true);
+    else top = staminaFins(R, n + 1, base * 0.8, reach, L);
+
+    const y0 = -0.02 * R;
+    this.add(merge(L.dark), M.dark, y0);
+    this.add(merge(L.mid), M.mid, y0);
+    this.add(merge(L.main), M.main, y0);
+    this.add(merge(L.steel), M.steel, y0);
+    this.add(merge(L.accent), M.accent, y0);
+
+    // ---- glowing seams between the layers (they peek out through the gaps)
+    const seamR = [0.5, 0.72].map((k) => R * k);
+    seamR.forEach((r, i) => {
+      const t = new THREE.TorusGeometry(r, R * 0.012, 4, 48).rotateX(Math.PI / 2);
+      this.add(t, M.seam, y0 + base * (0.9 + i * 0.6));
+    });
+
+    // ---- weight disc (underneath) with its own glow edge
+    const discR = R * 0.62 * wScale, discH = R * 0.13 * wScale;
+    const discY = y0 - discH * 0.5 - 0.005;
+    this.add(new THREE.CylinderGeometry(discR, discR * 0.94, discH, 18), M.dark, discY);
+    this.add(new THREE.TorusGeometry(discR * 0.99, R * 0.01, 4, 40).rotateX(Math.PI / 2), M.seam, discY + discH * 0.5);
+
+    // ---- core cap with the emblem
+    const capR = R * 0.3, capH = R * 0.17;
+    const capY = y0 + top + capH * 0.5;
+    this.add(capGeometry(s.core.shape, capR, capH), M.cap, capY);
+    this.add(new THREE.TorusGeometry(capR * 0.98, R * 0.014, 4, 40).rotateX(Math.PI / 2), M.rim, capY + capH * 0.48);
+    const emb = new THREE.Mesh(
+      new THREE.CircleGeometry(capR * 0.86, 28).rotateX(-Math.PI / 2),
+      this.own(new THREE.MeshBasicMaterial({ map: emblemTexture(tint), toneMapped: false })),
     );
-    disc.position.y = discY;
-    this.spinGroup.add(disc);
+    this.ownedGeo.push(emb.geometry);
+    emb.position.y = capY + capH * (s.core.shape === 'gem' ? 0.62 : s.core.shape === 'orb' ? 0.55 : 0.505);
+    this.spinGroup.add(emb);
+    // collar between cap and fins
+    this.add(new THREE.CylinderGeometry(capR * 1.25, capR * 1.4, R * 0.05, 14), M.dark, y0 + top - R * 0.01);
 
-    // accent stripe on the disc (secondary palette)
-    const stripe = new THREE.Mesh(new THREE.TorusGeometry(R * 0.6 * wScale, discH * 0.14, 4, 28).rotateX(Math.PI / 2), this.own(glow(s.profile.accent2)));
-    stripe.position.y = discY + discH * 0.1;
-    this.spinGroup.add(stripe);
-
-    // ring in the class's visual language
-    let ringGeo: THREE.BufferGeometry;
-    if (s.profile.ringStyle === 'spikes') ringGeo = spikeRing(R, n, thick, s.ring.spikes ?? 1);
-    else if (s.profile.ringStyle === 'plates') ringGeo = plateRing(R, n, thick);
-    else ringGeo = finRing(R, n, thick);
-    const ring = this.mesh(ringGeo, toon(cc.main, cc.dark, 0.18), 0.04);
-    ring.position.y = ringY;
-    this.spinGroup.add(ring);
-
-    // alternating accent tips on spikes / plates in the secondary palette
-    if (s.profile.ringStyle !== 'fins') {
-      const cap = this.mesh(
-        s.profile.ringStyle === 'spikes' ? new THREE.TorusGeometry(R * 0.5, thick * 0.35, 4, 24).rotateX(Math.PI / 2) : new THREE.TorusGeometry(R * 0.57, thick * 0.3, 4, 24).rotateX(Math.PI / 2),
-        toon(s.profile.accent2, s.profile.accent2, 0.45), 0,
-      );
-      cap.position.y = ringY + thick * 0.9;
-      this.spinGroup.add(cap);
-    }
-
-    // core
-    const coreR = R * 0.26;
-    const core = this.mesh(coreGeometry(s.core.shape, coreR), toon(s.core.tint ?? s.profile.accent2, s.core.tint ?? s.profile.accent2, 0.7), 0.05);
-    core.position.y = ringY + thick + coreR * 0.5;
-    this.spinGroup.add(core);
-
-    // tip (visible from the side)
-    const tip = this.mesh(tipGeometry(s.tip.shape, R), toon('#cfd6ea'), 0.05);
+    // ---- tip (visible from the side)
     const tipH = s.tip.shape === 'pin' ? R * 0.36 : s.tip.shape === 'flat' ? R * 0.1 : s.tip.shape === 'stub' ? R * 0.2 : s.tip.shape === 'ball' ? R * 0.34 : R * 0.3;
-    tip.position.y = discY - discH / 2 - tipH / 2;
-    this.spinGroup.add(tip);
+    this.add(tipGeometry(s.tip.shape, R), facet('#aab2c2', { metal: 0.85, rough: 0.25 }), discY - discH * 0.5 - tipH * 0.5);
 
     this.halfH = 0.17;
-    const shadowR = R * 1.15;
+    const shadowR = R * 1.18;
     this.shadow.scale.setScalar(shadowR);
     this.halo.scale.setScalar(R);
     this.shadow.position.y = -this.halfH + 0.012;
@@ -352,11 +395,12 @@ export class BladeView {
     this.shadow.position.y = -this.halfH + 0.012 - lift;
     this.halo.position.y = -this.halfH + 0.02 - lift;
     const sc = 1 - Math.min(0.5, s.leap * 0.5);
-    this.shadow.scale.setScalar(this.spec.radius * 1.15 * sc);
+    this.shadow.scale.setScalar(this.spec.radius * 1.18 * sc);
   }
 
   dispose(): void {
-    this.fadeMats.forEach((m) => m.dispose());
-    this.root.traverse((o) => { if (o instanceof THREE.Mesh && !Array.from(geoCache.values()).includes(o.geometry)) o.geometry.dispose(); });
+    this.clear();
+    this.shadow.geometry.dispose();
+    this.halo.geometry.dispose();
   }
 }

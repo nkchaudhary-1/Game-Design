@@ -17,11 +17,12 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve the production build
+npm run build:single   # ONE self-contained html file (dist-single/spinblade-arena.html) to open or host anywhere
 npm test           # 80 unit/simulation tests (Vitest)
 npm run balance    # headless CPU-vs-CPU balance check (see "Balance")
 ```
 
-Needs a browser with WebGL and WebAssembly. Fonts and the physics engine are bundled; nothing is fetched at runtime.
+Needs a browser with WebGL and WebAssembly. Fonts, art and the physics engine are bundled; nothing is fetched at runtime.
 
 ## Controls
 
@@ -144,6 +145,7 @@ Latest run (`npm run balance -- -n 100`, CPU Normal, both seats, 900 battles per
 * **18 blades are data only** (stats, moves, Supers listed as “coming soon”); **7 arenas** are data only.
 * **No hazards** yet: `arenas/hazards.ts` is the hook for arena mechanics.
 * **Bundle is ~5 MB (1.9 MB gzip)**, mostly the inlined physics WASM. Fine on broadband; lazy-loading physics is the first fix.
-* Blade silhouettes within a class share a ring style (colour/trim/count differ). Distinct silhouettes per blade is art work.
+* **Visual direction** follows the supplied reference pack (cream paper + navy + red UI, spiral-fin armoured blades, concrete diorama arena). Blades are generated in code, so they match the references' palette, layering and glow but not their surface detail; hero-quality models need real meshes. Blades in the same class share a fin pattern (colour, trim and count differ). Gravion, Phantom and the Stamina class have no reference art yet, so their look is extrapolated.
+* The reference art (`src/assets/art/`, cropped by `tools/prep-art.sh`) is used for the Hangar cards, Pre-battle cards and arena thumbnails. The Core Arena reference shows a bunny emblem on the floor; in-game the floor carries the V-chevron instead.
 * The CPU is tuned by simulation, not by people. Difficulty needs real playtests.
 * Phase 2 (per PRD): WebSocket relay, QR join, controller on a phone, 3+ players — the pad/bus boundary is ready for it.

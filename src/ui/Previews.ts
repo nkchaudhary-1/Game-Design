@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { BladeView, visualSpecFor } from '../blades/BladeMesh';
 import type { BuiltBlade } from '../blades/BladeFactory';
 import { CLASS_COLORS, clamp, lerp, TAU } from '../core/types';
+import { lit } from '../render/env';
 import { glow, toon } from '../render/materials';
 
 export class PreviewRenderer {
@@ -18,6 +19,8 @@ export class PreviewRenderer {
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true, powerPreference: 'default' });
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 0.82;
   }
 
   /** Render `scene` and copy the result into `target` (a 2D canvas, sized to its CSS box). */
@@ -29,6 +32,7 @@ export class PreviewRenderer {
     this.renderer.setSize(w, hh, false);
     camera.aspect = w / hh;
     camera.updateProjectionMatrix();
+    lit(scene, this.renderer, 0.9);
     this.renderer.render(scene, camera);
     const g = target.getContext('2d');
     if (!g) return;
@@ -42,6 +46,7 @@ export class PreviewRenderer {
     this.renderer.setSize(size, size, false);
     camera.aspect = 1;
     camera.updateProjectionMatrix();
+    lit(scene, this.renderer, 0.9);
     this.renderer.render(scene, camera);
     return this.canvas.toDataURL('image/png');
   }
@@ -50,23 +55,23 @@ export class PreviewRenderer {
 }
 
 function addLights(scene: THREE.Scene): void {
-  scene.add(new THREE.HemisphereLight(0xdbe6ff, 0x2a3260, 1.15));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.7);
+  scene.add(new THREE.HemisphereLight(0xc9d6f5, 0x2a3260, 0.55));
+  const sun = new THREE.DirectionalLight(0xfff1de, 1.6);
   sun.position.set(-5, 9, 6);
   scene.add(sun);
-  const rim = new THREE.DirectionalLight(0x9fb8ff, 0.6);
+  const rim = new THREE.DirectionalLight(0x7aa2ff, 0.9);
   rim.position.set(6, 3, -6);
   scene.add(rim);
 }
 
 /** A pedestal: a dark disc with a thin class-coloured ring, sitting just under the blade's tip. */
-function pedestal(radius: number, color: string): THREE.Group {
+function pedestal(radius: number, color: string, light = false): THREE.Group {
   const g = new THREE.Group();
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.55, radius * 1.65, 0.12, 40), toon('#151d3d'));
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.2, radius * 1.28, 0.1, 40), toon(light ? '#d8d2c4' : '#10172a'));
   disc.position.y = -0.1;
-  const ring = new THREE.Mesh(new THREE.RingGeometry(radius * 1.38, radius * 1.46, 48).rotateX(-Math.PI / 2), glow(color, 0.9));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(radius * 1.08, radius * 1.13, 48).rotateX(-Math.PI / 2), glow(color, 0.9));
   ring.position.y = -0.035;
-  const inner = new THREE.Mesh(new THREE.RingGeometry(radius * 0.8, radius * 0.84, 48).rotateX(-Math.PI / 2), glow(color, 0.35));
+  const inner = new THREE.Mesh(new THREE.RingGeometry(radius * 0.7, radius * 0.73, 48).rotateX(-Math.PI / 2), glow(color, 0.35));
   inner.position.y = -0.034;
   g.add(disc, ring, inner);
   return g;
@@ -93,7 +98,7 @@ export class BladeStage {
   private pinch = 0;
   reduced = false;
 
-  constructor(private readonly omega = 1.6) {
+  constructor(private readonly omega = 1.6, private readonly light = false) {
     addLights(this.scene);
   }
 
@@ -106,7 +111,7 @@ export class BladeStage {
     if (this.view) this.view.rebuild(spec);
     else { this.view = new BladeView(spec, null); this.scene.add(this.view.root); }
     if (this.ped) { this.scene.remove(this.ped); this.ped.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); }); }
-    this.ped = pedestal(spec.radius, CLASS_COLORS[built.def.class].main);
+    this.ped = pedestal(spec.radius, CLASS_COLORS[built.def.class].main, this.light);
     this.scene.add(this.ped);
   }
 
@@ -184,7 +189,7 @@ export class BladeStage {
     const v = THREE.MathUtils.degToRad(this.camera.fov);
     const hFov = 2 * Math.atan(Math.tan(v / 2) * Math.max(0.3, this.camera.aspect));
     const half = Math.min(v, hFov) / 2;
-    const d = ((this.radius * 1.5) / Math.tan(half)) * this.zoom;
+    const d = ((this.radius * 1.4) / Math.tan(half)) * this.zoom;
     const cp = Math.cos(this.pitch);
     this.camera.position.set(Math.sin(this.yaw) * cp * d, Math.sin(this.pitch) * d + 0.1, Math.cos(this.yaw) * cp * d);
     this.camera.lookAt(0, 0.05, 0);
@@ -246,7 +251,7 @@ export class HeroStage {
     const sway = this.reduced ? 0 : Math.sin(this.t * 0.25) * 0.22;
     const a = Math.max(0.3, this.camera.aspect);
     const th = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
-    const d = Math.max(7.4 / (th * a), 4.6 / th);
+    const d = Math.max(5.6 / (th * a), 3.6 / th);
     this.camera.position.set(Math.sin(sway) * d, d * 0.52, Math.cos(sway) * d);
     this.camera.lookAt(0, 0, 0.2);
   }
@@ -267,7 +272,7 @@ export class Thumbs {
     const key = `${built.def.id}|${Object.values(built.build).join(',')}`;
     let url = this.cache.get(key);
     if (!url) {
-      this.stage ??= new BladeStage(0);
+      this.stage ??= new BladeStage(0, true);
       this.stage.setBlade(built);
       url = this.stage.snapshot(this.pr, 256);
       this.cache.set(key, url);

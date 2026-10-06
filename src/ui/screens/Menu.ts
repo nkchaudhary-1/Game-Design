@@ -1,6 +1,7 @@
 // Main menu: logo, the two entry points, a 3D hero of the playable blades, and a one-screen "how to play".
 
 import { MVP_BLADES } from '../../blades/bladeData';
+import { emblemSvg } from '../../render/emblem';
 import { canvasEl, h, icon } from '../dom';
 import { muteButton } from '../common';
 import { HeroStage } from '../Previews';
@@ -26,9 +27,9 @@ export class MenuScreen implements Screen {
       h('div.menu-body', null,
         h('div.menu-copy', null,
           h('div.logo', null,
-            h('div.bars', null, h('i'), h('i'), h('i')),
+            Object.assign(h('div.mark'), { innerHTML: emblemSvg('currentColor', 72) }),
             'Spinblade', h('br'), 'Arena',
-            h('small', null, 'Launch · Steer · Knock out'),
+            h('small', null, 'Battle · Spin · Evolve'),
           ),
           h('p.tagline', null, 'Spin-blade duels in a pit. Slingshot in, hit hard, and either push them off the rim or spin them dry.'),
           h('div.menu-actions', null,

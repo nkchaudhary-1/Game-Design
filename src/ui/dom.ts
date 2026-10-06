@@ -72,6 +72,9 @@ export const ICON = {
   lock: '<rect x="5" y="11" width="14" height="10"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   wrench: '<path d="M14 6a4 4 0 0 0 5 5l-9 9-4-4 9-9z" />',
   phone: '<rect x="7" y="2" width="10" height="20"/><path d="M11 18h2"/>',
+  classATTACK: '<path d="M12 3 22 20H2z" fill="currentColor" stroke="none"/><path d="M12 9.5 16.5 17h-9z" fill="#fff" stroke="none"/>',
+  classDEFENSE: '<path d="M12 2 21 6.5v7L12 22 3 13.5v-7z" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="3.4" fill="#fff" stroke="none"/>',
+  classSTAMINA: '<circle cx="12" cy="12" r="9" fill="currentColor" stroke="none"/><path d="M12 6a6 6 0 1 0 6 6" stroke="#fff" stroke-width="2.4" fill="none"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17v.5"/>',
 } as const;
 
@@ -94,3 +97,6 @@ export function abilityIcon(type: string): keyof typeof ICON {
 }
 
 export const cap = (s: string): string => s.charAt(0) + s.slice(1).toLowerCase();
+
+/** Blade number as printed on the red tab: 01–21. */
+export const pad2 = (n: number): string => String(n).padStart(2, '0');

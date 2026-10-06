@@ -46,10 +46,15 @@ export class BattleView {
     this.fx.reduced = reduced;
     this.arena = new ArenaView(match.arena.def, match.arena);
     this.scene.add(this.arena.root);
-    this.scene.add(new THREE.HemisphereLight(0xdbe6ff, 0x1c2347, 1.05));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(-7, 16, 9);
+    this.scene.background = new THREE.Color('#0b1018');
+    this.scene.fog = new THREE.Fog('#0b1018', 36, 92);
+    this.scene.add(new THREE.HemisphereLight(0xa9bbe8, 0x1a2033, 0.55));
+    const sun = new THREE.DirectionalLight(0xfff0dc, 1.9);
+    sun.position.set(-9, 18, 10);
     this.scene.add(sun);
+    const rim = new THREE.DirectionalLight(0x6f9bff, 0.85);
+    rim.position.set(10, 7, -12);
+    this.scene.add(rim);
     this.rig = new CameraRig(match.arena.radius);
 
     match.blades.forEach((b, i) => {

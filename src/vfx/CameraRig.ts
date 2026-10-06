@@ -6,13 +6,13 @@ import * as THREE from 'three';
 import { clamp } from '../core/types';
 
 export class CameraRig {
-  readonly camera = new THREE.PerspectiveCamera(38, 1, 0.5, 220);
+  readonly camera = new THREE.PerspectiveCamera(40, 1, 0.5, 260);
   private readonly target = new THREE.Vector3();
   private dist = 30;
   private shakeMag = 0;
   private punch = 0;
   private aspect = 1;
-  private readonly pitch = THREE.MathUtils.degToRad(63);
+  private readonly pitch = THREE.MathUtils.degToRad(54);
 
   constructor(private readonly arenaRadius: number) {
     this.snap([]);
@@ -30,7 +30,7 @@ export class CameraRig {
     const h = 2 * Math.atan(Math.tan(v / 2) * this.aspect);
     const dv = (r * Math.sin(this.pitch)) / Math.tan(v / 2);   // the floor is foreshortened vertically
     const dh = r / Math.tan(h / 2);
-    return Math.max(dv, dh) * 1.12;
+    return Math.max(dv, dh) * 1.26;
   }
 
   private desired(focus: Array<{ x: number; z: number }>): { x: number; z: number; d: number } {
