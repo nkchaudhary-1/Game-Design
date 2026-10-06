@@ -8,6 +8,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { lit } from './env';
+import { GFX } from './quality';
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -21,11 +22,15 @@ export class GameRenderer {
   quality = 1;
 
   constructor(readonly canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // ?shot keeps the drawing buffer so headless screenshots of the canvas are reliable (costs a little speed)
+    const keep = new URLSearchParams(location.search).has('shot');
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: keep });
     this.renderer.setClearColor(0x0b1018, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+    this.renderer.shadowMap.enabled = GFX.shadows;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.setSize(canvas.clientWidth || 800, canvas.clientHeight || 600);
   }
 
@@ -35,12 +40,18 @@ export class GameRenderer {
   setSize(w: number, h: number): void {
     this.w = Math.max(2, Math.floor(w));
     this.h = Math.max(2, Math.floor(h));
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.quality;
+    const dpr = Math.min(window.devicePixelRatio || 1, GFX.maxDpr) * this.quality;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(this.w, this.h, false);
     this.composer?.setPixelRatio(dpr);
     this.composer?.setSize(this.w, this.h);
     this.bloom?.setSize(this.w * dpr, this.h * dpr);
+  }
+
+  /** After the graphics tier changed mid-session: follow it (shadows) without rebuilding the scene. */
+  applyTier(scene: THREE.Scene): void {
+    this.renderer.shadowMap.enabled = GFX.shadows;
+    scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined; if (m) (Array.isArray(m) ? m : [m]).forEach((x) => { x.needsUpdate = true; }); });
   }
 
   setQuality(q: number): void {
@@ -51,7 +62,7 @@ export class GameRenderer {
 
   private buildPost(scene: THREE.Scene, camera: THREE.Camera): void {
     try {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.quality;
+      const dpr = Math.min(window.devicePixelRatio || 1, GFX.maxDpr) * this.quality;
       const c = new EffectComposer(this.renderer);
       c.setPixelRatio(dpr);
       c.setSize(this.w, this.h);
@@ -74,7 +85,7 @@ export class GameRenderer {
     if (this.composer && this.pass && this.bloom) {
       this.pass.scene = scene;
       this.pass.camera = camera;
-      this.bloom.enabled = this.quality >= 0.8;
+      this.bloom.enabled = GFX.bloom && this.quality >= 0.8;
       this.composer.render();
     } else {
       this.renderer.render(scene, camera);

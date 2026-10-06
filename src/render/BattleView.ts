@@ -13,6 +13,7 @@ import { ImpactFX } from '../vfx/ImpactFX';
 import { SuperFX } from '../vfx/SuperFX';
 import { Trail } from '../vfx/Trails';
 import { glow } from './materials';
+import { GFX } from './quality';
 
 export const TEAM_COLORS = ['#f2f6ff', '#ffe14a'];
 
@@ -49,8 +50,17 @@ export class BattleView {
     this.scene.background = new THREE.Color('#0b1018');
     this.scene.fog = new THREE.Fog('#0b1018', 36, 92);
     this.scene.add(new THREE.HemisphereLight(0xa9bbe8, 0x1a2033, 0.55));
-    const sun = new THREE.DirectionalLight(0xfff0dc, 1.9);
-    sun.position.set(-9, 18, 10);
+    const sun = new THREE.DirectionalLight(0xfff0dc, 2.4);
+    sun.position.set(-11, 22, 12);
+    if (GFX.shadows) {
+      const R = match.arena.radius + 4;
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(GFX.shadowSize, GFX.shadowSize);
+      Object.assign(sun.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 4, far: 70 });
+      sun.shadow.bias = -0.0004;
+      sun.shadow.normalBias = 0.03;
+      sun.shadow.radius = 3;
+    }
     this.scene.add(sun);
     const rim = new THREE.DirectionalLight(0x6f9bff, 0.85);
     rim.position.set(10, 7, -12);
@@ -189,6 +199,7 @@ export class BattleView {
     });
 
     this.arena.update(this.match.blades.filter((b) => b.alive).map((b) => ({ x: b.x, z: b.z })));
+    this.arena.tick(dt);
     this.superFx.update(this.match, dt, this.yAt, this.views);
     this.fx.update(dt);
     this.rig.update(dt, this.focus(), this.reduced);

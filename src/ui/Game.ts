@@ -3,6 +3,9 @@
 
 import { AudioManager } from '../audio/AudioManager';
 import { GameRenderer } from '../render/GameRenderer';
+import { getArena } from '../arenas/arenaData';
+import { Arena } from '../arenas/Arena';
+import { paintFloorMaps } from '../arenas/arenaTextures';
 import { PreviewRenderer, Thumbs } from './Previews';
 import { BattleScreen } from './screens/BattleScreen';
 import { HangarScreen } from './screens/Hangar';
@@ -50,6 +53,10 @@ export class Game {
 
   start(initial: ScreenName = 'menu', arg?: string): void {
     this.go(initial, arg);
+    // paint the arena's concrete maps while the player is still in the menu, so the first battle starts quickly
+    window.setTimeout(() => {
+      try { const a = new Arena(getArena('core-pit')); paintFloorMaps([a.spawn(0, 2), a.spawn(1, 2)], a.radius); } catch { /* built on demand instead */ }
+    }, 1200);
     const loop = (now: number): void => {
       requestAnimationFrame(loop);
       const dt = Math.min(0.1, (now - this.last) / 1000);

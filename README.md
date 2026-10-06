@@ -46,6 +46,8 @@ with a running session score. The Hangar (all 21 blades) and Workshop (customiza
 | **Two-tab mode** | In battle, the phone icon opens the controller in a second tab. It talks to the arena tab over a `BroadcastChannel` — the Phase 2 shape (phone = controller, big screen = display) with the browser standing in for the relay. |
 | `?latency=80` | Adds artificial controller→display latency (ms) to feel-test responsiveness. |
 | `?reduced=1` | Reduced effects (no hit-stop, calmer camera). Also follows the OS “reduce motion” setting. |
+| `?quality=high\|medium\|low` | Force a graphics tier (see "Graphics tiers"). Default is auto-detected, then steps down if the frame rate drops. |
+| `?shot` | Keeps the WebGL drawing buffer so headless screenshots aren't blank (test aid only). |
 | `?screen=hangar&blade=gravion` | Deep-link a screen (`menu`, `hangar`, `workshop`, `lobby`, `battle`). |
 
 ## What is in the MVP
@@ -66,11 +68,27 @@ with a running session score. The Hangar (all 21 blades) and Workshop (customiza
 | Spec §12 | Customization: Ring/Core/Weight/Tip, stat trade-offs, compatibility, rarity, unlock level, live preview, build description, Super gating | ✅ ~35 parts |
 | Spec §13 | Levels 1–7 | ✅ as a test dial (no XP/progression) |
 | Spec §16 | Deterministic AI state machine, Easy/Normal/Hard | ✅ 8 states |
-| Spec §14–15 | Low-poly cel-shaded look, class colour language, minimal HUD | ✅ procedural geometry, no art assets |
+| Spec §14–15 | Class colour language, minimal HUD; look follows the reference pack | ✅ procedural high-poly geometry + generated PBR textures (no art assets in the 3D scene) |
 | Spec | Audio events | ✅ synthesised placeholders, swap-by-event-name |
 | Spec §21 | The 11 screens | ✅ 9 of 11: Main Menu, Blade Collection (class + rarity filters), Blade Detail, Customization, Super Selection (Supers tab), Pre-Battle, Battle, Victory, Defeat (+ Pause, How-to-play). ⚠ Arena Selection is one row (Core Pit). ❌ Upgrade/Progression (Phase 1 has no persistence; Level is a dial) |
 | Later | Networking / QR / 3+ players / persistence / accounts | ⏭ not in Phase 1 by design |
 | Later | The other 18 blades’ Supers and moves, 7 arenas, progression, campaign | ⏭ data exists, behaviour doesn’t |
+
+## Graphics tiers
+
+The 3D scene has three tiers (`src/render/quality.ts`). The game picks one from the device, and `BattleScreen` steps down
+automatically if the frame rate stays low. Force one with `?quality=`.
+
+| | High | Medium | Low |
+|---|---|---|---|
+| Blade geometry | lofted fins, bevelled/domed armour plates, bolts, lathe cores — **23k–84k tris per blade** (Phantom 23k, Gravion 33k, Ravok 84k) | 12k–35k | 7k–15k |
+| Materials | clear-coat paint, brushed-metal bump/roughness, HDR glow seams | same, smaller maps | plain |
+| Arena | PBR concrete floor (generated albedo/normal/roughness), 96-segment rim, rocks, crates, dust | fewer rocks/dust | minimal |
+| Shadows / bloom | 2048 shadow map, bloom | 1024 shadow map, bloom | none |
+| Max pixel ratio | 2 | 1.5 | 1 |
+
+Every texture is generated at load from canvas noise (no image files), cached per tier and pre-warmed on the menu.
+Built and checked in a software-rendered browser only: **frame rate on a real GPU has not been measured.**
 
 ## Decisions I made (please review)
 
@@ -145,7 +163,7 @@ Latest run (`npm run balance -- -n 100`, CPU Normal, both seats, 900 battles per
 * **18 blades are data only** (stats, moves, Supers listed as “coming soon”); **7 arenas** are data only.
 * **No hazards** yet: `arenas/hazards.ts` is the hook for arena mechanics.
 * **Bundle is ~5 MB (1.9 MB gzip)**, mostly the inlined physics WASM. Fine on broadband; lazy-loading physics is the first fix.
-* **Visual direction** follows the supplied reference pack (cream paper + navy + red UI, spiral-fin armoured blades, concrete diorama arena). Blades are generated in code, so they match the references' palette, layering and glow but not their surface detail; hero-quality models need real meshes. Blades in the same class share a fin pattern (colour, trim and count differ). Gravion, Phantom and the Stamina class have no reference art yet, so their look is extrapolated.
+* **Visual direction** follows the supplied reference pack (cream paper + navy + red UI, spiral-fin armoured blades, concrete diorama arena). The realism pass made blades and the arena high-poly with physically based materials, but they are still generated in code: they match the references' palette, layering and glow, not their hand-sculpted surface detail. Hero-quality models need real meshes. Blades in the same class share a fin pattern (colour, trim and count differ). Gravion, Phantom and the Stamina class have no reference art yet, so their look is extrapolated.
 * The reference art (`src/assets/art/`, cropped by `tools/prep-art.sh`) is used for the Hangar cards, Pre-battle cards and arena thumbnails. The Core Arena reference shows a bunny emblem on the floor; in-game the floor carries the V-chevron instead.
 * The CPU is tuned by simulation, not by people. Difficulty needs real playtests.
 * Phase 2 (per PRD): WebSocket relay, QR join, controller on a phone, 3+ players — the pad/bus boundary is ready for it.

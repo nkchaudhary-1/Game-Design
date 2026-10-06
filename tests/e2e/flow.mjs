@@ -20,7 +20,7 @@ const errs = []; page.on('pageerror', e => errs.push('PAGEERR ' + e.message)); p
 let fails = 0;
 const ok = (c, msg) => { console.log((c ? 'PASS ' : 'FAIL ') + msg); if (!c) fails++; };
 const ev = (fn, arg) => page.evaluate(fn, arg);
-await page.goto(base + '?screen=lobby'); await page.waitForTimeout(1500);
+await page.goto(base + '?screen=lobby&quality=' + (process.env.QUALITY || 'low')); await page.waitForTimeout(1500);
 await page.click('.cta .btn.primary'); await page.waitForTimeout(1500);
 ok(await ev(() => window.__battle?.currentPhase) === 'ready', 'battle starts in ready phase');
 const pad = await page.locator('.pad-surface').boundingBox();

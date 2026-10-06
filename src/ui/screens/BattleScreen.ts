@@ -6,6 +6,7 @@ import type { BuiltBlade } from '../../blades/BladeFactory';
 import { Battle } from '../../core/Battle';
 import { ChannelBus } from '../../core/InputBus';
 import { KeyboardController } from '../../core/Input';
+import { GFX, setTier } from '../../render/quality';
 import type { MatchResult } from '../../combat/events';
 import { ControllerPad } from '../ControllerPad';
 import { controllerUrl } from '../ControllerPage';
@@ -190,14 +191,21 @@ export class BattleScreen implements Screen {
     this.watchPerformance(dt);
   }
 
-  /** Lower the render scale if frames run long (never raises it again within a session). */
+  /** Lower the render scale, then the graphics tier, if frames run long (never raised again within a session). */
   private watchPerformance(dt: number): void {
     if (this.paused) return;
     this.acc += dt; this.slow += dt > 0.026 ? 1 : 0;
     if (this.acc < 1.5) return;
     const rr = this.ctx.battleRenderer();
     const frames = Math.max(1, Math.round(this.acc / 0.0167));
-    if (this.slow / frames > 0.5 && rr.quality > 0.6) rr.setQuality(Math.max(0.6, rr.quality - 0.2));
+    if (this.slow / frames > 0.5) {
+      if (rr.quality > 0.6) rr.setQuality(Math.max(0.6, rr.quality - 0.2));
+      else if (GFX.tier !== 'low') {
+        // still struggling at the lowest render scale: drop a graphics tier (shadows, bloom, lighter geometry on the next battle)
+        setTier(GFX.tier === 'high' ? 'medium' : 'low');
+        rr.applyTier(this.battle.view.scene);
+      }
+    }
     this.acc = 0; this.slow = 0;
   }
 

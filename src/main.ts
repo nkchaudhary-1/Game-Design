@@ -6,6 +6,7 @@ import '@fontsource/barlow/latin-600.css';
 import '@fontsource/barlow/latin-700.css';
 import './ui/ui.css';
 import { initPhysics } from './core/Physics';
+import { detectTier, setTier } from './render/quality';
 import { mountControllerPage } from './ui/ControllerPage';
 import { Game } from './ui/Game';
 import type { ScreenName } from './ui/screens/types';
@@ -27,6 +28,7 @@ function fail(message: string): void {
 
 try {
   const q = new URLSearchParams(location.search);
+  setTier(detectTier());
   if (q.get('role') === 'controller') {
     mountControllerPage(root, q);
   } else {

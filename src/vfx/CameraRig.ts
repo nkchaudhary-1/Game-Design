@@ -30,7 +30,7 @@ export class CameraRig {
     const h = 2 * Math.atan(Math.tan(v / 2) * this.aspect);
     const dv = (r * Math.sin(this.pitch)) / Math.tan(v / 2);   // the floor is foreshortened vertically
     const dh = r / Math.tan(h / 2);
-    return Math.max(dv, dh) * 1.26;
+    return Math.max(dv, dh) * 1.14;
   }
 
   private desired(focus: Array<{ x: number; z: number }>): { x: number; z: number; d: number } {

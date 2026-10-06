@@ -189,7 +189,7 @@ export class BladeStage {
     const v = THREE.MathUtils.degToRad(this.camera.fov);
     const hFov = 2 * Math.atan(Math.tan(v / 2) * Math.max(0.3, this.camera.aspect));
     const half = Math.min(v, hFov) / 2;
-    const d = ((this.radius * 1.4) / Math.tan(half)) * this.zoom;
+    const d = ((this.radius * 1.2) / Math.tan(half)) * this.zoom;
     const cp = Math.cos(this.pitch);
     this.camera.position.set(Math.sin(this.yaw) * cp * d, Math.sin(this.pitch) * d + 0.1, Math.cos(this.yaw) * cp * d);
     this.camera.lookAt(0, 0.05, 0);

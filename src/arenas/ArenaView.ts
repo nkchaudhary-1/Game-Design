@@ -1,112 +1,65 @@
-// ArenaView v2: Core Pit as the reference diorama. A grey concrete stadium with painted ring grooves, plate
-// seams, yellow hazard patches and the chevron emblem; a dark rim lip; and a ring of slate blocks and accent
-// crates round the outside. The pit itself is one textured mesh (painted once on a canvas), the clutter is
-// merged into a handful of draw calls. Physics is flat: the dish is visual only.
+// ArenaView v3: Core Pit as a realistic, high-poly diorama. A 2K PBR concrete stadium (carved grooves, plate seams,
+// cracks, worn hazard paint, engraved emblem), a ring of bevelled stone rim slabs, a surround of displaced rocks and
+// painted steel crates, glowing pylons, drifting dust, real shadows. Physics is flat: the dish is visual only.
 
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { TAU } from '../core/types';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { merge, ringSector } from '../blades/partGeometry';
 import { makeRng } from '../core/Rng';
-import { drawEmblem } from '../render/emblem';
-import { facet } from '../render/materials';
+import { TAU } from '../core/types';
+import { hdr } from '../render/materials';
+import { brushedMetal, fbm, normalCanvas, tex } from '../render/procTex';
+import { GFX } from '../render/quality';
 import type { Arena } from './Arena';
 import type { ArenaDef } from './arenaData';
+import { crateCanvas, paintFloorMaps } from './arenaTextures';
 
-const RINGS = 16;
-const SEGS = 64;
+const RINGS = 24;
+const SEGS = 96;
 const SLATE = ['#262a3d', '#2f3348', '#383c54', '#222538', '#42475f'];
 const ACCENTS: Array<{ color: string; mark: string }> = [
-  { color: '#e0323d', mark: '#fff1ee' }, { color: '#e0323d', mark: '#fff1ee' }, { color: '#e8a93a', mark: '#2a1d08' }, { color: '#2f6bff', mark: '#eaf1ff' },
+  { color: '#d92d3a', mark: '#fff1ee' }, { color: '#d92d3a', mark: '#fff1ee' }, { color: '#e3a336', mark: '#2a1d08' }, { color: '#2a63e8', mark: '#eaf1ff' },
 ];
 
-function paintFloor(): THREE.CanvasTexture {
-  const S = 1024, C = S / 2;
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const g = c.getContext('2d')!;
-  const rnd = makeRng(7);
-  // base concrete, slightly lighter towards the middle
-  const base = g.createRadialGradient(C, C, 40, C, C, C);
-  base.addColorStop(0, '#8e909f'); base.addColorStop(0.7, '#7b7e8f'); base.addColorStop(1, '#62657a');
-  g.fillStyle = base; g.fillRect(0, 0, S, S);
-  // painterly blotches
-  for (let i = 0; i < 2600; i++) {
-    const x = rnd() * S, y = rnd() * S, w = 8 + rnd() * 50, h = 6 + rnd() * 34;
-    g.fillStyle = rnd() > 0.5 ? 'rgba(255,255,255,0.045)' : 'rgba(10,12,30,0.06)';
-    g.save(); g.translate(x, y); g.rotate(rnd() * Math.PI); g.fillRect(-w / 2, -h / 2, w, h); g.restore();
-  }
-  const R = C * 0.97;
-  // alternating plate tone between the grooves
-  const bands = [0.22, 0.46, 0.7, 0.9];
-  const sect = 24;
-  for (let b = 0; b < bands.length; b++) {
-    const r0 = b === 0 ? 0 : bands[b - 1], r1 = bands[b];
-    for (let j = 0; j < sect; j++) {
-      if ((j + b) % 2) continue;
-      g.fillStyle = 'rgba(255,255,255,0.05)';
-      g.beginPath(); g.arc(C, C, r1 * R, (j * TAU) / sect, ((j + 1) * TAU) / sect); g.arc(C, C, r0 * R, ((j + 1) * TAU) / sect, (j * TAU) / sect, true); g.fill();
-    }
-  }
-  // grooves: dark line with a light edge
-  bands.forEach((f, i) => {
-    g.strokeStyle = 'rgba(30,33,52,0.65)'; g.lineWidth = i === 1 ? 9 : 6;
-    g.beginPath(); g.arc(C, C, f * R, 0, TAU); g.stroke();
-    g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 2;
-    g.beginPath(); g.arc(C, C, f * R + 6, 0, TAU); g.stroke();
-  });
-  // radial seams on the outer bands
-  g.strokeStyle = 'rgba(30,33,52,0.5)'; g.lineWidth = 3;
-  for (let j = 0; j < sect; j++) {
-    const a = (j * TAU) / sect;
-    for (const [r0, r1] of [[0.46, 0.7], [0.7, 0.9], [0.9, 0.97]]) {
-      g.beginPath(); g.moveTo(C + Math.cos(a) * r0 * R, C + Math.sin(a) * r0 * R); g.lineTo(C + Math.cos(a) * r1 * R, C + Math.sin(a) * r1 * R); g.stroke();
-    }
-  }
-  // hazard patches on the outer band
-  const hz = '#f2b33d';
-  for (const deg of [-52, 38, 128, 218]) {
-    const a0 = ((deg - 9) * Math.PI) / 180, a1 = ((deg + 9) * Math.PI) / 180;
-    g.fillStyle = hz;
-    g.beginPath(); g.arc(C, C, 0.965 * R, a0, a1); g.arc(C, C, 0.9 * R, a1, a0, true); g.closePath(); g.fill();
-    g.save(); g.clip(); g.strokeStyle = 'rgba(40,28,6,0.55)'; g.lineWidth = 5;
-    for (let k = -20; k < 20; k++) { g.beginPath(); g.moveTo(C + k * 12, C - R); g.lineTo(C + k * 12 + 60, C + R); g.stroke(); }
-    g.restore();
-  }
-  // centre: emblem in a ring, as a faint stencil
-  g.strokeStyle = 'rgba(30,33,52,0.35)'; g.lineWidth = 8;
-  g.beginPath(); g.arc(C, C, 0.19 * R, 0, TAU); g.stroke();
-  g.globalAlpha = 0.2;
-  drawEmblem(g, S, '#262a45', 0.27);
-  g.globalAlpha = 1;
-  // scuffs
-  for (let i = 0; i < 160; i++) {
-    const a = rnd() * TAU, r = Math.sqrt(rnd()) * R, x = C + Math.cos(a) * r, y = C + Math.sin(a) * r;
-    g.fillStyle = 'rgba(25,27,44,0.28)'; g.fillRect(x, y, 2 + rnd() * 9, 1 + rnd() * 2);
-  }
-  // darken the very edge so the rim lip reads
-  const edge = g.createRadialGradient(C, C, R * 0.9, C, C, C);
-  edge.addColorStop(0, 'rgba(0,0,0,0)'); edge.addColorStop(1, 'rgba(8,10,24,0.55)');
-  g.fillStyle = edge; g.fillRect(0, 0, S, S);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
+// ------------------------------------------------------------------------------------------ 3D noise for rocks
+function hash3(x: number, y: number, z: number): number {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
+function noise3(x: number, y: number, z: number): number {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const fx = x - xi, fy = y - yi, fz = z - zi;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
+  const l = (a: number, b: number, t: number) => a + (b - a) * t;
+  return l(
+    l(l(hash3(xi, yi, zi), hash3(xi + 1, yi, zi), u), l(hash3(xi, yi + 1, zi), hash3(xi + 1, yi + 1, zi), u), v),
+    l(l(hash3(xi, yi, zi + 1), hash3(xi + 1, yi, zi + 1), u), l(hash3(xi, yi + 1, zi + 1), hash3(xi + 1, yi + 1, zi + 1), u), v), w);
+}
+const fbm3 = (x: number, y: number, z: number): number => noise3(x, y, z) * 0.55 + noise3(x * 2.1, y * 2.1, z * 2.1) * 0.3 + noise3(x * 4.3, y * 4.3, z * 4.3) * 0.15;
 
-function crateTexture(color: string, mark: string, text: string | null): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d')!;
-  g.fillStyle = color; g.fillRect(0, 0, 256, 256);
-  g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(0, 0, 256, 18);
-  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 238, 256, 18);
-  if (text) {
-    g.fillStyle = mark; g.font = '800 86px "Barlow Condensed", "Arial Narrow", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(text, 128, 132);
-  } else drawEmblem(g, 256, mark, 0.5);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+function rockGeometry(seed: number): THREE.BufferGeometry {
+  const rnd = makeRng(seed);
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, [3, 5, 8][GFX.detail]);
+  const sx = 1.0 + rnd() * 0.9, sy = 0.65 + rnd() * 0.9, sz = 1.0 + rnd() * 0.9, off = rnd() * 90;
+  const p = g.attributes.position as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    const base = fbm3(v.x * 1.5 + off, v.y * 1.5 + off, v.z * 1.5 + off);
+    const ridge = 1 - Math.abs(2 * noise3(v.x * 3.2 + off * 2, v.y * 3.2, v.z * 3.2 + off) - 1);
+    const r = 0.62 + 0.62 * base + 0.2 * ridge;
+    p.setXYZ(i, v.x * r * sx, Math.max(-0.35, v.y * r * sy), v.z * r * sz);
+  }
+  g.deleteAttribute('normal'); g.deleteAttribute('uv');
+  g = mergeVertices(g, 1e-4);
+  g.computeVertexNormals();
+  const q = g.attributes.position as THREE.BufferAttribute;
+  const uv = new Float32Array(q.count * 2);
+  for (let i = 0; i < q.count; i++) { uv[i * 2] = q.getX(i) * 0.5 + q.getZ(i) * 0.25; uv[i * 2 + 1] = q.getY(i) * 0.5 + q.getZ(i) * 0.25; }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
 }
 
 export class ArenaView {
@@ -115,6 +68,9 @@ export class ArenaView {
   private readonly arena: Arena;
   private readonly def: ArenaDef;
   private readonly owned: Array<{ dispose(): void }> = [];
+  private dust: THREE.Points | null = null;
+  private time = 0;
+  private rockNormal: THREE.CanvasTexture | null = null;
 
   constructor(def: ArenaDef, arena: Arena) {
     this.def = def;
@@ -122,15 +78,29 @@ export class ArenaView {
     this.buildFloor();
     this.buildRim();
     this.buildSurround();
-    this.buildPads();
+    this.buildPylons();
+    this.buildDust();
     this.buildDanger();
     this.buildGround();
+    // coloured accent lights from the pit's edge: red one side, blue the other
+    const red = new THREE.PointLight('#ff5a4a', 28, 36, 2); red.position.set(-def.radius * 0.95, 3.2, -def.radius * 0.5);
+    const blue = new THREE.PointLight('#4f86ff', 28, 36, 2); blue.position.set(def.radius * 0.95, 3.2, def.radius * 0.45);
+    this.root.add(red, blue);
   }
 
   /** Visual floor height at radius r (the dish). */
   dishY(r: number): number { return -this.arena.dishDepth(r); }
 
   private track<T extends { dispose(): void }>(o: T): T { this.owned.push(o); return o; }
+
+  private shared(): THREE.CanvasTexture {
+    if (!this.rockNormal) {
+      const S = 512;
+      const h = fbm(S, 17, 6, 6);
+      this.rockNormal = this.track(tex(normalCanvas(h, S, 5), { repeat: 2 }));
+    }
+    return this.rockNormal;
+  }
 
   private buildFloor(): void {
     const R = this.def.radius;
@@ -150,94 +120,159 @@ export class ArenaView {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.computeVertexNormals();
-    const tex = this.track(paintFloor());
-    const mat = this.track(new THREE.MeshStandardMaterial({ map: tex, color: 0xb9bccb, roughness: 0.9, metalness: 0.02, envMapIntensity: 0.35 }));
-    this.root.add(new THREE.Mesh(g, mat));
+    const spawns = [0, 1].map((s) => this.arena.spawn(s, 2));
+    const maps = paintFloorMaps(spawns, R);
+    const mat = this.track(new THREE.MeshStandardMaterial({
+      map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), roughnessMap: maps.roughnessMap, roughness: 1, metalness: 0.04, envMapIntensity: 0.25,
+    }));
+    const floor = new THREE.Mesh(g, mat);
+    floor.receiveShadow = true;
+    this.root.add(floor);
   }
 
-  /** Dark concrete lip round the pit, with a few yellow inserts. */
+  /** A ring of bevelled stone slabs round the pit; eight hazard-striped ones. */
   private buildRim(): void {
     const R = this.def.radius;
-    const n = 48;
-    const blockW = ((TAU * R) / n) * 0.92;
-    const geo = this.track(new THREE.BoxGeometry(blockW, 0.46, 0.9));
-    const dark = this.track(facet('#3d4158', { metal: 0.1, rough: 0.8 }));
-    const gold = this.track(facet('#e8a93a', { metal: 0.1, rough: 0.7 }));
+    const n = 64, step = TAU / n;
+    const stone: THREE.BufferGeometry[] = [], yellow: THREE.BufferGeometry[] = [];
     for (let j = 0; j < n; j++) {
-      const a = (j * TAU) / n + TAU / n / 2;
-      const m = new THREE.Mesh(geo, j % 6 === 3 ? gold : dark);
-      m.position.set(Math.cos(a) * (R + 0.5), 0.0, Math.sin(a) * (R + 0.5));
-      m.rotation.y = -a + Math.PI / 2;
-      this.root.add(m);
+      const slab = ringSector(R + 0.02, R + 1.0, j * step + step * 0.02, (j + 1) * step - step * 0.02, 0.62, -0.42);
+      (j % 8 === 3 ? yellow : stone).push(slab);
+    }
+    const nm = this.shared();
+    const stoneMat = this.track(new THREE.MeshStandardMaterial({ color: '#4d5166', roughness: 0.82, metalness: 0.05, normalMap: nm, normalScale: new THREE.Vector2(0.9, 0.9), envMapIntensity: 0.5 }));
+    const hz = document.createElement('canvas'); hz.width = hz.height = 128;
+    const hg = hz.getContext('2d')!;
+    hg.fillStyle = '#e3a336'; hg.fillRect(0, 0, 128, 128); hg.fillStyle = '#1c1405';
+    for (let k = -4; k < 8; k++) { hg.beginPath(); hg.moveTo(k * 32, 0); hg.lineTo(k * 32 + 16, 0); hg.lineTo(k * 32 + 16 + 128, 128); hg.lineTo(k * 32 + 128, 128); hg.fill(); }
+    const hazTex = this.track(tex(hz, { srgb: true, repeat: 1 }));
+    const yellowMat = this.track(new THREE.MeshStandardMaterial({ map: hazTex, roughness: 0.6, metalness: 0.1, normalMap: nm, normalScale: new THREE.Vector2(0.5, 0.5) }));
+    for (const [geos, mat] of [[stone, stoneMat], [yellow, yellowMat]] as const) {
+      const m = merge(geos);
+      if (!m) continue;
+      this.track(m);
+      const mesh = new THREE.Mesh(m, mat);
+      mesh.castShadow = GFX.shadows; mesh.receiveShadow = true;
+      this.root.add(mesh);
     }
   }
 
-  /** The ring of slate blocks and accent crates: merged per colour so it stays a few draw calls. */
+  /** Displaced rocks and painted crates in a ring round the pit; low on the camera's side. */
   private buildSurround(): void {
     const R = this.def.radius;
     const rnd = makeRng(11);
-    const groups = new Map<string, THREE.BufferGeometry[]>();
-    const push = (key: string, g: THREE.BufferGeometry) => { (groups.get(key) ?? groups.set(key, []).get(key)!).push(g); };
-    const decals: THREE.Mesh[] = [];
-    const N = 78;
+    const nm = this.shared();
+    const bumpMetal = brushedMetal().bump;
+    const rocks = new Map<number, THREE.BufferGeometry[]>();
+    const N = GFX.rocks;
     for (let k = 0; k < N; k++) {
-      const a = ((k + (rnd() - 0.5) * 0.7) / N) * TAU;
-      const r = R + 1.7 + Math.pow(rnd(), 1.4) * 8.5;
+      const a = ((k + (rnd() - 0.5) * 0.8) / N) * TAU;
+      const r = R + 3.6 + Math.pow(rnd(), 1.3) * 8.5;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const w = 1.5 + rnd() * 2.4, d = 1.5 + rnd() * 2.4;
-      let h = 1.1 + rnd() * 3.2 + (r - R) * 0.32;
-      // nothing tall between the camera (south, +z) and the pit
-      if (z > R * 0.2) h = Math.min(h, 0.7 + rnd() * 0.7);
-      const accent = rnd() < 0.2 && r < R + 6.5;
-      const geo = new THREE.BoxGeometry(w, h, d);
-      geo.rotateY(rnd() * Math.PI);
-      geo.translate(x, h / 2 - 1.1, z);
-      if (accent) {
-        const spec = ACCENTS[Math.floor(rnd() * ACCENTS.length)];
-        push(spec.color, geo);
-        // emblem decal on the face that looks towards the pit
-        const dec = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w, d) * 0.62, Math.min(w, d) * 0.62), new THREE.MeshBasicMaterial({ map: this.track(crateTexture(spec.color, spec.mark, null)), toneMapped: true }));
-        dec.position.set(x - Math.cos(a) * (Math.min(w, d) * 0.5 + 0.02), Math.min(h, 1.6) * 0.55 + (h > 1.6 ? 0 : 0) - 1.1 + Math.min(h, 1.6) * 0.2, z - Math.sin(a) * (Math.min(w, d) * 0.5 + 0.02));
-        dec.lookAt(0, dec.position.y + 2, 0);
-        decals.push(dec);
-        this.track(dec.geometry); this.track(dec.material as THREE.Material);
-      } else {
-        push(SLATE[Math.floor(rnd() * SLATE.length)], geo);
-      }
+      const scale = 0.9 + rnd() * 1.5 + (r - R) * 0.1;
+      const g = rockGeometry(100 + k * 7);
+      const front = z > R * 0.2;
+      g.scale(scale, front ? scale * 0.55 : scale * (0.9 + rnd() * 0.6), scale);
+      g.rotateY(rnd() * TAU);
+      g.translate(x, -0.55 + (front ? -0.2 : 0), z);
+      const v = Math.floor(rnd() * SLATE.length);
+      (rocks.get(v) ?? rocks.set(v, []).get(v)!).push(g);
+    }
+    for (const [v, geos] of rocks) {
+      const m = merge(geos);
+      if (!m) continue;
+      this.track(m);
+      const mat = this.track(new THREE.MeshStandardMaterial({ color: SLATE[v], roughness: 0.82, metalness: 0.08, normalMap: nm, normalScale: new THREE.Vector2(1.2, 1.2), envMapIntensity: 0.55 }));
+      const mesh = new THREE.Mesh(m, mat);
+      mesh.castShadow = GFX.shadows; mesh.receiveShadow = true;
+      this.root.add(mesh);
+    }
+
+    // painted steel crates, grouped by colour so each colour is one draw call
+    const byColour = new Map<string, THREE.BufferGeometry[]>();
+    const crates = Math.round(10 + GFX.detail * 3);
+    for (let k = 0; k < crates; k++) {
+      const a = ((k + 0.5 + (rnd() - 0.5) * 0.5) / crates) * TAU;
+      const r = R + 2.4 + rnd() * 4.6;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const w = 1.5 + rnd() * 1.2, d = 1.5 + rnd() * 1.2;
+      const h = z > R * 0.2 ? 0.9 + rnd() * 0.5 : 1.3 + rnd() * 1.3;
+      const spec = ACCENTS[k % ACCENTS.length];
+      const geo = new RoundedBoxGeometry(w, h, d, [2, 3, 5][GFX.detail], 0.1);
+      geo.rotateY(a + (rnd() - 0.5) * 0.5);
+      geo.translate(x, h / 2 - 0.9, z);
+      (byColour.get(spec.color + '|' + spec.mark) ?? byColour.set(spec.color + '|' + spec.mark, []).get(spec.color + '|' + spec.mark)!).push(geo);
+    }
+    for (const [key, geos] of byColour) {
+      const [color, mark] = key.split('|');
+      const m = merge(geos);
+      if (!m) continue;
+      this.track(m);
+      const map = this.track(tex(crateCanvas(color, mark, null), { srgb: true }));
+      const mat = this.track(new THREE.MeshPhysicalMaterial({ map, metalness: 0.3, roughness: 0.46, clearcoat: 0.3, clearcoatRoughness: 0.35, bumpMap: bumpMetal, bumpScale: 0.3, envMapIntensity: 0.8 }));
+      const mesh = new THREE.Mesh(m, mat);
+      mesh.castShadow = GFX.shadows; mesh.receiveShadow = true;
+      this.root.add(mesh);
     }
     // the big signage crate, front right, low enough not to block the view
-    const sx = R * 0.78, sz = R * 0.7;
     const sign = new THREE.Mesh(
-      this.track(new THREE.BoxGeometry(3.6, 1.9, 2.6)),
-      [0, 1, 2, 3, 4, 5].map((i) => (i === 4 ? this.track(new THREE.MeshStandardMaterial({ map: this.track(crateTexture('#e0323d', '#fff1ee', 'SPIN')), roughness: 0.6, metalness: 0.1 })) : this.track(facet('#e0323d', { metal: 0.1, rough: 0.6 })))),
+      this.track(new RoundedBoxGeometry(3.8, 2.0, 2.6, 4, 0.12)),
+      [0, 1, 2, 3, 4, 5].map((i) => this.track(new THREE.MeshPhysicalMaterial({
+        map: this.track(tex(crateCanvas('#d92d3a', '#fff1ee', i === 4 ? 'SPIN' : null), { srgb: true })), metalness: 0.3, roughness: 0.45, clearcoat: 0.3, bumpMap: bumpMetal, bumpScale: 0.3,
+      }))),
     );
-    sign.position.set(sx + 3.4, -0.2, sz + 3.2);
+    sign.position.set(R * 0.8 + 3.2, -0.1, R * 0.7 + 3.0);
     sign.rotation.y = -0.9;
+    sign.castShadow = GFX.shadows; sign.receiveShadow = true;
     this.root.add(sign);
+  }
 
-    for (const [key, geos] of groups) {
-      const merged = mergeGeometries(geos, false);
-      geos.forEach((g) => g.dispose());
-      if (!merged) continue;
-      this.track(merged);
-      const mat = this.track(facet(key, { metal: 0.12, rough: 0.72 }));
-      this.root.add(new THREE.Mesh(merged, mat));
+  /** Slim steel pylons round the rim with glowing tops: they catch the bloom and light the rocks. */
+  private buildPylons(): void {
+    const R = this.def.radius;
+    const bodyGeo = this.track(new THREE.CylinderGeometry(0.2, 0.26, 3.4, 10));
+    const capGeo = this.track(new THREE.CylinderGeometry(0.28, 0.2, 0.34, 10));
+    const body = this.track(new THREE.MeshStandardMaterial({ color: '#1a1e29', metalness: 0.85, roughness: 0.4 }));
+    const cap = this.track(hdr('#9fd2ff', 2.6));
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + 0.26, r = R + 2.6;
+      const b = new THREE.Mesh(bodyGeo, body); b.position.set(Math.cos(a) * r, 0.75, Math.sin(a) * r); b.castShadow = GFX.shadows;
+      const c = new THREE.Mesh(capGeo, cap); c.position.set(Math.cos(a) * r, 2.6, Math.sin(a) * r);
+      this.root.add(b, c);
     }
-    decals.forEach((d) => this.root.add(d));
+  }
+
+  /** Drifting dust motes in the light. */
+  private buildDust(): void {
+    if (GFX.dust <= 0) return;
+    const R = this.def.radius, rnd = makeRng(3);
+    const n = GFX.dust;
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * TAU, r = Math.sqrt(rnd()) * (R + 4);
+      pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = 0.4 + rnd() * 8; pos[i * 3 + 2] = Math.sin(a) * r;
+    }
+    const g = this.track(new THREE.BufferGeometry());
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const x = c.getContext('2d')!; const grd = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, 'rgba(255,255,255,0.9)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = grd; x.fillRect(0, 0, 32, 32);
+    const mat = this.track(new THREE.PointsMaterial({ size: 0.11, map: this.track(new THREE.CanvasTexture(c)), color: '#b8c6e8', transparent: true, opacity: 0.38, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+    this.dust = new THREE.Points(g, mat);
+    this.root.add(this.dust);
   }
 
   /** Dark ground far below so there is never a hole in the world, with a soft glow under the pit. */
   private buildGround(): void {
     const R = this.def.radius;
-    const g = this.track(new THREE.CircleGeometry(R + 40, 40).rotateX(-Math.PI / 2));
-    const m = new THREE.Mesh(g, this.track(new THREE.MeshBasicMaterial({ color: '#0a0e16' })));
+    const m = new THREE.Mesh(this.track(new THREE.CircleGeometry(R + 44, 48).rotateX(-Math.PI / 2)), this.track(new THREE.MeshBasicMaterial({ color: '#090d15' })));
     m.position.y = -4.2;
     this.root.add(m);
-    const c = document.createElement('canvas');
-    c.width = c.height = 128;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
     const x = c.getContext('2d')!;
     const grd = x.createRadialGradient(64, 64, 6, 64, 64, 64);
-    grd.addColorStop(0, 'rgba(120,150,255,0.22)'); grd.addColorStop(0.5, 'rgba(70,90,200,0.08)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    grd.addColorStop(0, 'rgba(120,150,255,0.2)'); grd.addColorStop(0.5, 'rgba(70,90,200,0.07)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = grd; x.fillRect(0, 0, 128, 128);
     const halo = new THREE.Mesh(
       this.track(new THREE.CircleGeometry(R + 12, 40).rotateX(-Math.PI / 2)),
@@ -245,19 +280,6 @@ export class ArenaView {
     );
     halo.position.y = -3.9;
     this.root.add(halo);
-  }
-
-  /** Dashed launch pads at the spawn points. */
-  private buildPads(): void {
-    const mat = this.track(new THREE.MeshBasicMaterial({ color: '#f4f1ea', transparent: true, opacity: 0.55, depthWrite: false }));
-    for (let s = 0; s < 2; s++) {
-      const p = this.arena.spawn(s, 2);
-      for (let k = 0; k < 10; k++) {
-        const arc = new THREE.Mesh(this.track(new THREE.RingGeometry(1.95, 2.07, 6, 1, (k * TAU) / 10, (TAU / 10) * 0.55).rotateX(-Math.PI / 2)), mat);
-        arc.position.set(p.x, this.dishY(Math.hypot(p.x, p.z)) + 0.03, p.z);
-        this.root.add(arc);
-      }
-    }
   }
 
   private buildDanger(): void {
@@ -270,6 +292,20 @@ export class ArenaView {
       this.root.add(m);
       this.danger.push(m);
     }
+  }
+
+  /** Per-frame: drift the dust. */
+  tick(dt: number): void {
+    this.time += dt;
+    if (!this.dust) return;
+    const p = this.dust.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) {
+      let y = p.getY(i) + dt * (0.12 + (i % 5) * 0.03);
+      if (y > 8.4) y = 0.4;
+      p.setY(i, y);
+      p.setX(i, p.getX(i) + Math.sin(this.time * 0.4 + i) * dt * 0.08);
+    }
+    p.needsUpdate = true;
   }
 
   /** Light the rim next to blades that are close to it. `blades` are world positions. */
