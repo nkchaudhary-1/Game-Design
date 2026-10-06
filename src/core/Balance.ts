@@ -32,13 +32,16 @@ export const TUNING = {
   DAMAGE_JITTER: 0.15,     // contact-angle variance
   // -- spin
   DECAY_BASE: 3.0,         // passive spin lost per second at Stamina 5…
-  DECAY_PER_STAMINA: 0.26, // …less this much per point of Stamina above 5
+  DECAY_PER_STAMINA: 0.06, // …less this much per point of Stamina above 5
   MOVE_COST: 0.005 / L,    // spin/s lost per unit of speed (floor friction)
   STEER_COST: 0.36,        // spin/s lost at full steering — the price of agency
   WOBBLE_BELOW: 22,        // spin % under which a blade wobbles…
   WOBBLE_ACCEL: 34 * L,    // …and gets pushed around
   LOW_SPIN_FLOOR: 0.55,    // movement/impact multiplier reached at zero spin
   LOW_SPIN_VULN: 0.4,      // extra damage taken at zero spin
+  // -- defense curve: defMul = DEF_BASE + DEF_PER × Defense (damage and knockback taken are divided by it)
+  DEF_BASE: 0.4,
+  DEF_PER: 0.12,
   // -- mass curve: weight and stability
   MASS_BASE: 0.55,
   MASS_PER_WEIGHT: 0.13,
@@ -51,7 +54,7 @@ export const TUNING = {
   MAX_SPEED: 230 * L,
   TIMEOUT: 60,             // [PRD open item → proposed default] higher spin wins after this long
   SIMUL_WINDOW: 0.1,       // after a ring-out, a second KO inside this window is a double KO
-  DECAY_JITTER: 0.03,      // per-blade manufacturing variance, breaks perfect mirror ties
+  DECAY_JITTER: 0.09,      // per-match variance in how long a blade spins (±9%): without it a small, steady edge wins every time
   // -- ability scale: dash speeds and radial impulses in the data are written in "design units"
   DASH_SCALE: 0.5,
   IMPULSE_SCALE: 0.5,
@@ -99,7 +102,7 @@ export function deriveCombat(s: StatRatings): CombatParams {
     friction: TUNING.FRICTION,
     spinDecay: Math.max(0.9, TUNING.DECAY_BASE - TUNING.DECAY_PER_STAMINA * (s.stamina - 5)),
     atkMul: 0.3 + 0.13 * (0.6 * s.attack + 0.4 * s.spinDamage),
-    defMul: 0.2 + 0.145 * s.defense,
+    defMul: TUNING.DEF_BASE + TUNING.DEF_PER * s.defense,
     kbDealt: 0.55 + 0.09 * s.knockback,
     spinLossTaken: 1.25 - 0.05 * s.spinRetention,
     external: clamp(1.2 - 0.1 * s.stability, 0.15, 1),

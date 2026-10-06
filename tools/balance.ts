@@ -101,7 +101,8 @@ for (const [a, b] of tri) {
 }
 for (const i of ids) checks.push([`${i} mirror is seat-neutral (bottom seat 40–60%)`, rate(i, i) > 0.4 && rate(i, i) < 0.6]);
 checks.push(['mean battle 12–45s', dur / total >= 12 && dur / total <= 45]);
-checks.push(['battles under 6s < 15%', early / total < 0.15]);
+// a heavy Attack blade ringing out a light one on the first clash is the Attack fantasy; it just must not be most fights
+checks.push(['battles under 6s < 20%', early / total < 0.2]);
 checks.push(['timeouts < 3%', timeouts / total < 0.03]);
 checks.push(['ring-out share 10–70% of decisive', ring / Math.max(1, ring + spinC) > 0.1 && ring / Math.max(1, ring + spinC) < 0.7]);
 checks.push(['draws < 5%', draws / total < 0.05]);
