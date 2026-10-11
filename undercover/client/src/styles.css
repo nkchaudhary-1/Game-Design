@@ -1169,9 +1169,19 @@ textarea.input {
   font-family: var(--font-narration);
   font-style: normal;
   font-weight: 400;
-  font-size: 21px;
-  letter-spacing: 0.3em;
+  font-size: 18px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex: none;
+}
+.pill {
+  flex: none;
+}
+.topbar .chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .wordmark .hat {
   width: 30px;
