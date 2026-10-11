@@ -4,6 +4,7 @@ import { art } from '../art.js';
 import { Atmosphere } from '../components/Atmosphere.js';
 import { Hero, Skyline } from '../components/Hero.js';
 import { Art, Chevron, TopBar } from '../components/ui.js';
+import { MotionPrompt } from '../components/MotionPrompt.js';
 import { Rules } from '../screens/Rules.js';
 import { configureSolo } from './solo.js';
 import { TableGame } from './TableGame.js';
@@ -82,6 +83,7 @@ export function LocalApp() {
             }}
           />
         )}
+        <MotionPrompt />
       </div>
     </>
   );

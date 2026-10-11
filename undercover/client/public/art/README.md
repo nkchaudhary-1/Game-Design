@@ -11,6 +11,9 @@ Grayscale noir art, processed from the source pack with `tools/prepare-art.py` (
 | `role-{role}.jpg` | Flattened composite for compact cards (rules page, eliminated player) |
 | `avatar-01.jpg` … `avatar-11.jpg` | Seat portraits, keyed by seat number |
 | `frame.png` | Ornamental card frame (transparent PNG) |
+| `mystery.webp` | Question mark cut-out (RGBA) shown on the pass-and-play gate before the handoff; a drawn mark is used until it exists |
+| `bg-main.jpg` | Main page backdrop behind the fog layers |
+| `portrait-01.webp` … `portrait-11.webp` | Large 3:4 seat portraits |
 | `scene-square.jpg`, `scene-ballroom.jpg` | Spare backdrops |
 
 Figure files are RGBA cut-outs made by `tools/cutout.py` (background transparent, body opaque, smoke soft), so

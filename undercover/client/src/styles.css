@@ -1681,3 +1681,139 @@ textarea.input {
   overflow-wrap: anywhere;
   padding: 0 8px;
 }
+
+/* ------------------------------------------------------------------------
+   Parallax: --px / --py in -1..1 from parallax.ts. Far layers move against the tilt, near layers with it.
+   ------------------------------------------------------------------------ */
+:root {
+  --px: 0;
+  --py: 0;
+}
+.atmosphere img.backdrop {
+  translate: calc(var(--px) * -12px) calc(var(--py) * -8px);
+}
+.atmosphere .skyline svg {
+  translate: calc(var(--px) * -8px) calc(var(--py) * -4px);
+}
+.atmosphere .fog-bg {
+  translate: calc(var(--px) * -6px) calc(var(--py) * -4px);
+}
+.atmosphere .fog-mid {
+  translate: calc(var(--px) * 10px) calc(var(--py) * 6px);
+}
+.atmosphere .fog-fg {
+  translate: calc(var(--px) * 24px) calc(var(--py) * 14px);
+}
+.hero-media img.scene {
+  translate: calc(var(--px) * -10px) calc(var(--py) * -6px);
+}
+.hero-media img.fig {
+  translate: calc(var(--px) * 14px) calc(var(--py) * 8px);
+}
+.hero-copy {
+  translate: calc(var(--px) * 4px) calc(var(--py) * 2px);
+}
+.role-card.photo .figure img.scene {
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+  translate: calc(var(--px) * -10px) calc(var(--py) * -6px);
+}
+.role-card.photo .figure img.frame {
+  translate: calc(var(--px) * 6px) calc(var(--py) * 4px);
+}
+.role-card.photo .figure img.fig {
+  translate: calc(var(--px) * 18px) calc(var(--py) * 10px);
+}
+.role-card.photo .caption {
+  translate: calc(var(--px) * 3px) calc(var(--py) * 2px);
+}
+.role-card.photo,
+.gate-card {
+  transform: perspective(900px) rotateY(calc(var(--px) * 4deg)) rotateX(calc(var(--py) * -3deg));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.gate-card img.portrait {
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+  translate: calc(var(--px) * 10px) calc(var(--py) * 6px);
+}
+.gate-card img.frame {
+  translate: calc(var(--px) * -4px) calc(var(--py) * -3px);
+}
+.mode-media img {
+  translate: calc(var(--px) * 6px) calc(var(--py) * 3px);
+}
+.skyline-strip img {
+  translate: calc(var(--px) * -8px) calc(var(--py) * -4px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .role-card.photo,
+  .gate-card {
+    transform: none;
+  }
+}
+
+.motion-prompt {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--cta-h) + var(--safe-bottom) + 12px);
+  z-index: 40;
+  max-width: 448px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: rgba(21, 23, 25, 0.96);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: screen-in 500ms var(--ease) both;
+}
+.motion-prompt .copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.motion-prompt .row {
+  justify-content: flex-end;
+}
+
+/* Gate: the mystery card */
+.gate-card img.scene {
+  position: absolute;
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+  object-fit: cover;
+  filter: grayscale(1) blur(1.5px) brightness(0.55);
+  translate: calc(var(--px) * -8px) calc(var(--py) * -5px);
+}
+.gate-card img.mark {
+  position: absolute;
+  left: 4%;
+  top: 2%;
+  width: 92%;
+  height: 96%;
+  object-fit: contain;
+  filter: grayscale(1) drop-shadow(0 16px 24px rgba(0, 0, 0, 0.8));
+  translate: calc(var(--px) * 16px) calc(var(--py) * 10px);
+  animation: figure-rise 900ms var(--ease) both, idle-breathe 7s ease-in-out 0.9s infinite;
+}
+.gate-card.mystery img.frame {
+  z-index: 0;
+}
+.gate-card svg.mark.drawn {
+  position: absolute;
+  left: 8%;
+  top: 6%;
+  width: 84%;
+  height: 88%;
+  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.8));
+  translate: calc(var(--px) * 16px) calc(var(--py) * 10px);
+  animation: figure-rise 900ms var(--ease) both, idle-breathe 7s ease-in-out 0.9s infinite;
+}

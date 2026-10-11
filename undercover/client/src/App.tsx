@@ -2,6 +2,7 @@ import { isValidRoomCode } from '@undercover/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { Atmosphere } from './components/Atmosphere.js';
 import { Banner, TopBar } from './components/ui.js';
+import { MotionPrompt } from './components/MotionPrompt.js';
 import { Announcement, Discussion, Ended, Night, RoleReveal, Voting } from './screens/Game.js';
 import { Join } from './screens/Join.js';
 import { Landing } from './screens/Landing.js';
@@ -122,6 +123,7 @@ export function App() {
         <TopBar day={view?.day ?? 0} phase={phase} onRules={() => setRules(true)} showRules={!rules} />
         <Banner status={g.status} />
         {content}
+        <MotionPrompt />
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 import { BODYGUARD_MIN_PLAYERS, MAX_PLAYERS, MIN_PLAYERS, ROLE_NAMES, suggestName, type PlayerCount, type PublicPlayer, type RoomSettings, type RoomView } from '@undercover/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { art, portraitArt } from '../art.js';
+import { art } from '../art.js';
 import { Art, Avatar, Chevron, CtaBar, InlineError, PlayerRow, RoleCard, Timer } from '../components/ui.js';
 import { Skyline } from '../components/Hero.js';
 import { Night, RoleReveal, Voting } from '../screens/Game.js';
@@ -161,13 +161,56 @@ const STAGE_COPY: Record<Stage, { why: string; hint: string }> = {
 // Screens
 // ---------------------------------------------------------------------------
 
-function GatePortrait({ seat, index }: { seat: Seat; index: number }) {
+/** Before the handoff nothing is revealed: a question mark in the frame, never the person. */
+function GatePortrait({ seat }: { seat: Seat; index: number }) {
   const [photo, setPhoto] = useState(true);
   return (
-    <div className="gate-card">
-      {photo ? <Art src={portraitArt(index)} className="portrait" onMissing={() => setPhoto(false)} /> : <Avatar player={{ name: seat.name, color: seat.color }} size={300} square />}
-      <Art src={art('frame.png')} className="frame" />
+    <div className="gate-card mystery">
+      {photo ? (
+        <>
+          <Art src={art('role-unknown-scene.jpg')} className="scene" />
+          <Art src={art('frame.png')} className="frame" />
+          <Art src={art('mystery.webp')} className="mark" onMissing={() => setPhoto(false)} />
+        </>
+      ) : (
+        <>
+          <Art src={art('role-unknown-scene.jpg')} className="scene" />
+          <Art src={art('frame.png')} className="frame" />
+          <MysteryMark />
+        </>
+      )}
     </div>
+  );
+}
+
+/** Drawn stand-in for art/mystery.webp: a carved question mark in smoke. */
+function MysteryMark() {
+  return (
+    <svg className="mark drawn" viewBox="0 0 300 400" aria-hidden="true">
+      <defs>
+        <radialGradient id="qm-glow" cx="50%" cy="45%" r="50%">
+          <stop offset="0" stopColor="#c5c9cc" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#c5c9cc" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="qm-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3a3e43" />
+          <stop offset="0.5" stopColor="#15171a" />
+          <stop offset="1" stopColor="#25282b" />
+        </linearGradient>
+        <linearGradient id="qm-rim" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="0.6" stopColor="#c5c9cc" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#777d82" stopOpacity="0.2" />
+        </linearGradient>
+        <filter id="qm-blur">
+          <feGaussianBlur stdDeviation="14" />
+        </filter>
+      </defs>
+      <ellipse cx="150" cy="190" rx="130" ry="160" fill="url(#qm-glow)" filter="url(#qm-blur)" />
+      <text x="150" y="300" textAnchor="middle" fontFamily="'Barlow Condensed', Impact, sans-serif" fontWeight="700" fontSize="340" fill="url(#qm-fill)" stroke="url(#qm-rim)" strokeWidth="3" paintOrder="stroke">
+        ?
+      </text>
+    </svg>
   );
 }
 
