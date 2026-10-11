@@ -31,6 +31,8 @@ export interface PublicPlayer {
   alive: boolean;
   connected: boolean;
   isHost: boolean;
+  /** Seat number (join order among players), used for the portrait art. */
+  avatar: number;
   /** Only present once this player's role has been deliberately revealed (eliminated / game end). */
   role?: Role;
   /** Night: whether this player has finished acting. Only meaningful for the viewer themselves or God. */

@@ -1,7 +1,8 @@
 import { BODYGUARD_MIN_PLAYERS, PLAYER_COLORS, PLAYER_COUNTS, suggestName, type Mode, type PlayerColor, type PlayerCount, type RoomSettings } from '@undercover/shared';
 import { useState } from 'react';
 import type { ClientMessage } from '@undercover/shared';
-import { COLOR_HEX, CtaBar, InlineError } from '../components/ui.js';
+import { Hero } from '../components/Hero.js';
+import { Chevron, COLOR_HEX, CtaBar, InlineError } from '../components/ui.js';
 import type { GameError } from '../ws.js';
 
 interface Props {
@@ -67,12 +68,9 @@ export function Landing({ send, error, clearError, onRules, onJoin, initialCode 
 
   return (
     <>
-      <main className="screen" data-screen="landing">
-        <div className="hero">
-          <div className="wordmark-big">Undercover</div>
-          <p className="narration">Someone at this table is lying.</p>
-          <p className="lead">A real-time social deduction game for 5 to 11 friends. One phone each, no accounts.</p>
-        </div>
+      <main className="screen flush" data-screen="landing">
+        <Hero tagline="Someone at this table is lying." lead="A real-time social deduction game for 5 to 11 friends. One phone each, no accounts." />
+        <div className="stack gutter">
 
         <section className="card">
           <h3>Join a game</h3>
@@ -148,10 +146,12 @@ export function Landing({ send, error, clearError, onRules, onJoin, initialCode 
           Read the full rules
         </button>
         <InlineError error={error} onDismiss={clearError} />
+        </div>
       </main>
       <CtaBar>
-        <button className="btn primary block" onClick={create} data-testid="create">
+        <button className="btn primary block with-chevron" onClick={create} data-testid="create">
           Create room
+          <Chevron />
         </button>
       </CtaBar>
     </>

@@ -574,6 +574,7 @@ export function viewFor(room: RoomState, viewerId: string, clock: Clock): RoomVi
   const ended = room.phase === 'ended';
   const viewerIsTraitor = viewer?.role === 'traitor';
 
+  let seat = 0;
   const players = room.players.map((p) => {
     const pub: RoomView['players'][number] = {
       id: p.id,
@@ -582,6 +583,7 @@ export function viewFor(room: RoomState, viewerId: string, clock: Clock): RoomVi
       alive: p.alive,
       connected: p.connected,
       isHost: p.id === room.hostId,
+      avatar: p.id === room.godId ? -1 : seat++,
     };
     const revealed =
       p.role !== null &&

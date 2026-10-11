@@ -1,7 +1,28 @@
 import { ROLE_NAMES, type PlayerColor, type PublicPlayer, type Role } from '@undercover/shared';
 import { useEffect, useState, type ReactNode } from 'react';
+import { avatarArt, isMissing, markMissing, ROLE_ART } from '../art.js';
 import { useCountdown } from '../useGame.js';
 import { Silhouette, type Figure } from './Silhouette.js';
+
+/** An image that reports when it is missing so the caller can fall back. */
+export function Art({ src, alt = '', className, onMissing }: { src: string; alt?: string; className?: string; onMissing?: () => void }) {
+  const [failed, setFailed] = useState(() => isMissing(src));
+  if (failed) return null;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        markMissing(src);
+        setFailed(true);
+        onMissing?.();
+      }}
+    />
+  );
+}
 
 export const COLOR_HEX: Record<PlayerColor, string> = {
   moon: '#f2f3f4',
@@ -26,10 +47,12 @@ export function initials(name: string): string {
   return (parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '');
 }
 
-export function Avatar({ player, size = 36 }: { player: Pick<PublicPlayer, 'name' | 'color'>; size?: number }) {
+export function Avatar({ player, size = 44, square }: { player: Pick<PublicPlayer, 'name' | 'color'> & { avatar?: number }; size?: number; square?: boolean }) {
+  const src = player.avatar !== undefined && player.avatar >= 0 ? avatarArt(player.avatar) : null;
+  const [photo, setPhoto] = useState(() => !!src && !isMissing(src));
   return (
-    <span className="avatar" style={{ width: size, height: size, background: COLOR_HEX[player.color], color: textOn(player.color), fontSize: size * 0.42 }}>
-      {initials(player.name).toUpperCase()}
+    <span className={`avatar${square ? ' square' : ''}${photo ? ' photo' : ''}`} style={{ width: size, height: size, background: COLOR_HEX[player.color], color: textOn(player.color), fontSize: size * 0.38 }}>
+      {photo && src ? <Art src={src} onMissing={() => setPhoto(false)} /> : initials(player.name).toUpperCase()}
     </span>
   );
 }
@@ -40,11 +63,7 @@ export function TopBar({ day, phase, onRules, showRules }: { day: number; phase:
     <header className="topbar">
       <div className="topbar-inner">
         <a className="wordmark" href="/" onClick={(e) => e.preventDefault()}>
-          <svg viewBox="0 0 64 64" aria-hidden="true">
-            <path d="M14 30c0-6 7-9 18-9s18 3 18 9l-3 2H17z" fill="#151719" stroke="#C5C9CC" strokeWidth="2" />
-            <path d="M20 23c0-9 4-13 12-13s12 4 12 13" fill="#151719" stroke="#C5C9CC" strokeWidth="2" />
-            <path d="M12 56c2-12 9-17 20-17s18 5 20 17" fill="#151719" stroke="#C5C9CC" strokeWidth="2" />
-          </svg>
+          <HatIcon />
           Undercover
         </a>
         {chip && <span className={`chip${phase === 'night' ? '' : ' live'}`}>{chip}</span>}
@@ -56,6 +75,24 @@ export function TopBar({ day, phase, onRules, showRules }: { day: number; phase:
         )}
       </div>
     </header>
+  );
+}
+
+export function HatIcon() {
+  return (
+    <svg viewBox="0 0 64 40" aria-hidden="true" className="hat">
+      <path d="M4 30 Q32 40 60 30 L58 26 Q32 34 6 26 Z" fill="#c5c9cc" />
+      <path d="M16 27 Q14 12 24 8 Q32 5 40 8 Q50 12 48 27 Q32 32 16 27 Z" fill="#0b0d0f" stroke="#c5c9cc" strokeWidth="2" />
+      <path d="M17 22 Q32 27 47 22" fill="none" stroke="#c5c9cc" strokeWidth="2" />
+    </svg>
+  );
+}
+
+export function Chevron() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="chevron">
+      <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -121,12 +158,20 @@ export function Timer({ endsAt, totalMs, offset, label, urgentMs = 10_000 }: { e
 export function RoleCard({ role, figure, title, line, compact, children }: { role?: Role | null; figure?: Figure; title?: string; line?: string; compact?: boolean; children?: ReactNode }) {
   const fig: Figure = figure ?? role ?? 'unknown';
   const name = title ?? (role ? ROLE_NAMES[role] : 'Unknown');
+  const src = ROLE_ART[fig === 'crowd' ? 'innocent' : fig === 'god' ? 'unknown' : fig];
+  const [photo, setPhoto] = useState(() => !isMissing(src));
   return (
-    <div className={`role-card${compact ? ' compact' : ''}`} data-testid="role-card" data-role={role ?? undefined}>
+    <div className={`role-card${compact ? ' compact' : ''}${photo ? ' photo' : ''}`} data-testid="role-card" data-role={role ?? undefined}>
       <div className="figure">
-        <div className="halo" />
-        <Silhouette figure={fig} />
-        <div className="ground" />
+        {photo ? (
+          <Art src={src} className="photo" onMissing={() => setPhoto(false)} />
+        ) : (
+          <>
+            <div className="halo" />
+            <Silhouette figure={fig} />
+            <div className="ground" />
+          </>
+        )}
       </div>
       <div className="caption">
         <div className="role-name">{name}</div>

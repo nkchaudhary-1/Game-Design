@@ -1,6 +1,8 @@
 import { BODYGUARD_MIN_PLAYERS, MAX_PLAYERS, MIN_PLAYERS, ROLE_NAMES, suggestName, type PlayerCount, type PublicPlayer, type RoomSettings, type RoomView } from '@undercover/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Avatar, CtaBar, InlineError, PlayerRow, RoleCard, Timer } from '../components/ui.js';
+import { art } from '../art.js';
+import { Art, Avatar, Chevron, CtaBar, InlineError, PlayerRow, RoleCard, Timer } from '../components/ui.js';
+import { Skyline } from '../components/Hero.js';
 import { Night, RoleReveal, Voting } from '../screens/Game.js';
 import { Table, useTable, type Seat } from './table.js';
 
@@ -20,30 +22,38 @@ function Setup({ onStart }: { onStart: (names: string[], settings: RoomSettings)
     <>
       <main className="screen" data-screen="setup">
         <div className="hero">
-          <p className="eyebrow">Pass &amp; play</p>
-          <h1>Who's at the table?</h1>
+          <p className="eyebrow ruled">Pass &amp; play</p>
+          <h1 className="textured">Who's at the table?</h1>
           <p className="lead">One phone for everyone. It goes around for the private moments, and stays in the middle for the rest.</p>
         </div>
         <section className="stack" data-testid="seats">
           {names.map((name, i) => (
-            <div className="row" key={i}>
-              <span className="muted mono" style={{ width: 22, textAlign: 'right' }}>
-                {i + 1}
-              </span>
+            <div className="seat-row" key={i}>
+              <span className="seat-no mono">{i + 1}</span>
+              <Avatar player={{ name, color: 'fog', avatar: i }} size={52} square />
               <input className="input" aria-label={`Player ${i + 1} name`} value={name} maxLength={20} onChange={(e) => setNames(names.map((x, j) => (j === i ? e.target.value : x)))} />
-              <button className="btn small" aria-label="Shuffle name" onClick={() => setNames(names.map((x, j) => (j === i ? suggestName() : x)))}>
-                Shuffle
+              <button className="btn small icon-btn" aria-label="Shuffle name" title="Shuffle name" onClick={() => setNames(names.map((x, j) => (j === i ? suggestName() : x)))}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 7h4l3 4M3 17h4l10-10h4M14 17h3M17 4l3 3-3 3M17 14l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
-              <button className="btn small ghost" aria-label="Remove player" disabled={n <= MIN_PLAYERS} onClick={() => setNames(names.filter((_, j) => j !== i))}>
+              <button className="btn small ghost remove" aria-label="Remove player" disabled={n <= MIN_PLAYERS} onClick={() => setNames(names.filter((_, j) => j !== i))}>
                 ×
               </button>
             </div>
           ))}
-          <button className="btn" data-testid="add-seat" disabled={n >= MAX_PLAYERS} onClick={() => setNames([...names, suggestName()])}>
-            Add a player ({n} of {MAX_PLAYERS})
+          <button className="btn add-seat" data-testid="add-seat" disabled={n >= MAX_PLAYERS} onClick={() => setNames([...names, suggestName()])}>
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Add a player <span className="muted">({n} of {MAX_PLAYERS})</span>
           </button>
         </section>
-        <section className="card">
+        <section className="card option-card">
+          <div className="option-media" aria-hidden="true">
+            <Art src={art('role-bodyguard.jpg')} />
+          </div>
           <div className="toggle">
             <div className="copy">
               <strong>Bodyguard</strong>
@@ -51,20 +61,34 @@ function Setup({ onStart }: { onStart: (names: string[], settings: RoomSettings)
             </div>
             <button type="button" role="switch" aria-checked={bodyguard && bodyguardAllowed} aria-label="Bodyguard" className="switch" disabled={!bodyguardAllowed} onClick={() => setBodyguard((b) => !b)} />
           </div>
-          <div className="field">
-            <label htmlFor="table-minutes">Discussion minutes (optional)</label>
-            <input id="table-minutes" className="input" inputMode="numeric" placeholder={n <= 6 ? 'Default 3' : n <= 9 ? 'Default 5' : 'Default 7'} value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/[^0-9]/g, '').slice(0, 2))} />
-          </div>
-          <p className="muted">
-            {n} players: {n <= 6 ? '1 Traitor, 1 Doctor' : n <= 9 ? '2 Traitors, 1 Doctor, 1 Police' : '3 Traitors, 1 Doctor, 1 Police'}
-            {bodyguard && bodyguardAllowed ? ', 1 Bodyguard' : ''}, the rest Innocent.
-          </p>
         </section>
+        <div className="field">
+          <label htmlFor="table-minutes">Discussion minutes (optional)</label>
+          <div className="select-wrap">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" className="select-icon">
+              <circle cx="12" cy="13" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M12 9v4l2.5 2M10 3h4M12 3v2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <select id="table-minutes" className="input select" value={minutes} onChange={(e) => setMinutes(e.target.value)}>
+              <option value="">Default {n <= 6 ? 3 : n <= 9 ? 5 : 7}</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20].map((m) => (
+                <option key={m} value={String(m)}>
+                  {m} minute{m === 1 ? '' : 's'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="muted">
+          {n} players: {n <= 6 ? '1 Traitor, 1 Doctor' : n <= 9 ? '2 Traitors, 1 Doctor, 1 Police' : '3 Traitors, 1 Doctor, 1 Police'}
+          {bodyguard && bodyguardAllowed ? ', 1 Bodyguard' : ''}, the rest Innocent.
+        </p>
         {!ok && <p className="inline-error">Every seat needs a different name.</p>}
+        <Skyline />
       </main>
       <CtaBar>
         <button
-          className="btn primary block"
+          className="btn primary block with-chevron"
           data-testid="table-start"
           disabled={!ok}
           onClick={() => {
@@ -73,6 +97,7 @@ function Setup({ onStart }: { onStart: (names: string[], settings: RoomSettings)
           }}
         >
           Deal the roles
+          <Chevron />
         </button>
       </CtaBar>
     </>
@@ -122,20 +147,23 @@ const STAGE_COPY: Record<Stage, { why: string; hint: string }> = {
 // Screens
 // ---------------------------------------------------------------------------
 
-function Gate({ seat, stage, progress, onUnlock }: { seat: Seat; stage: Stage; progress: string; onUnlock: () => void }) {
+function Gate({ table, seat, stage, progress, onUnlock }: { table: Table; seat: Seat; stage: Stage; progress: string; onUnlock: () => void }) {
   return (
     <>
       <main className="screen center" data-screen="gate">
         <p className="eyebrow">{progress}</p>
         <p className="narration">Pass the phone to</p>
-        <Avatar player={seat} size={72} />
-        <h1 data-testid="gate-name">{seat.name}</h1>
+        <Avatar player={{ name: seat.name, color: seat.color, avatar: seat.view?.players.find((p) => p.id === seat.id)?.avatar ?? table.seats.indexOf(seat) }} size={140} square />
+        <h1 data-testid="gate-name" className="textured">
+          {seat.name}
+        </h1>
         <p className="lead">{STAGE_COPY[stage].why}.</p>
         <p className="muted">{STAGE_COPY[stage].hint}</p>
       </main>
       <CtaBar>
-        <button className="btn primary block" data-testid="unlock" onClick={onUnlock}>
+        <button className="btn primary block with-chevron" data-testid="unlock" onClick={onUnlock}>
           I'm {seat.name}
+          <Chevron />
         </button>
       </CtaBar>
     </>
@@ -211,7 +239,9 @@ function Shared({ table, view, onNewGame }: { table: Table; view: RoomView; onNe
         <>
           <main className="screen" data-screen="ended">
             <p className="eyebrow">Game over</p>
-            <h1 data-testid="winner">{traitorsWon ? 'The Traitors win' : 'The town wins'}</h1>
+            <h1 data-testid="winner" className="textured">
+              {traitorsWon ? 'The Traitors win' : 'The town wins'}
+            </h1>
             <p className="narration">{traitorsWon ? 'The city belongs to the shadows now.' : 'Every liar has been dragged into the light.'}</p>
             <section className="stack">
               <h3>Everyone's role</h3>
@@ -287,7 +317,7 @@ export function TableGame({ onExit }: { onExit: () => void }) {
     const total = table.seats.filter((s) => s.view?.you.alive || stage === 'reveal').length;
     const done = total - pending.length;
     const progress = `${done} of ${total} done`;
-    if (!current) return <Gate seat={seat} stage={stage} progress={progress} onUnlock={() => setUnlocked(seat.conn.id)} />;
+    if (!current) return <Gate table={table} seat={seat} stage={stage} progress={progress} onUnlock={() => setUnlocked(seat.conn.id)} />;
 
     const v = current.view!;
     const props = { view: v, send: (m: Parameters<Table['send']>[1]) => table.send(current, m), offset: 0, error: current.error, clearError: () => table.clearError(current) };
