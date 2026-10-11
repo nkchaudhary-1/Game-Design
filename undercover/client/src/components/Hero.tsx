@@ -11,7 +11,7 @@ export function Hero({ tagline, lead }: { tagline: string; lead: string }) {
         {photo ? (
           <>
             <Art src={art('hero-scene.jpg')} className="scene" />
-            <Art src={art('hero-figure.jpg')} className="fig" onMissing={() => setPhoto(false)} />
+            <Art src={art('hero-figure.webp')} className="fig" onMissing={() => setPhoto(false)} />
           </>
         ) : (
           <Silhouette figure="traitor" className="hero-fallback" />

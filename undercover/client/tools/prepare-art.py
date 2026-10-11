@@ -7,6 +7,8 @@ Needs Pillow. Figure images must have black backgrounds; the CSS screen-blends t
 """
 from PIL import Image, ImageOps, ImageChops, ImageEnhance
 import os, sys
+sys.path.insert(0, os.path.dirname(__file__))
+from cutout import cutout
 
 src, out = sys.argv[1], sys.argv[2]
 os.makedirs(out, exist_ok=True)
@@ -41,13 +43,13 @@ ROLES = {
 
 for role, (env, fig) in ROLES.items():
     save(ImageEnhance.Brightness(fit(load(env), 900, 1200)).enhance(0.6), f'role-{role}-scene.jpg', 76)
-    save(fit(load(fig), 900, 1200), f'role-{role}-figure.jpg', 80)
+    ImageOps.fit(cutout(os.path.join(src, fig + '.png')), (900, 1200), Image.LANCZOS).save(os.path.join(out, f'role-{role}-figure.webp'), 'WEBP', quality=84, method=6)
     save(composite(load(env), load(fig), 0.5), f'role-{role}.jpg')
 
 square = load('Fogbound Gothic Square at Night')
 detective = load('Noir Detective with Cigarette Smoke')
 save(ImageEnhance.Brightness(fit(square, 900, 1200)).enhance(0.7), 'hero-scene.jpg', 76)
-save(fit(detective, 900, 1200), 'hero-figure.jpg', 80)
+ImageOps.fit(cutout(os.path.join(src, 'Noir Detective with Cigarette Smoke.png')), (900, 1200), Image.LANCZOS).save(os.path.join(out, 'hero-figure.webp'), 'WEBP', quality=84, method=6)
 save(fit(load('Moonlit Noir Over the Gothic City'), 1200, 400, 0.5, 0.35), 'skyline.jpg')
 save(fit(load('Gothic Ballroom Beneath the Chandelier'), 800, 600, 0.5, 0.45), 'card-table.jpg')
 save(fit(composite(load('Misty Noir Alleyway at Night'), load('Mysterious Noir Detective Silhouette'), 0.5), 800, 600, 0.5, 0.3), 'card-solo.jpg')

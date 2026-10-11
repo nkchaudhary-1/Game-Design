@@ -10,8 +10,22 @@ import { Table, useTable, type Seat } from './table.js';
 // Setup: names around the table
 // ---------------------------------------------------------------------------
 
+/** A suggested name that no other seat already has. */
+function freshName(taken: string[]): string {
+  const lower = new Set(taken.map((n) => n.trim().toLowerCase()));
+  for (let i = 0; i < 50; i++) {
+    const n = suggestName();
+    if (!lower.has(n.toLowerCase())) return n;
+  }
+  return `${suggestName()} ${taken.length + 1}`;
+}
+
 function Setup({ onStart }: { onStart: (names: string[], settings: RoomSettings) => void }) {
-  const [names, setNames] = useState<string[]>(() => Array.from({ length: 6 }, () => suggestName()));
+  const [names, setNames] = useState<string[]>(() => {
+    const out: string[] = [];
+    for (let i = 0; i < 6; i++) out.push(freshName(out));
+    return out;
+  });
   const [bodyguard, setBodyguard] = useState(false);
   const [minutes, setMinutes] = useState('');
   const n = names.length;
@@ -32,7 +46,7 @@ function Setup({ onStart }: { onStart: (names: string[], settings: RoomSettings)
               <span className="seat-no mono">{i + 1}</span>
               <Avatar player={{ name, color: 'fog', avatar: i }} size={52} square />
               <input className="input" aria-label={`Player ${i + 1} name`} value={name} maxLength={20} onChange={(e) => setNames(names.map((x, j) => (j === i ? e.target.value : x)))} />
-              <button className="btn small icon-btn" aria-label="Shuffle name" title="Shuffle name" onClick={() => setNames(names.map((x, j) => (j === i ? suggestName() : x)))}>
+              <button className="btn small icon-btn" aria-label="Shuffle name" title="Shuffle name" onClick={() => setNames(names.map((x, j) => (j === i ? freshName(names.filter((_, k) => k !== i)) : x)))}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M3 7h4l3 4M3 17h4l10-10h4M14 17h3M17 4l3 3-3 3M17 14l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -42,7 +56,7 @@ function Setup({ onStart }: { onStart: (names: string[], settings: RoomSettings)
               </button>
             </div>
           ))}
-          <button className="btn add-seat" data-testid="add-seat" disabled={n >= MAX_PLAYERS} onClick={() => setNames([...names, suggestName()])}>
+          <button className="btn add-seat" data-testid="add-seat" disabled={n >= MAX_PLAYERS} onClick={() => setNames([...names, freshName(names)])}>
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
               <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
               <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

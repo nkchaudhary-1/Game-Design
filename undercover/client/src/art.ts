@@ -20,7 +20,7 @@ export const ROLE_ART: Record<Role | 'unknown', string> = {
 /** Layered role art: a darkened scene, the ornamental frame, and the figure on black (screen-blended on top). */
 export const ROLE_LAYERS = (figure: Role | 'unknown') => ({
   scene: art(`role-${figure}-scene.jpg`),
-  figure: art(`role-${figure}-figure.jpg`),
+  figure: art(`role-${figure}-figure.webp`),
   frame: art('frame.png'),
 });
 
