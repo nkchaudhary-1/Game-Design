@@ -1,7 +1,7 @@
 import { isValidRoomCode } from '@undercover/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { Atmosphere } from './components/Atmosphere.js';
-import { Banner, TopBar } from './components/ui.js';
+import { Banner, FogPulse, TopBar } from './components/ui.js';
 import { MotionPrompt } from './components/MotionPrompt.js';
 import { Announcement, Discussion, Ended, Night, RoleReveal, Voting } from './screens/Game.js';
 import { Join } from './screens/Join.js';
@@ -122,6 +122,7 @@ export function App() {
       <div className="app" data-phase={phase ?? 'none'} data-role={view?.you.role ?? undefined} data-connection={g.status}>
         <TopBar day={view?.day ?? 0} phase={phase} onRules={() => setRules(true)} showRules={!rules} />
         <Banner status={g.status} />
+        <FogPulse key={`${phase ?? 'none'}:${view?.day ?? 0}:${view?.night?.step ?? ''}:${rules}`} />
         {content}
         <MotionPrompt />
       </div>

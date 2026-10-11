@@ -284,3 +284,8 @@ export function ClosedEye() {
     </svg>
   );
 }
+
+/** Fog thickens briefly whenever the screen changes. Re-mounted by key, so it replays. */
+export function FogPulse() {
+  return <div className="fog-pulse" aria-hidden="true" />;
+}

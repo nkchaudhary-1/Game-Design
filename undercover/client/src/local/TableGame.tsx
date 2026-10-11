@@ -1,7 +1,7 @@
 import { BODYGUARD_MIN_PLAYERS, MAX_PLAYERS, MIN_PLAYERS, ROLE_NAMES, suggestName, type PlayerCount, type PublicPlayer, type RoomSettings, type RoomView } from '@undercover/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { art } from '../art.js';
-import { Art, Avatar, Chevron, CtaBar, InlineError, PlayerRow, RoleCard, Timer } from '../components/ui.js';
+import { Art, Avatar, Chevron, CtaBar, FogPulse, InlineError, PlayerRow, RoleCard, Timer } from '../components/ui.js';
 import { Skyline } from '../components/Hero.js';
 import { Night, RoleReveal, Voting } from '../screens/Game.js';
 import { Table, useTable, type Seat } from './table.js';
@@ -398,7 +398,13 @@ export function TableGame({ onExit }: { onExit: () => void }) {
     const total = table.seats.filter((s) => s.view?.you.alive || stage === 'reveal').length;
     const done = total - pending.length;
     const progress = `${done} of ${total} done`;
-    if (!current) return <Gate table={table} seat={seat} stage={stage} progress={progress} onUnlock={() => setUnlocked(seat.conn.id)} />;
+    if (!current)
+      return (
+        <>
+          <FogPulse key={`gate:${stage}:${view.day}:${seat.conn.id}`} />
+          <Gate table={table} seat={seat} stage={stage} progress={progress} onUnlock={() => setUnlocked(seat.conn.id)} />
+        </>
+      );
 
     const v = current.view!;
     const props = { view: v, send: (m: Parameters<Table['send']>[1]) => table.send(current, m), offset: 0, error: current.error, clearError: () => table.clearError(current) };
@@ -411,6 +417,7 @@ export function TableGame({ onExit }: { onExit: () => void }) {
     );
     return (
       <div className="private-view" data-seat={current.name}>
+        <FogPulse key={`private:${stage}:${view.day}:${current.conn.id}`} />
         {stage === 'reveal' && <RoleReveal {...props} />}
         {stage === 'narrator' && <Night {...props} />}
         {stage === 'night' && (
@@ -424,5 +431,10 @@ export function TableGame({ onExit }: { onExit: () => void }) {
     );
   }
 
-  return <Shared table={table} view={view} onNewGame={onExit} />;
+  return (
+    <>
+      <FogPulse key={`shared:${view.phase}:${view.day}`} />
+      <Shared table={table} view={view} onNewGame={onExit} />
+    </>
+  );
 }
