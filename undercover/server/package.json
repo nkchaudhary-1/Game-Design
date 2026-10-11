@@ -1,0 +1,25 @@
+{
+  "name": "@undercover/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "simulate": "tsx src/simulate.ts",
+    "simulate:chaos": "tsx src/simulate.ts --chaos",
+    "test:restart": "tsx src/restartTest.ts"
+  },
+  "dependencies": {
+    "@undercover/shared": "*",
+    "ioredis": "^5.4.1",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
+  }
+}

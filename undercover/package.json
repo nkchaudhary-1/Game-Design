@@ -1,0 +1,26 @@
+{
+  "name": "undercover",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "server", "client"],
+  "scripts": {
+    "build": "npm run build -w shared && npm run build -w client && npm run build -w server",
+    "dev": "concurrently -k -n server,client \"npm run dev -w server\" \"npm run dev -w client\"",
+    "start": "node server/dist/index.js",
+    "test": "npm run test -w shared && npm run test -w server",
+    "test:e2e": "npm run test:e2e -w client",
+    "simulate": "npm run simulate -w server",
+    "simulate:chaos": "npm run simulate:chaos -w server",
+    "test:restart": "npm run test:restart -w server",
+    "typecheck": "tsc -b shared server client",
+    "lint": "npm run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-types",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"],
+  "references": [{ "path": "../shared" }]
+}
