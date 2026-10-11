@@ -32,6 +32,10 @@ import {
 } from '@undercover/shared';
 import { alivePlayers, findPlayer, gamePlayers, playerName, rolesOf, type PlayerState, type RoomState, type TimerState } from './state.js';
 
+function withArticle(role: Role): string {
+  return `${role === 'innocent' ? 'an' : 'the'} ${ROLE_NAMES[role]}`;
+}
+
 export class GameError extends Error {
   constructor(
     public code: ErrorCode,
@@ -356,7 +360,7 @@ export function resolveNightPhase(room: RoomState, rng: Rng, clock: Clock): void
   enterAnnouncement(room, 'dayReveal', publicText, clock);
   if (outcome.killedId) {
     const victim = findPlayer(room, outcome.killedId);
-    room.log.push(`Day ${room.day}: ${publicText}${victim?.role ? ` They were the ${ROLE_NAMES[victim.role]}.` : ''}`);
+    room.log.push(`Day ${room.day}: ${publicText}${victim?.role ? ` They were ${withArticle(victim.role)}.` : ''}`);
   } else {
     room.log.push(`Day ${room.day}: ${publicText}`);
   }
@@ -447,7 +451,7 @@ export function resolveVoting(room: RoomState, clock: Clock): void {
       victim.alive = false;
       role = victim.role;
     }
-    text = `${playerName(room, tally.eliminatedId)} was voted out. They were ${role === 'innocent' ? 'an' : 'the'} ${role ? ROLE_NAMES[role] : 'unknown'}.`;
+    text = `${playerName(room, tally.eliminatedId)} was voted out. They were ${role ? withArticle(role) : 'unknown'}.`;
   } else if (tally.cast === 0) {
     text = 'No votes were cast. No one was eliminated.';
   } else {

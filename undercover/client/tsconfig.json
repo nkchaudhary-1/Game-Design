@@ -12,6 +12,6 @@
     "declaration": false,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"],
+  "include": ["src", "e2e"],
   "references": [{ "path": "../shared" }]
 }

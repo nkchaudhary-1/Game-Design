@@ -1,3 +1,12 @@
+# Game-Design
+
+Two games live in this repo:
+
+* **Spinblade Arena** (this README, root folder): a 3D top-down spinning-blade duel.
+* **Undercover** ([`undercover/`](undercover/README.md)): a real-time social-deduction party game (Mafia style) with a noir look, playable on phones via a shared link.
+
+---
+
 # Spinblade Arena — MVP
 
 A 3D, top-down spinning-blade duel. Slingshot in, hit hard, and win by **ring-out** (knock them over the

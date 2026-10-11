@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["shared", "server", "client"],
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
   "scripts": {
     "build": "npm run build -w shared && npm run build -w client && npm run build -w server",
     "dev": "concurrently -k -n server,client \"npm run dev -w server\" \"npm run dev -w client\"",
@@ -14,7 +18,8 @@
     "simulate:chaos": "npm run simulate:chaos -w server",
     "test:restart": "npm run test:restart -w server",
     "typecheck": "tsc -b shared server client",
-    "lint": "npm run typecheck"
+    "lint": "npm run typecheck",
+    "smoke": "npm run smoke -w server --"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

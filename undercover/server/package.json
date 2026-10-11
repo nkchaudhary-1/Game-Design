@@ -11,7 +11,8 @@
     "test": "vitest run",
     "simulate": "tsx src/simulate.ts",
     "simulate:chaos": "tsx src/simulate.ts --chaos",
-    "test:restart": "tsx src/restartTest.ts"
+    "test:restart": "tsx src/restartTest.ts",
+    "smoke": "tsx src/smoke.ts"
   },
   "dependencies": {
     "@undercover/shared": "*",
