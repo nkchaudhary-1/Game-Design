@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
-const demoOnly = process.env.DEMO_BUILD === '1';
+const demoOnly = process.env.LOCAL_BUILD === '1';
 
 export default defineConfig({
   plugins: [react()],
@@ -15,11 +15,11 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: demoOnly ? 'dist-demo' : 'dist',
+    outDir: demoOnly ? 'dist-local' : 'dist',
     sourcemap: false,
     target: 'es2020',
     rollupOptions: {
-      input: demoOnly ? { demo: resolve(__dirname, 'demo.html') } : { main: resolve(__dirname, 'index.html'), demo: resolve(__dirname, 'demo.html') },
+      input: demoOnly ? { local: resolve(__dirname, 'local.html') } : { main: resolve(__dirname, 'index.html'), local: resolve(__dirname, 'local.html') },
     },
   },
 });

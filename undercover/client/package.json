@@ -8,7 +8,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "build:demo": "DEMO_BUILD=1 vite build"
+    "build:local": "LOCAL_BUILD=1 vite build"
   },
   "dependencies": {
     "@undercover/shared": "*",

@@ -49,6 +49,8 @@ export interface Clock {
   now(): number;
   /** Multiplier applied to all timer durations (TIMER_SCALE). */
   scale: number;
+  /** Optional per-timer multiplier (pass-and-play keeps discussion real and parks the rest). */
+  scaleFor?(kind: TimerState['kind']): number;
 }
 
 export const realClock: Clock = {
@@ -57,7 +59,7 @@ export const realClock: Clock = {
 };
 
 function setTimer(room: RoomState, clock: Clock, kind: TimerState['kind'], ms: number): void {
-  const total = Math.max(250, Math.round(ms * clock.scale));
+  const total = Math.max(250, Math.round(ms * (clock.scaleFor?.(kind) ?? clock.scale)));
   room.timer = { kind, endsAt: clock.now() + total, totalMs: total };
 }
 

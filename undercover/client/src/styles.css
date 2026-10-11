@@ -1140,3 +1140,24 @@ textarea.input {
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* Pass & play: timers are parked while the phone goes around; only discussion runs on a clock. */
+.table-mode .timer {
+  display: none;
+}
+.table-mode .table-timer .timer {
+  display: flex;
+}
+.table-mode .private-view .ctabar:not(:last-of-type) {
+  display: none;
+}
+.app .card.raised h2 {
+  margin-bottom: 2px;
+}
+.app button.card {
+  width: 100%;
+  font: inherit;
+}
+.app button.card .badge {
+  align-self: flex-start;
+}
