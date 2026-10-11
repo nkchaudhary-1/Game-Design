@@ -37,6 +37,13 @@ npm run test:restart   # kills the server mid-night against Redis and checks the
 npm run test:e2e       # Playwright: five browsers play a full game (+ God run), screenshots at 375x812
 ```
 
+## Browser-only modes
+
+`client/src/local/` runs the real `RoomManager` inside the tab (`transport.ts`). `table.ts` + `TableGame.tsx`
+is pass & play: one `Conn` per seat, a privacy gate between handoffs, non-discussion timers parked via
+`Clock.scaleFor`. `solo.ts` is you against `BotBrain` bots. Server code imported here must stay free of
+Node-only APIs (web crypto, no `process.env`, no `ioredis` import path).
+
 ## Conventions
 
 - Phase order: `waiting -> roleReveal -> [night -> dayReveal -> discussion -> voting -> voteResult] -> ended`.
