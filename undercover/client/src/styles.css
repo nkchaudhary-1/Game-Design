@@ -1794,6 +1794,7 @@ textarea.input {
   translate: calc(var(--px) * -8px) calc(var(--py) * -5px);
 }
 .gate-card img.mark {
+  transition: opacity 600ms var(--ease);
   position: absolute;
   left: 4%;
   top: 2%;

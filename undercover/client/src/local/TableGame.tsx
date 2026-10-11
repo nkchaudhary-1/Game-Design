@@ -163,22 +163,26 @@ const STAGE_COPY: Record<Stage, { why: string; hint: string }> = {
 
 /** Before the handoff nothing is revealed: a question mark in the frame, never the person. */
 function GatePortrait({ seat }: { seat: Seat; index: number }) {
-  const [photo, setPhoto] = useState(true);
+  // The drawn mark shows until the real art/mystery.webp has actually loaded (some hosts answer a
+  // missing file with 200, so onError alone is not enough).
+  const [loaded, setLoaded] = useState(false);
+  void seat;
   return (
     <div className="gate-card mystery">
-      {photo ? (
-        <>
-          <Art src={art('role-unknown-scene.jpg')} className="scene" />
-          <Art src={art('frame.png')} className="frame" />
-          <Art src={art('mystery.webp')} className="mark" onMissing={() => setPhoto(false)} />
-        </>
-      ) : (
-        <>
-          <Art src={art('role-unknown-scene.jpg')} className="scene" />
-          <Art src={art('frame.png')} className="frame" />
-          <MysteryMark />
-        </>
-      )}
+      <Art src={art('role-unknown-scene.jpg')} className="scene" />
+      <Art src={art('frame.png')} className="frame" />
+      {!loaded && <MysteryMark />}
+      <img
+        src={art('mystery.webp')}
+        alt=""
+        className="mark"
+        style={{ opacity: loaded ? 1 : 0 }}
+        onLoad={(e) => {
+          const img = e.currentTarget;
+          if (img.naturalWidth > 0) setLoaded(true);
+        }}
+        onError={() => setLoaded(false)}
+      />
     </div>
   );
 }
@@ -189,25 +193,35 @@ function MysteryMark() {
     <svg className="mark drawn" viewBox="0 0 300 400" aria-hidden="true">
       <defs>
         <radialGradient id="qm-glow" cx="50%" cy="45%" r="50%">
-          <stop offset="0" stopColor="#c5c9cc" stopOpacity="0.35" />
+          <stop offset="0" stopColor="#e3e6e8" stopOpacity="0.5" />
+          <stop offset="0.5" stopColor="#c5c9cc" stopOpacity="0.18" />
           <stop offset="1" stopColor="#c5c9cc" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="qm-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3a3e43" />
-          <stop offset="0.5" stopColor="#15171a" />
-          <stop offset="1" stopColor="#25282b" />
+        <linearGradient id="qm-fill" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#5a5f64" />
+          <stop offset="0.45" stopColor="#1b1e21" />
+          <stop offset="1" stopColor="#2e3236" />
         </linearGradient>
         <linearGradient id="qm-rim" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
-          <stop offset="0.6" stopColor="#c5c9cc" stopOpacity="0.5" />
-          <stop offset="1" stopColor="#777d82" stopOpacity="0.2" />
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.55" stopColor="#c5c9cc" stopOpacity="0.6" />
+          <stop offset="1" stopColor="#777d82" stopOpacity="0.25" />
         </linearGradient>
-        <filter id="qm-blur">
-          <feGaussianBlur stdDeviation="14" />
+        <filter id="qm-blur" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="16" />
+        </filter>
+        <filter id="qm-smoke" x="-40%" y="-40%" width="180%" height="180%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="7" />
+          <feColorMatrix values="0 0 0 0 0.85 0 0 0 0 0.87 0 0 0 0 0.88 0 0 0 0.55 -0.1" />
+          <feGaussianBlur stdDeviation="6" />
         </filter>
       </defs>
-      <ellipse cx="150" cy="190" rx="130" ry="160" fill="url(#qm-glow)" filter="url(#qm-blur)" />
-      <text x="150" y="300" textAnchor="middle" fontFamily="'Barlow Condensed', Impact, sans-serif" fontWeight="700" fontSize="340" fill="url(#qm-fill)" stroke="url(#qm-rim)" strokeWidth="3" paintOrder="stroke">
+      <ellipse cx="150" cy="200" rx="150" ry="190" fill="url(#qm-glow)" filter="url(#qm-blur)" />
+      <ellipse cx="150" cy="190" rx="120" ry="150" filter="url(#qm-smoke)" opacity="0.5" />
+      <text x="150" y="305" textAnchor="middle" fontFamily="'Barlow Condensed', Impact, sans-serif" fontWeight="700" fontSize="360" fill="#000" opacity="0.6" transform="translate(6 10)">
+        ?
+      </text>
+      <text x="150" y="305" textAnchor="middle" fontFamily="'Barlow Condensed', Impact, sans-serif" fontWeight="700" fontSize="360" fill="url(#qm-fill)" stroke="url(#qm-rim)" strokeWidth="3.5" paintOrder="stroke">
         ?
       </text>
     </svg>
