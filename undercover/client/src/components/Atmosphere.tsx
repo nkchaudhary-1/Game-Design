@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
+import { art } from '../art.js';
+import { Art } from './ui.js';
 
 /** Layered noir city: moonlight, skyline, three fog layers, rain, grain, vignette. */
 export function Atmosphere() {
   const [paused, setPaused] = useState(document.hidden);
+  const [photo, setPhoto] = useState(true);
   useEffect(() => {
     const onVis = () => setPaused(document.hidden);
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
   return (
-    <div className={`atmosphere${paused ? ' paused' : ''}`} aria-hidden="true">
+    <div className={`atmosphere${paused ? ' paused' : ''}${photo ? ' photo' : ''}`} aria-hidden="true">
+      {photo && <Art src={art('bg-main.jpg')} className="backdrop" onMissing={() => setPhoto(false)} />}
       <div className="moonlight" />
       <div className="fog fog-bg" />
       <div className="skyline">

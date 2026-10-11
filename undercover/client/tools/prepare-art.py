@@ -52,6 +52,7 @@ save(fit(load('Moonlit Noir Over the Gothic City'), 1200, 400, 0.5, 0.35), 'skyl
 save(fit(load('Gothic Ballroom Beneath the Chandelier'), 800, 600, 0.5, 0.45), 'card-table.jpg')
 save(fit(composite(load('Misty Noir Alleyway at Night'), load('Mysterious Noir Detective Silhouette'), 0.5), 800, 600, 0.5, 0.3), 'card-solo.jpg')
 save(fit(square, 900, 1200), 'scene-square.jpg', 72)
+save(ImageEnhance.Brightness(fit(load('Moonlit Gothic Square in the Rain'), 900, 1500, 0.5, 0.55)).enhance(0.8), 'bg-main.jpg', 74)
 save(fit(load('Gothic Ballroom Beneath the Chandelier'), 900, 1200), 'scene-ballroom.jpg', 72)
 
 trio = load('Noir Trio in Smoke')
