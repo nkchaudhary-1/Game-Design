@@ -1,4 +1,3 @@
-import { randomBytes, randomUUID } from 'node:crypto';
 import {
   cleanName,
   isValidRoomCode,
@@ -32,7 +31,19 @@ import {
 } from './game.js';
 import { RateLimiter } from './ratelimit.js';
 import { findPlayer, type RoomState } from './state.js';
-import { MemoryStore, type RoomStore } from './store.js';
+import { MemoryStore } from './memoryStore.js';
+import type { RoomStore } from './store.js';
+
+const webCrypto = globalThis.crypto;
+function randomUUID(): string {
+  return webCrypto.randomUUID();
+}
+function randomSecret(): string {
+  const bytes = new Uint8Array(16);
+  webCrypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+const env = (key: string): string | undefined => (typeof process !== 'undefined' && process.env ? process.env[key] : undefined);
 
 export interface Conn {
   id: string;
@@ -61,9 +72,9 @@ export class RoomManager {
   private log: (line: string) => void;
   private rooms = new Map<string, RoomState>();
   private conns = new Map<string, Map<string, Set<Conn>>>(); // code -> playerId -> conns
-  private timers = new Map<string, NodeJS.Timeout>();
-  private graceTimers = new Map<string, NodeJS.Timeout>(); // `${code}:${playerId}`
-  private sweeper: NodeJS.Timeout | null = null;
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private graceTimers = new Map<string, ReturnType<typeof setTimeout>>(); // `${code}:${playerId}`
+  private sweeper: ReturnType<typeof setInterval> | null = null;
   private createLimiter = new RateLimiter(6, 6 / 60_000);
   private joinLimiter = new RateLimiter(30, 30 / 60_000);
   private messageLimiter = new RateLimiter(40, 20 / 1000);
@@ -73,7 +84,7 @@ export class RoomManager {
     this.store = opts.store ?? new MemoryStore();
     this.clock = opts.clock ?? realClock;
     this.rng = opts.rng ?? Math.random;
-    this.graceMs = opts.graceMs ?? Math.max(1000, Math.round((Number(process.env.GRACE_MS ?? '90000') || 90000) * this.clock.scale));
+    this.graceMs = opts.graceMs ?? Math.max(1000, Math.round((Number(env('GRACE_MS') ?? '90000') || 90000) * this.clock.scale));
     this.log = opts.log ?? (() => {});
     this.rateLimits = opts.rateLimits ?? true;
   }
@@ -93,7 +104,7 @@ export class RoomManager {
       this.armTimer(room);
     }
     this.sweeper = setInterval(() => void this.sweep(), 60_000);
-    this.sweeper.unref?.();
+    (this.sweeper as { unref?: () => void }).unref?.();
     this.log(`boot: ${rooms.length} room(s) restored`);
     return rooms.length;
   }
@@ -161,7 +172,7 @@ export class RoomManager {
     const name = cleanName(rawName) || 'Stranger';
     let code = makeRoomCode(this.rng);
     for (let i = 0; i < 20 && (this.rooms.has(code) || (await this.store.get(code))); i++) code = makeRoomCode(this.rng);
-    const host = { id: randomUUID(), name, color, secret: randomBytes(16).toString('hex') };
+    const host = { id: randomUUID(), name, color, secret: randomSecret() };
     const room = createRoom(code, host, settings, this.clock);
     this.rooms.set(code, room);
     this.bind(conn, room, host.id, host.secret);
@@ -180,7 +191,7 @@ export class RoomManager {
       cleanName(rawName) || 'Stranger',
       room.players.map((p) => p.name),
     );
-    const player = { id: randomUUID(), name, color, secret: randomBytes(16).toString('hex') };
+    const player = { id: randomUUID(), name, color, secret: randomSecret() };
     addPlayer(room, player, this.clock);
     this.bind(conn, room, player.id, player.secret);
     room.log.push(`${name} joined.`);
@@ -323,7 +334,7 @@ export class RoomManager {
       this.graceTimers.delete(key);
       void this.graceExpired(room.code, playerId);
     }, this.graceMs);
-    t.unref?.();
+    (t as { unref?: () => void }).unref?.();
     this.graceTimers.set(key, t);
   }
 
@@ -372,7 +383,7 @@ export class RoomManager {
       this.timers.delete(room.code);
       void this.fireTimer(room.code);
     }, delay);
-    t.unref?.();
+    (t as { unref?: () => void }).unref?.();
     this.timers.set(room.code, t);
   }
 

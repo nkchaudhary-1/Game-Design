@@ -6,6 +6,7 @@
 import WebSocket from 'ws';
 import type { ClientMessage, PlayerColor, RoomSettings, RoomView, ServerMessage } from '@undercover/shared';
 import { PLAYER_COLORS } from '@undercover/shared';
+import { BotBrain } from './botBrain.js';
 
 export interface BotOptions {
   name: string;
@@ -27,7 +28,7 @@ export class Bot {
   secret: string | null = null;
   messages: ServerMessage[] = [];
   errors: Extract<ServerMessage, { type: 'error' }>[] = [];
-  private lastActionKey = '';
+  private brain: BotBrain;
   private waiters: { pred: (v: RoomView) => boolean; resolve: (v: RoomView) => void }[] = [];
   private rng: () => number;
   private closedByUs = false;
@@ -37,6 +38,7 @@ export class Bot {
     public opts: BotOptions,
   ) {
     this.rng = opts.rng ?? Math.random;
+    this.brain = new BotBrain({ rng: this.rng, impatient: opts.impatient });
   }
 
   get name(): string {
@@ -132,73 +134,10 @@ export class Bot {
     for (const w of ready) w.resolve(view);
   }
 
-  private pick<T>(items: T[]): T {
-    return items[Math.floor(this.rng() * items.length)];
-  }
-
-  /** Decide what to do with the latest view. Only legal moves, exactly once per step. */
   private act(view: RoomView): void {
-    const me = view.players.find((p) => p.id === view.youId);
-    if (!me) return;
-    const controller = view.isHost || view.isGod;
-    const stepKey = `${view.phase}:${view.day}:${view.night?.step ?? ''}:${view.announcement === null ? 'pending' : 'pub'}`;
-
-    switch (view.phase) {
-      case 'waiting':
-        return; // the simulation driver starts the game
-      case 'roleReveal':
-        if (!view.acked && !view.isGod && this.once(stepKey)) this.send({ type: 'ackReveal' });
-        return;
-      case 'night': {
-        const night = view.night;
-        if (!night) return;
-        if (night.step === 'narrator') {
-          if (!night.narratorAcked && !view.isGod && this.once(stepKey)) this.send({ type: 'ackNarrator' });
-          return;
-        }
-        if (night.canAct && night.yourPick && !night.yourPick.confirmed && night.legalTargets?.length) {
-          if (this.once(stepKey)) {
-            const target = this.pick(night.legalTargets);
-            // Traitors first mark, then confirm, so the live team-picks path is exercised.
-            if (view.you.role === 'traitor') this.send({ type: 'nightAction', targetId: target, confirm: false });
-            this.send({ type: 'nightAction', targetId: target, confirm: true });
-          }
-        }
-        return;
-      }
-      case 'dayReveal':
-      case 'voteResult': {
-        if (!controller) return;
-        if (view.god?.pendingAnnouncement !== undefined && view.announcement === null) {
-          if (this.once(stepKey + ':publish')) {
-            this.send({ type: 'publishAnnouncement', text: view.god.pendingAnnouncement + ' (The narrator nods.)' });
-          }
-          return;
-        }
-        if (view.isGod || this.opts.impatient) {
-          if (this.once(stepKey + ':advance')) setTimeout(() => this.send({ type: 'advancePhase' }), 30);
-        }
-        return;
-      }
-      case 'discussion':
-        if (controller && this.opts.impatient !== false && this.once(stepKey)) {
-          setTimeout(() => this.send({ type: 'advancePhase' }), 30);
-        }
-        return;
-      case 'voting': {
-        if (view.isGod || !me.alive || view.voteTally?.yourVote) return;
-        const targets = view.players.filter((p) => p.alive && p.id !== view.youId && p.id !== view.godId);
-        if (targets.length && this.once(stepKey)) this.send({ type: 'castVote', targetId: this.pick(targets).id });
-        return;
-      }
-      default:
-        return;
+    for (const msg of this.brain.act(view)) {
+      if (msg.type === 'advancePhase') setTimeout(() => this.send(msg), 30);
+      else this.send(msg);
     }
-  }
-
-  private once(key: string): boolean {
-    if (this.lastActionKey === key) return false;
-    this.lastActionKey = key;
-    return true;
   }
 }

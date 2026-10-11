@@ -1,11 +1,8 @@
 import type { RoomState } from './state.js';
 
-export const IDLE_TTL_MS = 3 * 60 * 60 * 1000;
-export const ENDED_TTL_MS = 15 * 60 * 1000;
-
-export function ttlFor(room: RoomState): number {
-  return room.phase === 'ended' ? ENDED_TTL_MS : IDLE_TTL_MS;
-}
+import { ttlFor } from './ttl.js';
+export { IDLE_TTL_MS, ENDED_TTL_MS, ttlFor } from './ttl.js';
+export { MemoryStore } from './memoryStore.js';
 
 export interface RoomStore {
   get(code: string): Promise<RoomState | null>;
@@ -16,36 +13,6 @@ export interface RoomStore {
   /** Remove expired rooms. Returns the codes removed. */
   sweep(now: number): Promise<string[]>;
   close(): Promise<void>;
-}
-
-export class MemoryStore implements RoomStore {
-  private rooms = new Map<string, RoomState>();
-
-  async get(code: string): Promise<RoomState | null> {
-    return this.rooms.get(code) ?? null;
-  }
-  async set(room: RoomState): Promise<void> {
-    this.rooms.set(room.code, room);
-  }
-  async delete(code: string): Promise<void> {
-    this.rooms.delete(code);
-  }
-  async list(): Promise<RoomState[]> {
-    return [...this.rooms.values()];
-  }
-  async sweep(now: number): Promise<string[]> {
-    const gone: string[] = [];
-    for (const room of this.rooms.values()) {
-      if (now - room.updatedAt > ttlFor(room)) {
-        this.rooms.delete(room.code);
-        gone.push(room.code);
-      }
-    }
-    return gone;
-  }
-  async close(): Promise<void> {
-    this.rooms.clear();
-  }
 }
 
 /** Redis-backed store. Rooms are JSON under `uc:room:{code}`; `uc:rooms` indexes the codes. */

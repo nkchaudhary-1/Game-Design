@@ -51,7 +51,10 @@ export interface Clock {
   scale: number;
 }
 
-export const realClock: Clock = { now: () => Date.now(), scale: Number(process.env.TIMER_SCALE ?? '1') || 1 };
+export const realClock: Clock = {
+  now: () => Date.now(),
+  scale: Number((typeof process !== 'undefined' && process.env ? process.env.TIMER_SCALE : undefined) ?? '1') || 1,
+};
 
 function setTimer(room: RoomState, clock: Clock, kind: TimerState['kind'], ms: number): void {
   const total = Math.max(250, Math.round(ms * clock.scale));

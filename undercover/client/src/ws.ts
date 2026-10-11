@@ -51,16 +51,30 @@ function saveSession(s: Session | null): void {
 
 type Listener = (s: ClientState) => void;
 
+/** The subset of WebSocket the client relies on, so a local in-browser transport can stand in. */
+export interface SocketLike {
+  readonly OPEN: number;
+  readyState: number;
+  onopen: (() => void) | null;
+  onmessage: ((ev: { data: string }) => void) | null;
+  onclose: (() => void) | null;
+  onerror: (() => void) | null;
+  send(data: string): void;
+  close(): void;
+}
+
 export class GameClient {
   state: ClientState = {
     status: 'idle',
     view: null,
-    session: loadSession(),
+    session: null,
     error: null,
     clockOffset: 0,
     resolved: false,
   };
-  private ws: WebSocket | null = null;
+  private socketFactory: () => SocketLike = () => new WebSocket(this.url) as unknown as SocketLike;
+  private persist = true;
+  private ws: SocketLike | null = null;
   private listeners = new Set<Listener>();
   private attempts = 0;
   private retryTimer: number | null = null;
@@ -68,7 +82,22 @@ export class GameClient {
   private closedByUs = false;
   private pendingRejoin = false;
 
-  constructor(private url: string = defaultUrl()) {}
+  constructor(private url: string = defaultUrl()) {
+    this.state.session = loadSession();
+  }
+
+  /** Swap the transport (used by the solo demo) and optionally stop touching localStorage. */
+  configure(opts: { socketFactory?: () => SocketLike; persist?: boolean }): void {
+    if (opts.socketFactory) this.socketFactory = opts.socketFactory;
+    if (opts.persist !== undefined) {
+      this.persist = opts.persist;
+      if (!opts.persist) this.state = { ...this.state, session: null };
+    }
+  }
+
+  private save(s: Session | null): void {
+    if (this.persist) saveSession(s);
+  }
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
@@ -82,10 +111,10 @@ export class GameClient {
   }
 
   connect(): void {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
+    if (this.ws && (this.ws.readyState === this.ws.OPEN || this.ws.readyState === 0)) return;
     this.closedByUs = false;
     this.set({ status: this.everOpened ? 'reconnecting' : 'connecting' });
-    const ws = new WebSocket(this.url);
+    const ws = this.socketFactory();
     this.ws = ws;
     ws.onopen = () => {
       this.attempts = 0;
@@ -98,7 +127,7 @@ export class GameClient {
         this.set({ resolved: true });
       }
     };
-    ws.onmessage = (ev) => this.onMessage(JSON.parse(ev.data as string) as ServerMessage);
+    ws.onmessage = (ev) => this.onMessage(JSON.parse(ev.data) as ServerMessage);
     ws.onclose = () => {
       if (this.ws === ws) this.ws = null;
       if (this.closedByUs) return;
@@ -122,7 +151,7 @@ export class GameClient {
 
   /** Called when the tab becomes visible again or the network returns. */
   nudge(): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.ws && this.ws.readyState === this.ws.OPEN) return;
     if (this.retryTimer !== null) {
       window.clearTimeout(this.retryTimer);
       this.retryTimer = null;
@@ -131,7 +160,7 @@ export class GameClient {
   }
 
   private raw(msg: ClientMessage): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    if (!this.ws || this.ws.readyState !== this.ws.OPEN) return false;
     this.ws.send(JSON.stringify(msg));
     return true;
   }
@@ -151,7 +180,7 @@ export class GameClient {
   /** Forget the room and start fresh. */
   leave(): void {
     this.raw({ type: 'leaveRoom' });
-    saveSession(null);
+    this.save(null);
     this.set({ session: null, view: null, error: null, resolved: true });
   }
 
@@ -159,7 +188,7 @@ export class GameClient {
     switch (msg.type) {
       case 'joined': {
         const session = { roomCode: msg.code, playerId: msg.playerId, secret: msg.secret };
-        saveSession(session);
+        this.save(session);
         this.pendingRejoin = false;
         this.set({ session, resolved: true });
         break;
@@ -174,14 +203,14 @@ export class GameClient {
         if (this.pendingRejoin && msg.ref === 'rejoin') {
           // Stale session: the room is gone or the secret is wrong. Start over quietly.
           this.pendingRejoin = false;
-          saveSession(null);
+          this.save(null);
           this.set({ session: null, view: null, resolved: true });
           break;
         }
         this.set({ error: { code: msg.code, message: msg.message, ref: msg.ref, at: Date.now() } });
         break;
       case 'left':
-        saveSession(null);
+        this.save(null);
         this.set({ session: null, view: null, resolved: true });
         break;
       case 'pong':

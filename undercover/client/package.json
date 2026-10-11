@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:demo": "DEMO_BUILD=1 vite build"
   },
   "dependencies": {
     "@undercover/shared": "*",
