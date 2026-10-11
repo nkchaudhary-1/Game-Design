@@ -1622,3 +1622,41 @@ textarea.input {
   color: transparent;
 }
 
+
+/* Pass & play gate: a big portrait card */
+.gate-card {
+  position: relative;
+  width: min(74vw, 300px);
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background: #050607;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+  margin: 4px 0 6px;
+}
+.gate-card .avatar {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0;
+  font-size: 72px !important;
+}
+.gate-card img.frame {
+  position: absolute;
+  left: 6%;
+  top: 5%;
+  width: 88%;
+  height: 90%;
+  object-fit: fill;
+  mix-blend-mode: screen;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.gate-name {
+  font-size: 32px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 0 8px;
+}

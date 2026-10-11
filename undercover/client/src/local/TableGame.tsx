@@ -153,8 +153,11 @@ function Gate({ table, seat, stage, progress, onUnlock }: { table: Table; seat: 
       <main className="screen center" data-screen="gate">
         <p className="eyebrow">{progress}</p>
         <p className="narration">Pass the phone to</p>
-        <Avatar player={{ name: seat.name, color: seat.color, avatar: seat.view?.players.find((p) => p.id === seat.id)?.avatar ?? table.seats.indexOf(seat) }} size={140} square />
-        <h1 data-testid="gate-name" className="textured">
+        <div className="gate-card">
+          <Avatar player={{ name: seat.name, color: seat.color, avatar: seat.view?.players.find((p) => p.id === seat.id)?.avatar ?? table.seats.indexOf(seat) }} size={300} square />
+          <Art src={art('frame.png')} className="frame" />
+        </div>
+        <h1 data-testid="gate-name" className="textured gate-name">
           {seat.name}
         </h1>
         <p className="lead">{STAGE_COPY[stage].why}.</p>
