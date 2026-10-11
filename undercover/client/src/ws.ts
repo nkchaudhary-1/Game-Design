@@ -74,6 +74,8 @@ export class GameClient {
   };
   private socketFactory: () => SocketLike = () => new WebSocket(this.url) as unknown as SocketLike;
   private persist = true;
+  /** True on the static, server-free build: never rewrite the address bar (relative assets depend on it). */
+  staticPage = false;
   private ws: SocketLike | null = null;
   private listeners = new Set<Listener>();
   private attempts = 0;
@@ -87,8 +89,9 @@ export class GameClient {
   }
 
   /** Swap the transport (used by the solo demo) and optionally stop touching localStorage. */
-  configure(opts: { socketFactory?: () => SocketLike; persist?: boolean }): void {
+  configure(opts: { socketFactory?: () => SocketLike; persist?: boolean; staticPage?: boolean }): void {
     if (opts.socketFactory) this.socketFactory = opts.socketFactory;
+    if (opts.staticPage !== undefined) this.staticPage = opts.staticPage;
     if (opts.persist !== undefined) {
       this.persist = opts.persist;
       if (!opts.persist) this.state = { ...this.state, session: null };

@@ -70,5 +70,5 @@ class LocalSocket implements SocketLike {
 
 export function configureSolo(): void {
   const manager = makeManager({ now: () => Date.now(), scale: SCALE });
-  client.configure({ socketFactory: () => new LocalSocket(manager), persist: false });
+  client.configure({ socketFactory: () => new LocalSocket(manager), persist: false, staticPage: true });
 }

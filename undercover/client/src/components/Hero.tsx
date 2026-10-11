@@ -8,7 +8,14 @@ export function Hero({ tagline, lead }: { tagline: string; lead: string }) {
   return (
     <section className={`hero-art${photo ? ' photo' : ''}`}>
       <div className="hero-media" aria-hidden="true">
-        {photo ? <Art src={art('hero.jpg')} onMissing={() => setPhoto(false)} /> : <Silhouette figure="traitor" className="hero-fallback" />}
+        {photo ? (
+          <>
+            <Art src={art('hero-scene.jpg')} className="scene" />
+            <Art src={art('hero-figure.jpg')} className="fig" onMissing={() => setPhoto(false)} />
+          </>
+        ) : (
+          <Silhouette figure="traitor" className="hero-fallback" />
+        )}
         <div className="hero-lamp" />
       </div>
       <div className="hero-copy">

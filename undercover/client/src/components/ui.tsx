@@ -1,6 +1,6 @@
 import { ROLE_NAMES, type PlayerColor, type PublicPlayer, type Role } from '@undercover/shared';
 import { useEffect, useState, type ReactNode } from 'react';
-import { avatarArt, isMissing, markMissing, ROLE_ART } from '../art.js';
+import { avatarArt, isMissing, markMissing, ROLE_ART, ROLE_LAYERS } from '../art.js';
 import { useCountdown } from '../useGame.js';
 import { Silhouette, type Figure } from './Silhouette.js';
 
@@ -157,14 +157,19 @@ export function Timer({ endsAt, totalMs, offset, label, urgentMs = 10_000 }: { e
 
 export function RoleCard({ role, figure, title, line, compact, children }: { role?: Role | null; figure?: Figure; title?: string; line?: string; compact?: boolean; children?: ReactNode }) {
   const fig: Figure = figure ?? role ?? 'unknown';
+  const key = fig === 'crowd' ? 'innocent' : fig === 'god' ? 'unknown' : fig;
   const name = title ?? (role ? ROLE_NAMES[role] : 'Unknown');
-  const src = ROLE_ART[fig === 'crowd' ? 'innocent' : fig === 'god' ? 'unknown' : fig];
-  const [photo, setPhoto] = useState(() => !isMissing(src));
+  const layers = ROLE_LAYERS(key);
+  const [photo, setPhoto] = useState(() => !isMissing(layers.figure));
   return (
     <div className={`role-card${compact ? ' compact' : ''}${photo ? ' photo' : ''}`} data-testid="role-card" data-role={role ?? undefined}>
       <div className="figure">
         {photo ? (
-          <Art src={src} className="photo" onMissing={() => setPhoto(false)} />
+          <>
+            <Art src={compact ? ROLE_ART[key] : layers.scene} className="scene" />
+            {!compact && <Art src={layers.frame} className="frame" />}
+            {!compact && <Art src={layers.figure} className="fig" onMissing={() => setPhoto(false)} />}
+          </>
         ) : (
           <>
             <div className="halo" />

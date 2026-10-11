@@ -17,6 +17,13 @@ export const ROLE_ART: Record<Role | 'unknown', string> = {
   unknown: art('role-unknown.jpg'),
 };
 
+/** Layered role art: a darkened scene, the ornamental frame, and the figure on black (screen-blended on top). */
+export const ROLE_LAYERS = (figure: Role | 'unknown') => ({
+  scene: art(`role-${figure}-scene.jpg`),
+  figure: art(`role-${figure}-figure.jpg`),
+  frame: art('frame.png'),
+});
+
 export const AVATAR_COUNT = 11;
 export function avatarArt(index: number): string {
   const n = ((index % AVATAR_COUNT) + AVATAR_COUNT) % AVATAR_COUNT;

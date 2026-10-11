@@ -43,7 +43,7 @@ export function App() {
 
   // Keep the address bar on the invite link while in a room, so sharing the URL just works.
   useEffect(() => {
-    if (g.view && location.pathname !== `/join/${g.view.code}`) {
+    if (!client.staticPage && g.view && location.pathname !== `/join/${g.view.code}`) {
       history.replaceState(null, '', `/join/${g.view.code}`);
       setPath(`/join/${g.view.code}`);
     }
@@ -52,8 +52,10 @@ export function App() {
   const leave = useCallback(() => {
     g.leave();
     setManualCode(null);
-    history.replaceState(null, '', '/');
-    setPath('/');
+    if (!client.staticPage) {
+      history.replaceState(null, '', '/');
+      setPath('/');
+    }
   }, [g]);
 
   const joinCode = manualCode ?? codeFromPath(path);
