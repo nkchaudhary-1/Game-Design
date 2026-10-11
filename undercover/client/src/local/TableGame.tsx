@@ -176,7 +176,7 @@ function GatePortrait({ seat }: { seat: Seat; index: number }) {
         src={art('mystery.webp')}
         alt=""
         className="mark"
-        style={{ opacity: loaded ? 1 : 0 }}
+        hidden={!loaded}
         onLoad={(e) => {
           const img = e.currentTarget;
           if (img.naturalWidth > 0) setLoaded(true);
