@@ -74,6 +74,26 @@ avatars = [
 for i, av in enumerate(avatars):
     save(av, f'avatar-{i + 1:02d}.jpg', 82)
 
+def portrait(im, cx, cy, wfrac):
+    W, H = im.size; w = int(W * wfrac); h = int(w * 4 / 3)
+    l = max(0, min(W - w, int(W * cx - w / 2))); t = max(0, min(H - h, int(H * cy - h / 2)))
+    return im.crop((l, t, l + w, t + h)).resize((600, 800), Image.LANCZOS)
+ports = [
+    portrait(detective, 0.5, 0.3, 0.78),
+    portrait(load('Noir Doctor Preparing for a Procedure'), 0.5, 0.27, 0.78),
+    portrait(trio, 0.5, 0.5, 0.42),
+    portrait(load('Noir Police Officer in Silhouette'), 0.5, 0.28, 0.78),
+    portrait(trio, 0.2, 0.36, 0.42),
+    portrait(load('Noir Shadow Agent in Smoke'), 0.5, 0.27, 0.78),
+    portrait(trio, 0.79, 0.34, 0.42),
+    portrait(load('Mysterious Noir Detective Silhouette'), 0.5, 0.3, 0.78),
+    fit(load('Fogbound Gothic Street Entrance'), 600, 800, 0.3, 0.3),
+    fit(load('Gothic Ballroom Beneath the Chandelier'), 600, 800, 0.5, 0.2),
+    fit(load('Moonlit Noir Over the Gothic City'), 600, 800, 0.4, 0.15),
+]
+for i, p in enumerate(ports):
+    p.save(os.path.join(out, f'portrait-{i + 1:02d}.webp'), 'WEBP', quality=82, method=6)
+
 frame = Image.open(os.path.join(src, 'frame.png')).convert('RGBA').resize((600, 800), Image.LANCZOS)
 frame.save(os.path.join(out, 'frame.png'), 'PNG', optimize=True)
 print('frame.png')

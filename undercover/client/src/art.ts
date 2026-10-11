@@ -30,6 +30,12 @@ export function avatarArt(index: number): string {
   return art(`avatar-${String(n + 1).padStart(2, '0')}.jpg`);
 }
 
+/** Large 3:4 portrait for the pass-and-play gate; same numbering as the avatars. */
+export function portraitArt(index: number): string {
+  const n = ((index % AVATAR_COUNT) + AVATAR_COUNT) % AVATAR_COUNT;
+  return art(`portrait-${String(n + 1).padStart(2, '0')}.webp`);
+}
+
 /** Stable portrait index for a player: their position at the table. */
 export function avatarIndexFor(players: { id: string }[], id: string): number {
   const i = players.findIndex((p) => p.id === id);

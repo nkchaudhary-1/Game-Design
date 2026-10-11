@@ -1,6 +1,6 @@
 import { BODYGUARD_MIN_PLAYERS, MAX_PLAYERS, MIN_PLAYERS, ROLE_NAMES, suggestName, type PlayerCount, type PublicPlayer, type RoomSettings, type RoomView } from '@undercover/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { art } from '../art.js';
+import { art, portraitArt } from '../art.js';
 import { Art, Avatar, Chevron, CtaBar, InlineError, PlayerRow, RoleCard, Timer } from '../components/ui.js';
 import { Skyline } from '../components/Hero.js';
 import { Night, RoleReveal, Voting } from '../screens/Game.js';
@@ -161,16 +161,23 @@ const STAGE_COPY: Record<Stage, { why: string; hint: string }> = {
 // Screens
 // ---------------------------------------------------------------------------
 
+function GatePortrait({ seat, index }: { seat: Seat; index: number }) {
+  const [photo, setPhoto] = useState(true);
+  return (
+    <div className="gate-card">
+      {photo ? <Art src={portraitArt(index)} className="portrait" onMissing={() => setPhoto(false)} /> : <Avatar player={{ name: seat.name, color: seat.color }} size={300} square />}
+      <Art src={art('frame.png')} className="frame" />
+    </div>
+  );
+}
+
 function Gate({ table, seat, stage, progress, onUnlock }: { table: Table; seat: Seat; stage: Stage; progress: string; onUnlock: () => void }) {
   return (
     <>
       <main className="screen center" data-screen="gate">
         <p className="eyebrow">{progress}</p>
         <p className="narration">Pass the phone to</p>
-        <div className="gate-card">
-          <Avatar player={{ name: seat.name, color: seat.color, avatar: seat.view?.players.find((p) => p.id === seat.id)?.avatar ?? table.seats.indexOf(seat) }} size={300} square />
-          <Art src={art('frame.png')} className="frame" />
-        </div>
+        <GatePortrait seat={seat} index={seat.view?.players.find((p) => p.id === seat.id)?.avatar ?? table.seats.indexOf(seat)} />
         <h1 data-testid="gate-name" className="textured gate-name">
           {seat.name}
         </h1>
