@@ -44,49 +44,49 @@ arena({
   id: 'elevation-ring', name: 'Elevation Ring', tagline: 'High ground wins.',
   mechanic: 'Raised platforms, a lower centre and ramps.', movement: 'Ramps launch; drops add impact.',
   favours: 'ATTACK', exploit: 'Drop attacks from the platforms.', counter: 'Stay in the low centre, away from ramps.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#2a2740', segment: '#34304f', rim: '#f3e9d6', accent: '#ff8a3a' },
 });
 arena({
   id: 'magnetic-core', name: 'Magnetic Core', tagline: 'The middle pulls back.',
   mechanic: 'A central magnet that pulls and pushes.', movement: 'Curved paths towards (or away from) the centre.',
   favours: 'DEFENSE', exploit: 'Hold the centre while it drags opponents in.', counter: 'Use the push phase to slip past.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#162a3d', segment: '#1d3850', rim: '#dff1ff', accent: '#2f86ff' },
 });
 arena({
   id: 'crystal-arena', name: 'Crystal Arena', tagline: 'Smash for buffs.',
   mechanic: 'Breakable crystals that spawn temporary buffs.', movement: 'Players divert to claim crystals.',
   favours: 'STAMINA', exploit: 'Grab buffs while the opponent is busy.', counter: 'Contest crystals, deny the buff.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#241a40', segment: '#2e2252', rim: '#eadbff', accent: '#27e0ff' },
 });
 arena({
   id: 'shift-floor', name: 'Shift Floor', tagline: 'The ground moves.',
   mechanic: 'Five to eight large floor sections that move and rotate, with occasional gaps.', movement: 'Routes keep changing.',
   favours: 'STAMINA', exploit: 'Ambush from shifting sections.', counter: 'Stay on the larger, slower sections.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#1c2b33', segment: '#26404b', rim: '#e3f6f2', accent: '#38d6b8' },
 });
 arena({
   id: 'wind-tunnel', name: 'Wind Tunnel', tagline: 'Ride the lanes.',
   mechanic: 'Directional airflow zones with speed lanes.', movement: 'Pushes and speed boosts along visible lanes.',
   favours: 'ATTACK', exploit: 'Use speed lanes to get a running start.', counter: 'Cross the wind, never ride into it.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#1a2f40', segment: '#22405a', rim: '#e6f4ff', accent: '#6fe0ff' },
 });
 arena({
   id: 'lava-ring', name: 'Lava Ring', tagline: 'Risky shortcuts.',
   mechanic: 'A lava channel round a safe centre, with vents.', movement: 'Lava damages and launches; shortcuts cross it.',
   favours: 'ATTACK', exploit: 'Knock opponents into the lava channel.', counter: 'Stay in the safe centre and let them come.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#2f1f22', segment: '#40292d', rim: '#ffe3cf', accent: '#ff5a36' },
 });
 arena({
   id: 'gravity-well', name: 'Gravity Well', tagline: 'Weight changes everything.',
   mechanic: 'A central well with low-, high- and orbit-gravity zones.', movement: 'Floaty, heavy or curving depending on the zone.',
   favours: 'DEFENSE', exploit: 'Fight in the high-gravity zone where collisions are stronger.', counter: 'Use low gravity to out-run, orbit to flank.',
-  implemented: false,
+  implemented: true,
   palette: { floor: '#1d1a3a', segment: '#272250', rim: '#e4dcff', accent: '#a05cff' },
 });
 

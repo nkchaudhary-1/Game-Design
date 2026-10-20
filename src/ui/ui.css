@@ -361,6 +361,10 @@ select.sel option { background: var(--navy-2); }
 .banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; opacity: 0; white-space: nowrap; font: 800 clamp(48px, 9vw, 112px)/.9 var(--f-display); letter-spacing: .04em; text-transform: uppercase; font-style: italic; }
 .banner small { display: block; margin-top: 12px; font: 800 clamp(14px, 2.4vw, 22px)/1.1 var(--f-display); letter-spacing: .3em; color: var(--text); font-style: normal; }
 .banner.show { animation: pop 1.7s var(--ease) forwards; }
+.callout { position: absolute; left: 50%; top: 15%; transform: translateX(-50%); max-width: min(92vw, 560px); padding: 8px 18px; border-radius: 999px; background: rgba(8, 12, 28, .78); border: 1.5px solid var(--c, #fff); color: #fff; font: 800 clamp(12px, 1.8vw, 16px)/1.2 var(--f-display); letter-spacing: .12em; text-transform: uppercase; text-align: center; opacity: 0; pointer-events: none; box-shadow: 0 0 22px -4px var(--c, #fff); }
+.callout.show { animation: callout 2.6s var(--ease) forwards; }
+@keyframes callout { 0% { opacity: 0; transform: translate(-50%, -10px); } 10% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.arena-tag { margin-top: 2px; font: 800 11px/1 var(--f-display); letter-spacing: .24em; text-transform: uppercase; color: var(--muted, #8b93b5); text-align: center; }
 .banner.ring { color: var(--red); text-shadow: 0 0 30px rgba(252, 44, 51, .6); } .banner.spin { color: var(--stamina-light); text-shadow: 0 0 30px rgba(39, 224, 255, .5); } .banner.neutral { color: var(--warn); text-shadow: 0 0 30px rgba(242, 179, 61, .5); }
 @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.6) skewX(-8deg); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1) skewX(-8deg); } 82% { opacity: 1; } 100% { opacity: 0; } }
 .hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font: 700 16px/1.2 var(--f-display); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); text-shadow: 0 0 8px #000; text-align: center; pointer-events: none; padding: 0 12px; }

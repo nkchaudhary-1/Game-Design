@@ -32,6 +32,11 @@ export type FxKind =
   | 'radial' | 'zoneStart' | 'zoneEnd' | 'teleport' | 'slamStart' | 'slam' | 'shield' | 'shieldHit' | 'shieldBreak'
   | 'decoy' | 'decoyPop' | 'dash' | 'spinGain' | 'drain' | 'pull' | 'ambush' | 'guard';
 
+/** What the arena itself did (see arenas/hazards.ts): drives its sounds and flashes. */
+export type ArenaEventKind =
+  | 'pull' | 'push' | 'magnetWarn' | 'crystalBreak' | 'crystalSpawn' | 'gapWarn' | 'gapOpen' | 'gapClose'
+  | 'gustWarn' | 'gust' | 'lavaWarn' | 'lavaBurst' | 'lavaBurn' | 'drop' | 'stumble';
+
 export type SimEvent =
   | { type: 'launch'; slot: number; power: number; x: number; z: number }
   | { type: 'hit'; x: number; z: number; nx: number; nz: number; strength: number; a: number; b: number; dmgA: number; dmgB: number; heavy: boolean }
@@ -41,4 +46,5 @@ export type SimEvent =
   | { type: 'charge'; slot: number; index: number; state: 'start' | 'cancel' | 'max' }
   | { type: 'super'; slot: number; superId: string; state: 'activate' | 'end' | 'ready' }
   | { type: 'fx'; kind: FxKind; slot: number; x: number; z: number; radius?: number; power?: number }
+  | { type: 'arena'; kind: ArenaEventKind; x: number; z: number; slot: number; power: number }
   | { type: 'spinLow'; slot: number };

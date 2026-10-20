@@ -7,6 +7,7 @@
 //   npm run roster -- -n 24 --level 5
 //   npm run roster -- --shard 2/4                # run a quarter of the pairs (merge the JSON afterwards)
 //   npm run roster -- --json out.json            # write raw results
+//   npm run roster -- --focus ghost-viper,voidrunner   # only the pairs that include these blades
 //   npm run roster -- --set KB_EXP=0.5 --stat ravok.attack=8
 
 import fs from 'node:fs';
@@ -30,6 +31,7 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === '--stat') { const [path, v] = args[i + 1].split('='); const [id, key] = path.split('.'); (BLADES[id].stats as unknown as Record<string, number>)[key] = parseFloat(v); }
 }
 
+const focus = opt('--focus', '') ? opt('--focus', '').split(',') : null;
 const ids = opt('--ids', '') ? opt('--ids', '').split(',') : PLAYABLE_BLADES;
 
 interface Cell { w: number; n: number; dur: number; ring: number }
@@ -45,8 +47,9 @@ const built = Object.fromEntries(ids.map((id) => [id, buildBlade(id, { level: LE
 let pairIndex = 0;
 for (let i = 0; i < ids.length; i++) {
   for (let j = i + 1; j < ids.length; j++) {
-    if ((pairIndex++ % shards) !== shard - 1) continue;
     const a = ids[i], b = ids[j];
+    if (focus && !focus.includes(a) && !focus.includes(b)) continue;
+    if ((pairIndex++ % shards) !== shard - 1) continue;
     const c: Cell = { w: 0, n: 0, dur: 0, ring: 0 };
     for (let s = 0; s < N; s++) {
       const swap = s % 2 === 1;

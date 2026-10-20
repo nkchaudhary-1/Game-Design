@@ -24,6 +24,8 @@ export interface BattleOptions {
   reduced: boolean;
   audio: AudioManager;
   onResult: (r: MatchResult) => void;
+  /** The arena did something (a magnet flipped, a vent is about to erupt…): the screen may announce it. */
+  onArena?: (e: Extract<SimEvent, { type: 'arena' }>) => void;
   seed?: number;
 }
 
@@ -169,6 +171,7 @@ export class Battle {
           else if (e.slot === 0) a.play('super_ready');
           break;
         case 'spinLow': if (e.slot === 0) a.play('spin_low'); break;
+        case 'arena': a.arena(e.kind, this.panAt(e.x), e.power); this.o.onArena?.(e); break;
         case 'ability': if (e.slot === 0) a.play('ability', e.charge); break;
         case 'end': {
           this.result = e.result;

@@ -14,6 +14,7 @@
 // ring_out, spin_low, arena_hazard, button_click, upgrade, victory, defeat — plus launch / charge / ability.
 
 import type { BladeClass } from '../core/types';
+import type { ArenaEventKind } from '../combat/events';
 import { clamp } from '../core/types';
 
 export type AudioEvent =
@@ -223,6 +224,66 @@ export class AudioManager {
         break;
       case 'ability':
         this.hiss({ f0: 500, f1: 2400, q: 1.2, dur: 0.18, gain: 0.08 + 0.08 * p, pan });
+        break;
+    }
+  }
+
+  /** What the arena itself does: each mechanic has its own voice (the spec's arena_hazard, one per hazard). */
+  arena(kind: ArenaEventKind, pan = 0, p = 0): void {
+    if (!this.ac) return;
+    switch (kind) {
+      case 'pull':
+        this.tone({ type: 'sine', f0: 90, f1: 300, dur: 0.9, gain: 0.12, pan });
+        this.hiss({ type: 'lowpass', f0: 300, f1: 1400, q: 0.8, dur: 0.9, gain: 0.08, pan });
+        break;
+      case 'push':
+        this.tone({ type: 'sine', f0: 320, f1: 70, dur: 0.7, gain: 0.13, pan });
+        this.hiss({ type: 'lowpass', f0: 1500, f1: 200, q: 0.8, dur: 0.7, gain: 0.09, pan });
+        break;
+      case 'magnetWarn':
+        [0, 0.16].forEach((d) => this.tone({ type: 'square', f0: 480, dur: 0.07, gain: 0.04, delay: d, pan }));
+        break;
+      case 'crystalBreak': {
+        const base = [523, 660, 784, 988][Math.max(0, Math.min(3, Math.round(p)))];
+        [1, 1.5, 2, 3.01].forEach((r, i) => this.tone({ type: 'sine', f0: base * r, f1: base * r * 0.99, dur: 0.5 - i * 0.08, gain: 0.1 / (1 + i * 0.5), delay: i * 0.012, pan }));
+        this.hiss({ type: 'highpass', f0: 3200, q: 0.8, dur: 0.18, gain: 0.1, pan });
+        break;
+      }
+      case 'crystalSpawn':
+        this.tone({ type: 'sine', f0: 1480, f1: 1900, dur: 0.25, gain: 0.04, pan });
+        break;
+      case 'gapWarn':
+        [0, 0.2, 0.4].forEach((d) => this.tone({ type: 'square', f0: 190, dur: 0.06, gain: 0.05, delay: d, pan }));
+        break;
+      case 'gapOpen':
+        this.tone({ type: 'sine', f0: 80, f1: 38, dur: 0.4, gain: 0.2, pan });
+        this.clang(0.5, pan, 0.55, 0.8);
+        break;
+      case 'gapClose':
+        this.tone({ type: 'sine', f0: 70, f1: 45, dur: 0.25, gain: 0.14, pan });
+        this.clang(0.35, pan, 0.7, 0.5);
+        break;
+      case 'stumble':
+        this.tone({ type: 'sine', f0: 150, f1: 70, dur: 0.12, gain: 0.08, pan });
+        break;
+      case 'gustWarn':
+        this.hiss({ type: 'bandpass', f0: 400, f1: 1500, q: 1.1, dur: 0.9, gain: 0.05, pan });
+        break;
+      case 'gust':
+        this.hiss({ type: 'bandpass', f0: 500, f1: 900, q: 0.9, dur: 1.5, gain: 0.14, pan });
+        break;
+      case 'lavaWarn':
+        this.tone({ type: 'sawtooth', f0: 52, f1: 70, dur: 1.2, gain: 0.07, pan });
+        break;
+      case 'lavaBurst':
+        this.hiss({ type: 'lowpass', f0: 2200, f1: 180, q: 0.7, dur: 0.7, gain: 0.2, pan });
+        this.tone({ type: 'sine', f0: 100, f1: 34, dur: 0.5, gain: 0.22, pan });
+        break;
+      case 'lavaBurn':
+        this.hiss({ type: 'highpass', f0: 3600, q: 0.7, dur: 0.14, gain: 0.04, pan });
+        break;
+      case 'drop':
+        this.tone({ type: 'sine', f0: 120, f1: 48, dur: 0.18, gain: 0.14, pan });
         break;
     }
   }

@@ -9,10 +9,12 @@ import type { BladeStats } from '../combat/events';
 
 export interface ActiveMod {
   id: number;
-  source: 'ability' | 'super' | 'zone';
+  source: 'ability' | 'super' | 'zone' | 'arena';
   /** Which Super this came from, so it can be cleared when the Super ends (the 8 s cap). */
   superId?: string;
   tag?: string;
+  /** Arena buffs: which one (a crystal's name), so the renderer can colour the aura. */
+  kind?: string;
   until: number;
   mods: ModSet;
   flags: ModFlag[];
@@ -60,6 +62,8 @@ export class BladeRuntime {
 
   // runtime state
   mods: ActiveMod[] = [];
+  /** Multipliers from the arena itself, replaced every step (Gravity Well). */
+  env: ModSet = {};
   cooldown: [number, number, number] = [0, 0, 0];
   cooldownMax: [number, number, number] = [1, 1, 1];
   charge = { index: -1, t: 0, maxed: false };
@@ -102,7 +106,7 @@ export class BladeRuntime {
 
   /** Product of every active multiplier for `key`, including spin-loss scaling (Rage Mode, Last Stand). */
   mod(key: ModKey): number {
-    let m = 1;
+    let m = this.env[key] ?? 1;
     const lost = 1 - Math.max(0, Math.min(100, this.spin)) / 100;
     for (const a of this.mods) {
       const v = a.mods[key];

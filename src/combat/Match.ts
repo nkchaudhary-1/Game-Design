@@ -48,7 +48,7 @@ export class Match {
 
   constructor(arenaDef: ArenaDef, entries: MatchEntry[], rng: Rng) {
     this.rng = rng;
-    this.arena = new Arena(arenaDef);
+    this.arena = new Arena(arenaDef, rng);
     this.physics = new PhysicsWorld(TUNING.DT);
     this.physics.addGround(this.arena.radius);
     entries.forEach((e, slot) => {

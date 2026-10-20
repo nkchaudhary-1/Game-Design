@@ -46,6 +46,7 @@ export class BattleScreen implements Screen {
     this.battle = new Battle({
       rr, player, cpu, difficulty: s.difficulty, arenaId: s.arenaId, reduced: ctx.reduced, audio: ctx.audio,
       onResult: (r) => this.onResult(r, player, cpu),
+      onArena: (e) => this.hud.arenaEvent(e),
     });
 
     this.hud = new HUD({

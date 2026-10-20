@@ -85,7 +85,7 @@ add({
 });
 add({
   id: 'blazefang', name: 'Blazefang', cls: 'ATTACK', role: 'Burst Attacker', fantasy: 'Speed creates impact.', difficulty: 'MEDIUM', rarity: 'COMMON',
-  stats: st(8, 3, 5, 5, 9, 4, 8, 9, 5), moves: ['Fang Rush', 'Flare Guard', 'Side Burst'],
+  stats: st(8, 4, 6, 6, 9, 5, 8, 9, 6), moves: ['Fang Rush', 'Flare Guard', 'Side Burst'],
   supers: ['Inferno Rush', 'Flame Trail', 'Burnout', 'Fang Storm', 'Inferno Crash'],
   hints: ['Light attack ring', 'High-grip tip', 'Speed core'],
   recommended: { ring: 'ring.light-attack', tip: 'tip.high-grip', core: 'core.speed' },
@@ -93,7 +93,7 @@ add({
 });
 add({
   id: 'riftclaw', name: 'Riftclaw', cls: 'ATTACK', role: 'Precision Attacker', fantasy: 'One perfect hit.', difficulty: 'HARD', rarity: 'RARE',
-  stats: st(9, 4, 4, 6, 9, 4, 8, 7, 4), moves: ['Claw Strike', 'Feint', 'Lunge'],
+  stats: st(9, 4, 5, 6, 9, 5, 8, 7, 5), moves: ['Claw Strike', 'Feint', 'Lunge'],
   supers: ['Critical Strike', 'Rift Dash', 'Mark Target', 'Execution', 'Rift Breaker'],
   hints: ['Balanced weight', 'Precision tip', 'Agility core'],
   recommended: { weight: 'weight.balanced', tip: 'tip.precision', core: 'core.agility' },
@@ -101,7 +101,7 @@ add({
 });
 add({
   id: 'volt-reaper', name: 'Volt Reaper', cls: 'ATTACK', role: 'Speed Attacker', fantasy: 'Never stop moving.', difficulty: 'HARD', rarity: 'RARE',
-  stats: st(8, 3, 5, 4, 10, 3, 7, 9, 5), moves: ['Volt Dash', 'Reaper Spin', 'Arc Dodge'],
+  stats: st(8, 4, 6, 5, 10, 4, 7, 9, 6), moves: ['Volt Dash', 'Reaper Spin', 'Arc Dodge'],
   supers: ['Overcharge', 'Chain Strike', 'Electric Field', 'Flash Step', 'Volt Storm'],
   hints: ['Lightweight ring', 'Speed tip', 'Agility core'],
   recommended: { ring: 'ring.light', tip: 'tip.speed', core: 'core.agility' },
@@ -109,7 +109,7 @@ add({
 });
 add({
   id: 'titan-breaker', name: 'Titan Breaker', cls: 'ATTACK', role: 'Heavy Destroyer', fantasy: 'Weight is power.', difficulty: 'EASY', rarity: 'EPIC',
-  stats: st(10, 7, 4, 10, 2, 8, 10, 8, 4), moves: ['Titan Bash', 'Heavy Guard', 'Ground Charge'],
+  stats: st(9, 6, 4, 9, 2, 7, 9, 7, 4), moves: ['Titan Bash', 'Heavy Guard', 'Ground Charge'],
   supers: ['Earthquake', 'Crush Mode', 'Gravity Slam', 'Unstoppable', 'Titan Fall'],
   hints: ['Maximum weight', 'Heavy ring', 'Stability core'],
   recommended: { weight: 'weight.maximum', ring: 'ring.heavy', core: 'core.stability' },
@@ -117,7 +117,7 @@ add({
 });
 add({
   id: 'inferno-x', name: 'Inferno X', cls: 'ATTACK', role: 'Sustained Attacker', fantasy: 'Constant pressure.', difficulty: 'MEDIUM', rarity: 'RARE',
-  stats: st(8, 4, 6, 6, 6, 5, 7, 9, 6), moves: ['Burn Strike', 'Heat Guard', 'Flame Dash'],
+  stats: st(7, 4, 6, 5, 6, 5, 6, 7, 6), moves: ['Burn Strike', 'Heat Guard', 'Flame Dash'],
   supers: ['Heatwave', 'Burning Spin', 'Inferno Ring', 'Overheat', 'Inferno Core'],
   hints: ['Medium-heavy ring', 'Attack core', 'Balanced tip'],
   recommended: { ring: 'ring.medium-heavy', core: 'core.attack', tip: 'tip.balanced' },
@@ -125,7 +125,7 @@ add({
 });
 add({
   id: 'stormfang', name: 'Stormfang', cls: 'ATTACK', role: 'Combo Attacker', fantasy: 'The more you hit, the stronger you become.', difficulty: 'HARD', rarity: 'EPIC',
-  stats: st(8, 4, 6, 5, 9, 4, 7, 9, 6), moves: ['Fang Combo', 'Storm Dash', 'Whiplash'],
+  stats: st(9, 4, 6, 6, 9, 5, 7, 9, 6), moves: ['Fang Combo', 'Storm Dash', 'Whiplash'],
   supers: ['Combo Rush', 'Storm Chain', 'Cyclone Strike', 'Momentum', 'Storm Breaker'],
   hints: ['Agile ring', 'Combo core', 'Speed tip'],
   recommended: { ring: 'ring.agile', core: 'core.combo', tip: 'tip.speed' },
@@ -160,7 +160,7 @@ add({
 });
 add({
   id: 'stonecore', name: 'Stonecore', cls: 'DEFENSE', role: 'Immovable Tank', fantasy: 'Become the arena.', difficulty: 'EASY', rarity: 'EPIC',
-  stats: st(4, 9, 9, 10, 1, 10, 2, 3, 9), moves: ['Stone Bash', 'Root', 'Center Hold'],
+  stats: st(4, 8, 8, 9, 1, 9, 2, 3, 8), moves: ['Stone Bash', 'Root', 'Center Hold'],
   supers: ['Earth Anchor', 'Stone Skin', 'Gravity Lock', 'Core Recovery', 'Mountain Form'],
   hints: ['Maximum weight', 'Stamina core'],
   recommended: { weight: 'weight.maximum', core: 'core.stamina' },
@@ -176,14 +176,14 @@ add({
 });
 add({
   id: 'guardian-prime', name: 'Guardian Prime', cls: 'DEFENSE', role: 'Balanced Defender', fantasy: 'Ready for anything.', difficulty: 'EASY', rarity: 'COMMON',
-  stats: st(6, 8, 8, 7, 5, 8, 5, 5, 8), moves: ['Prime Bash', 'Guard', 'Recover'],
+  stats: st(5, 7, 6, 6, 4, 7, 4, 4, 6), moves: ['Prime Bash', 'Guard', 'Recover'],
   supers: ['Guardian Shield', 'Recovery Pulse', 'Counter Guard', 'Last Stand', 'Guardian Mode'],
   hints: ['Balanced parts'], recommended: {},
   visual: plates('guardian-prime', 4, '#b3bdd3', '#1f3a8a', '#d7e0f5', '#26304f'), implemented: true,
 });
 add({
   id: 'gravity-rex', name: 'Gravity Rex', cls: 'DEFENSE', role: 'Arena Controller', fantasy: 'Control where the fight happens.', difficulty: 'HARD', rarity: 'EPIC',
-  stats: st(6, 8, 7, 8, 3, 9, 6, 5, 7), moves: ['Gravity Bash', 'Pull', 'Center Lock'],
+  stats: st(7, 8, 7, 8, 4, 9, 6, 6, 7), moves: ['Gravity Bash', 'Pull', 'Center Lock'],
   supers: ['Gravity Well', 'Heavy Field', 'Orbit Lock', 'Reverse Gravity', 'Gravity Collapse'],
   hints: ['Heavy ring', 'Control core'],
   recommended: { ring: 'ring.heavy', core: 'core.control' },
@@ -202,7 +202,7 @@ add({
 });
 add({
   id: 'voidrunner', name: 'Voidrunner', cls: 'STAMINA', role: 'Speed Spinner', fantasy: 'Catch me if you can.', difficulty: 'MEDIUM', rarity: 'COMMON',
-  stats: st(5, 3, 9, 3, 10, 3, 4, 6, 9), moves: ['Void Dash', 'Slipstream', 'Drift'],
+  stats: st(7, 5, 9, 7, 10, 5, 5, 8, 9), moves: ['Void Dash', 'Slipstream', 'Drift'],
   supers: ['Void Step', 'Speed Burst', 'Afterimage', 'Phase Run', 'Voidstorm'],
   hints: ['Ultra-light parts', 'Agility core'],
   recommended: { weight: 'weight.ultra-light', core: 'core.agility' },
@@ -210,7 +210,7 @@ add({
 });
 add({
   id: 'nightveil', name: 'Nightveil', cls: 'STAMINA', role: 'Stealth Spinner', fantasy: 'Disappear. Reposition. Strike.', difficulty: 'HARD', rarity: 'RARE',
-  stats: st(5, 4, 9, 4, 9, 4, 5, 7, 9), moves: ['Veil Strike', 'Fade', 'Shadow Drift'],
+  stats: st(6, 5, 9, 5, 9, 5, 6, 8, 9), moves: ['Veil Strike', 'Fade', 'Shadow Drift'],
   supers: ['Cloak', 'Hide & Seek', 'Shadow Clone', 'Night Dash', 'Nightfall'],
   hints: ['Lightweight', 'Stealth core'],
   recommended: { weight: 'weight.light', core: 'core.stealth' },
@@ -218,7 +218,7 @@ add({
 });
 add({
   id: 'spectra', name: 'Spectra', cls: 'STAMINA', role: 'Illusion Spinner', fantasy: 'Make the opponent attack the wrong blade.', difficulty: 'HARD', rarity: 'EPIC',
-  stats: st(5, 4, 8, 4, 10, 3, 4, 6, 8), moves: ['Mirror Spin', 'Fake Dash', 'Prism Drift'],
+  stats: st(6, 5, 8, 6, 10, 4, 6, 8, 8), moves: ['Mirror Spin', 'Fake Dash', 'Prism Drift'],
   supers: ['Decoy', 'Mirror Clone', 'Phase Shift', 'False Target', 'Spectral Storm'],
   hints: ['Agility parts', 'Lightweight', 'Deception core'],
   recommended: { ring: 'ring.agile', weight: 'weight.light', core: 'core.deception' },
@@ -226,7 +226,7 @@ add({
 });
 add({
   id: 'ghost-viper', name: 'Ghost Viper', cls: 'STAMINA', role: 'Dodge / Counter Spinner', fantasy: 'Let them attack first.', difficulty: 'HARD', rarity: 'RARE',
-  stats: st(7, 4, 8, 4, 10, 4, 6, 8, 8), moves: ['Viper Strike', 'Dodge', 'Counter Spin'],
+  stats: st(6, 4, 6, 4, 8, 4, 6, 6, 6), moves: ['Viper Strike', 'Dodge', 'Counter Spin'],
   supers: ['Venom Dash', 'Phase Shift', 'Counter Bite', 'Predator Mode', 'Ghost Strike'],
   hints: ['Agile attack ring', 'Speed tip'],
   recommended: { ring: 'ring.agile-attack', tip: 'tip.speed' },
@@ -242,7 +242,7 @@ add({
 });
 add({
   id: 'nebula-drift', name: 'Nebula Drift', cls: 'STAMINA', role: 'Endurance Specialist', fantasy: 'The longer the fight, the stronger I become.', difficulty: 'MEDIUM', rarity: 'LEGENDARY',
-  stats: st(4, 6, 10, 5, 7, 6, 4, 5, 10), moves: ['Nebula Spin', 'Orbit', 'Drift Guard'],
+  stats: st(4, 5, 9, 5, 6, 5, 4, 4, 8), moves: ['Nebula Spin', 'Orbit', 'Drift Guard'],
   supers: ['Spin Burst', 'Spin Drain', 'Endurance Mode', 'Energy Recover', 'Nebula Collapse'],
   hints: ['Maximum stamina', 'Balanced stability'],
   recommended: { core: 'core.max-stamina' },

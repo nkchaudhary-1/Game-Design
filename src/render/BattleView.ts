@@ -127,7 +127,7 @@ export class BattleView {
 
   setReduced(r: boolean): void { this.reduced = r; this.fx.reduced = r; }
 
-  private yAt = (x: number, z: number): number => this.arena.dishY(Math.min(Math.hypot(x, z), this.match.arena.radius));
+  private yAt = (x: number, z: number): number => this.match.arena.surfaceY(x, z);
 
   private focus(): Array<{ x: number; z: number }> {
     const alive = this.match.blades.filter((b) => b.alive && !b.fallen);
@@ -175,6 +175,8 @@ export class BattleView {
       } else if (e.type === 'fx' && (e.kind === 'dash' || e.kind === 'slam')) {
         this.boost[e.slot] = 1;
         if (e.kind === 'slam') this.rig.shake(1);
+      } else if (e.type === 'arena') {
+        this.arena.onEvent(e, { fx: this.fx, y: this.yAt, shake: (k) => this.rig.shake(k) });
       } else if (e.type === 'ko') {
         const b = this.match.blades[e.slot];
         if (e.cause === 'ring') {
@@ -198,9 +200,8 @@ export class BattleView {
     this.match.blades.forEach((b, i) => {
       const v = this.views[i];
       const x = lerp(b.prevX, b.x, alpha), z = lerp(b.prevZ, b.z, alpha);
-      const r = Math.min(Math.hypot(x, z), arena.radius);
       const ty = b.bb.body.translation().y;
-      const y = ty + this.arena.dishY(r);
+      const y = ty + arena.surfaceY(x, z);
 
       // spin: rotation rate follows spin; a spun-out blade coasts to a stop.
       const target = b.out === 'spin' ? 0 : lerp(1.4, 13, Math.pow(clamp(b.spin / 100, 0, 1), 0.7));
@@ -209,9 +210,8 @@ export class BattleView {
       this.angles[i] -= frameTurn(this.omegas[i], dt, v.symmetry); // capped per frame: no wagon-wheel strobing
 
       const vx = b.vx, vz = b.vz;
-      // lean into the motion, and tilt with the dish slope
-      const slope = Math.atan(((0.9 * 2) / arena.radius) * (r / arena.radius));
-      const inv = r > 0.01 ? 1 / r : 0;
+      // lean into the motion, and tilt with the floor (the dish, and the Elevation Ring's ramps)
+      const gx = (arena.surfaceY(x + 0.3, z) - arena.surfaceY(x - 0.3, z)) / 0.6, gz = (arena.surfaceY(x, z + 0.3) - arena.surfaceY(x, z - 0.3)) / 0.6;
       const k = 0.022;
       // the lean eases (collisions change velocity in one step; the tilt must not snap with it)
       const ease = 1 - Math.exp(-dt * 8);
@@ -241,8 +241,8 @@ export class BattleView {
         const sv = Math.hypot(vx, vz) || 1;
         tiltX += (vx / sv) * fall; tiltZ += (vz / sv) * fall;
       }
-      const leanX = this.leanXs[i] + -x * inv * slope + tiltX;
-      const leanZ = this.leanZs[i] + -z * inv * slope + tiltZ;
+      const leanX = this.leanXs[i] - Math.atan(gx) + tiltX;
+      const leanZ = this.leanZs[i] - Math.atan(gz) + tiltZ;
       // keep the rim above the floor when the model leans over, and add the hop
       const lift = fall > 0 ? 0 : b.radius * Math.sin(Math.min(0.6, Math.hypot(tiltX, tiltZ))) * 0.85;
       const yy = y + d.hop + lift;
@@ -268,7 +268,7 @@ export class BattleView {
     for (const l of this.flashes) l.intensity *= Math.exp(-dt * 13);
     this.scuffs.update(dt);
     this.arena.update(this.match.blades.filter((b) => b.alive).map((b) => ({ x: b.x, z: b.z })));
-    this.arena.tick(dt);
+    this.arena.tick(dt, this.match);
     this.superFx.update(this.match, dt, this.yAt, this.views);
     this.fx.update(dt);
     this.rig.update(dt, this.focus(), this.reduced);

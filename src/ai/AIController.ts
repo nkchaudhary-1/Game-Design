@@ -53,6 +53,8 @@ export class AIController {
   private chargeIndex = -1;
   private superReadySince = -1;
   private clock = 0;
+  /** Willing to detour for arena pickups (Crystal Arena); re-rolled with `aggressive`. */
+  private collect = true;
 
   constructor(
     readonly slot: number,
@@ -111,13 +113,16 @@ export class AIController {
       const base = m === 'ADVANTAGE' ? 0.95 : m === 'EVEN' ? 0.8 : 0.45;
       this.aggressive = this.rng() < base * (0.6 + 0.4 * p.skill);
       this.aggressiveUntil = this.clock + 2.5 + this.rng() * 2.5;
+      this.collect = this.rng() < 0.3 + 0.6 * p.skill;
     }
+
+    const hz = this.hazardSense(match, me);
 
     const wantsSuper = this.wantsSuper(match, me, dist, opp);
     const ctx: AIContext = {
       cls, oppCls, dist, myD, outward, closing, mySpin: me.spin, oppSpin: opp.spin,
       superReady: me.superState === 'READY' && !!me.superId, wantsSuper,
-      sinceHurt: match.t - me.lastHurtAt, radius: R, hazardNear: false,
+      sinceHurt: match.t - me.lastHurtAt, radius: R, hazardNear: hz.danger > 0.5,
       stalled: match.t - Math.max(match.lastHit, 4) > 5.5,
     };
     this.state = chooseState(ctx, this.aggressive);
@@ -132,7 +137,8 @@ export class AIController {
         break;
       }
       case 'EDGE_AVOID': {
-        tx = cx; tz = cz;
+        // a hazard (lava, an open gap, a downwind rim) sends it the way the arena says is safe; the rim sends it to the middle
+        if (hz.danger > 0.5 && hz.mag > 0.01 && myD < R * 0.88) { tx = hz.ax; tz = hz.az; } else { tx = cx; tz = cz; }
         if (this.canUse(me, 1) && me.built.moves[1].type === 'DEFENSE' && dist < R * 0.25) this.tap(1);
         break;
       }
@@ -178,6 +184,14 @@ export class AIController {
       }
     }
 
+    // detour for a pickup when nobody is about to fight: only the quiet states, and only when it is close
+    if (this.collect && hz.danger < 0.3 && me.spin > 25 && dist > 4.5 && (this.state === 'SEARCH' || this.state === 'EVADE' || this.state === 'CHASE')) {
+      const pk = this.nearestPickup(match, me);
+      if (pk) { [tx, tz] = norm(pk.x - me.x, pk.z - me.z, tx, tz); }
+    }
+    // soft push away from whatever the arena makes dangerous
+    if (hz.danger > 0.1) { tx += hz.ax * hz.danger * 1.4; tz += hz.az * hz.danger * 1.4; }
+
     // never wander over the rim
     const edge = clamp((myD - R * AI_RANGE.edge) / (R * 0.12), 0, 1);
     tx = lerp(tx, cx, edge); tz = lerp(tz, cz, edge);
@@ -192,6 +206,33 @@ export class AIController {
   // ------------------------------------------------------------------------------------------ helpers
   private ox = 0;
   private oz = 0;
+
+  /** How dangerous is it here and just ahead, and which way is safer? (Core Pit: never.) */
+  private hazardSense(match: Match, me: BladeRuntime): { danger: number; ax: number; az: number; mag: number } {
+    const arena = match.arena;
+    if (arena.hazards.length === 0) return { danger: 0, ax: 0, az: 0, mag: 0 };
+    const here = arena.danger(me.x, me.z, match);
+    const ahead = arena.danger(me.x + me.vx * 0.5, me.z + me.vz * 0.5, match);
+    const danger = Math.max(here, ahead);
+    if (danger < 0.05) return { danger: 0, ax: 0, az: 0, mag: 0 };
+    let ax = 0, az = 0;
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4, dx = Math.cos(a), dz = Math.sin(a);
+      const d = arena.danger(me.x + dx * 2.6, me.z + dz * 2.6, match);
+      ax -= dx * d; az -= dz * d;
+    }
+    const mag = Math.hypot(ax, az);
+    return { danger, ax: mag > 1e-6 ? ax / mag : 0, az: mag > 1e-6 ? az / mag : 0, mag };
+  }
+
+  private nearestPickup(match: Match, me: BladeRuntime): { x: number; z: number } | null {
+    let best: { x: number; z: number } | null = null, bd = 7.5 * 7.5;
+    for (const p of match.arena.pickups(match)) {
+      const d = (p.x - me.x) ** 2 + (p.z - me.z) ** 2;
+      if (d < bd / p.value) { bd = d * p.value; best = p; }
+    }
+    return best;
+  }
 
   /** What the CPU believes its opponent is: a Phantom's decoy fools it, stealth blurs it. */
   private targetFor(match: Match, me: BladeRuntime): { x: number; z: number; vx: number; vz: number } | null {

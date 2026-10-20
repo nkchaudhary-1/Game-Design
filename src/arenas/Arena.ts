@@ -2,11 +2,15 @@
 
 import { TUNING, wallGrip } from '../core/Balance';
 import type { ArenaDef } from './arenaData';
-import type { Hazard } from './hazards';
+import type { Rng } from '../core/Rng';
+import { createHazards, type Hazard, type Pickup } from './hazards';
+import type { Match } from '../combat/Match';
 
 export class Arena {
-  readonly hazards: Hazard[] = [];
-  constructor(readonly def: ArenaDef) {}
+  readonly hazards: Hazard[];
+  constructor(readonly def: ArenaDef, rng?: Rng) {
+    this.hazards = rng ? createHazards(def.id, rng) : [];
+  }
 
   get radius(): number { return this.def.radius; }
 
@@ -46,5 +50,31 @@ export class Arena {
   dishDepth(r: number): number {
     const u = Math.min(1, r / this.radius);
     return 0.9 * (1 - u * u);
+  }
+
+  /** Height the arena's mechanic adds on top of the dish (Elevation Ring's platforms); 0 everywhere else. */
+  heightAt(x: number, z: number): number {
+    let h = 0;
+    for (const k of this.hazards) if (k.heightAt) h += k.heightAt(x, z);
+    return h;
+  }
+
+  /** Where the floor is, for drawing blades on it. */
+  surfaceY(x: number, z: number): number {
+    return -this.dishDepth(Math.hypot(x, z)) + this.heightAt(x, z);
+  }
+
+  /** 0–1: how much a blade should keep away from this spot right now (lava, an open gap, a downwind rim…). */
+  danger(x: number, z: number, match: Match): number {
+    let d = 0;
+    for (const k of this.hazards) if (k.danger) d = Math.max(d, k.danger(x, z, match));
+    return d;
+  }
+
+  /** Things worth a detour for a CPU (Crystal Arena's crystals). */
+  pickups(match: Match): Pickup[] {
+    const out: Pickup[] = [];
+    for (const k of this.hazards) if (k.pickups) out.push(...k.pickups(match));
+    return out;
   }
 }

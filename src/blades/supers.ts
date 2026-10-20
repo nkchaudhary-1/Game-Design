@@ -251,7 +251,7 @@ def({ id: 'titan-breaker.titan-fall', name: 'Titan Fall', bladeId: 'titan-breake
 // -------------------------------------------------------------------------------------------- INFERNO X
 def({ id: 'inferno-x.heatwave', name: 'Heatwave', bladeId: 'inferno-x', unlockLevel: 1, duration: 7, fx: 'burst',
   description: 'Pulses of heat from your core, every second and a half, that shove and scorch.',
-  effects: [start({ kind: 'radial', radius: 4, impulse: 6, damage: 4 }), every(1.4, { kind: 'radial', radius: 4, impulse: 6, damage: 4 })] });
+  effects: [start({ kind: 'radial', radius: 4, impulse: 5, damage: 2.6 }), every(1.6, { kind: 'radial', radius: 4, impulse: 5, damage: 2.6 })] });
 def({ id: 'inferno-x.burning-spin', name: 'Burning Spin', bladeId: 'inferno-x', unlockLevel: 3, duration: 7, fx: 'aura',
   description: 'Wrap yourself in fire: a burning field round you and harder hits, at a small spin cost.',
   effects: [start({ kind: 'zone', zone: 'trap', radius: 2.6, duration: 7, strength: 4, damage: 3.5, at: 'self', follow: true }), start({ kind: 'mod', duration: 7, mods: { dmgDealt: 1.25, spinDecay: 1.2 } })] });
@@ -438,7 +438,7 @@ def({ id: 'spectra.spectral-storm', name: 'Spectral Storm', bladeId: 'spectra', 
 // -------------------------------------------------------------------------------------------- GHOST VIPER
 def({ id: 'ghost-viper.venom-dash', name: 'Venom Dash', bladeId: 'ghost-viper', unlockLevel: 1, duration: 6, fx: 'trail',
   description: 'Strike in a streak of venom: a lunge, then a poisoned field that siphons spin from anything close.',
-  effects: [start({ kind: 'dash', dir: 'target', speed: 13 }), start({ kind: 'drain', radius: 3.5, rate: 4.5, duration: 6 }), start({ kind: 'mod', duration: 6, mods: { dmgDealt: 1.2 } })] });
+  effects: [start({ kind: 'dash', dir: 'target', speed: 13 }), start({ kind: 'drain', radius: 3.5, rate: 1.8, duration: 6 }), start({ kind: 'mod', duration: 6, mods: { dmgDealt: 1.08 } })] });
 def({ id: 'ghost-viper.phase-shift', name: 'Phase Shift', bladeId: 'ghost-viper', unlockLevel: 3, duration: 6, fx: 'trail',
   description: 'Pass through other blades for a few seconds and move faster.',
   effects: [start({ kind: 'mod', duration: 2.5, flags: ['ghost'], tag: 'phase-shift' }), start({ kind: 'mod', duration: 6, mods: { accel: 1.4 } })] });

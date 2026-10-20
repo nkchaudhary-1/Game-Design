@@ -4,7 +4,8 @@
 
 import * as THREE from 'three';
 import type { Match } from '../combat/Match';
-import type { MatchResult } from '../combat/events';
+import type { MatchResult, SimEvent } from '../combat/events';
+import { CRYSTAL_INFO, CRYSTAL_KINDS } from '../arenas/hazards';
 import { TEAM_COLORS } from '../render/BattleView';
 import { TUNING } from '../core/Balance';
 import { CLASS_COLORS, clamp } from '../core/types';
@@ -38,6 +39,8 @@ export class HUD {
   private readonly status: HTMLElement;
   private readonly scoreEl: HTMLElement;
   private readonly bannerEl: HTMLElement;
+  private readonly calloutEl: HTMLElement;
+  private lastCallout = -9;
   private readonly hintEl: HTMLElement;
   private liveStart = -1;
   private shownKo = -1;
@@ -75,7 +78,7 @@ export class HUD {
 
     this.scoreEl = h('div.score');
     this.status = h('div.status');
-    this.el.append(h('div.hud-round', null, this.scoreEl, this.status));
+    this.el.append(h('div.hud-round', null, this.scoreEl, this.status, h('div.arena-tag', null, match.arena.def.name)));
     this.renderScore();
 
     for (let slot = 0; slot < 2; slot++) {
@@ -86,9 +89,32 @@ export class HUD {
     }
 
     this.bannerEl = h('div.banner', { 'aria-live': 'assertive' });
+    this.calloutEl = h('div.callout', { 'aria-live': 'polite' });
     this.hintEl = h('div.hint.pulse');
-    this.el.append(this.bannerEl, this.hintEl);
+    this.el.append(this.bannerEl, this.calloutEl, this.hintEl);
     this.setReadyHint();
+  }
+
+  /** The arena did something: say so in a line at the top, so a mechanic is never a surprise. */
+  arenaEvent(e: Extract<SimEvent, { type: 'arena' }>): void {
+    const who = e.slot >= 0 ? this.o.names[e.slot] : '';
+    const info = e.kind === 'crystalBreak' ? CRYSTAL_INFO[CRYSTAL_KINDS[Math.max(0, Math.min(3, Math.round(e.power)))]] : null;
+    const say: Partial<Record<typeof e.kind, [string, string]>> = {
+      pull: ['Magnet pulling in', '#35a0ff'], push: ['Magnet pushing out', '#ff7a3a'],
+      gapWarn: ['A floor plate is about to drop', '#ff9a2a'], gustWarn: ['Gust incoming', '#6fe0ff'],
+      lavaWarn: ['Vents about to erupt', '#ff6a2a'],
+      crystalBreak: [`${who}: ${info?.name ?? 'Crystal'}. ${info?.text ?? ''}`, info?.color ?? '#27e0ff'],
+      drop: [`${who}: drop attack`, '#ff8a3a'],
+    };
+    const s = say[e.kind];
+    if (!s) return;
+    const t = this.o.match.t;
+    if (t - this.lastCallout < 1.1 && e.kind !== 'crystalBreak') return;
+    this.lastCallout = t;
+    const el = this.calloutEl;
+    el.textContent = s[0];
+    el.style.setProperty('--c', s[1]);
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
 
   private setReadyHint(): void {
