@@ -23,18 +23,22 @@ export type ModFlag =
   | 'reflectDamage'    // spin damage taken is also dealt back to the attacker
   | 'reflectKnockback' // knockback taken is also dealt back to the attacker
   | 'stealth'          // opponent's targeting becomes inaccurate; next hit is an ambush
-  | 'ambush';          // next hit deals bonus damage, then the flag ends
+  | 'ambush'           // next hit deals bonus damage, then the flag ends
+  | 'absorb';          // spin damage taken is partly converted into spin (Aegiron's Absorb)
 
 /** Extra multiplier reached at 0 spin, interpolated by how much spin has been lost. */
 export interface SpinLossScale { dmgDealt?: number; kbDealt?: number; dmgTaken?: number; spinDecay?: number }
 
-export type ZoneKind = 'trap' | 'well' | 'blackhole';
+/** trap: hits what crosses it · well: pulls and slows · blackhole: pulls and drains · repel: pushes away · orbit: swings round the centre · slow: drags and dulls steering */
+export type ZoneKind = 'trap' | 'well' | 'blackhole' | 'repel' | 'orbit' | 'slow';
 
 export type EffectDef =
   | { kind: 'dash'; dir: 'heading' | 'target' | 'perp' | 'away'; speed: number; scaleByCharge?: boolean }
   | {
       kind: 'mod'; target?: 'self' | 'opponent'; duration: number; mods?: ModSet; flags?: ModFlag[];
       spinLoss?: SpinLossScale; scaleByCharge?: boolean; tag?: string;
+      /** Re-applying the same tag adds a stack (up to this many) instead of replacing: combos, momentum. */
+      stack?: number;
     }
   | { kind: 'radial'; radius: number; impulse: number; damage: number }
   | { kind: 'pull'; radius: number; strength: number; duration: number }
@@ -44,7 +48,9 @@ export type EffectDef =
   | { kind: 'spin'; amount: number }
   | { kind: 'shield'; hits: number; duration: number }
   | { kind: 'decoy'; duration: number }
-  | { kind: 'slam'; delay: number; radius: number; impulse: number; damage: number };
+  | { kind: 'slam'; delay: number; radius: number; impulse: number; damage: number }
+  /** Jump back to where this blade was `seconds` ago and win back `spin` (0–1) of the spin lost since then. */
+  | { kind: 'rewind'; seconds: number; spin: number };
 
 export type AbilityType = 'ATTACK' | 'DEFENSE' | 'MOVEMENT' | 'CONTROL' | 'BUFF' | 'DEBUFF';
 

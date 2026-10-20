@@ -38,6 +38,7 @@ export function stepMatch(m: Match): void {
     b.prevX = b.x; b.prevZ = b.z;
     b.prevSpin = b.spin;
     expireMods(m, b);
+    sampleHistory(m, b);
     updateAbilities(m, b, dt);
     updateSuper(m, b, dt);
     syncBodyFlags(m, b);
@@ -67,6 +68,15 @@ export function stepMatch(m: Match): void {
   // 5. consequences
   for (const b of m.blades) tickSpin(m, b, dt);
   if (m.phase === 'live') checkKnockouts(m);
+}
+
+/** Remember where the blade was and how much spin it had (every 0.1 s, last 4 s): Rewind reads it. */
+function sampleHistory(m: Match, b: BladeRuntime): void {
+  if (!b.launched || b.out) return;
+  const last = b.history[b.history.length - 1];
+  if (last && m.t - last.t < 0.1) return;
+  b.history.push({ t: m.t, x: b.x, z: b.z, spin: b.spin });
+  if (b.history.length > 40) b.history.shift();
 }
 
 function expireMods(m: Match, b: BladeRuntime): void {

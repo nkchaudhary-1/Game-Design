@@ -27,10 +27,13 @@ export function superIntent(superId: string): 'offense' | 'defense' | 'utility' 
         if (e.target === 'opponent') off += 2;
         if (e.mods && ((e.mods.dmgTaken ?? 1) < 1 || (e.mods.kbTaken ?? 1) < 1 || (e.mods.mass ?? 1) > 1)) defn += 2;
         if (e.mods && ((e.mods.dmgDealt ?? 1) > 1 || (e.mods.kbDealt ?? 1) > 1)) off += 1;
-        if (e.flags?.includes('reflectDamage') || e.flags?.includes('reflectKnockback')) defn += 2;
+        if (e.flags?.includes('reflectDamage') || e.flags?.includes('reflectKnockback') || e.flags?.includes('absorb')) defn += 2;
+        if (e.stack) off += 1;
         if (e.spinLoss) defn += 1;
         break;
       case 'shield': defn += 3; break;
+      case 'rewind': defn += 2; break;
+      case 'spin': defn += 1; break;
       default: break;
     }
   };

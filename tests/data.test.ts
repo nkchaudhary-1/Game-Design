@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLADE_ORDER, BLADES, MVP_BLADES, bladesByClass } from '../src/blades/bladeData';
+import { BLADE_ORDER, BLADES, MVP_BLADES, PLAYABLE_BLADES, bladesByClass } from '../src/blades/bladeData';
 import { getAbility } from '../src/blades/abilities';
 import { SUPERS } from '../src/blades/supers';
 import { SUPER_MAX_DURATION, SUPER_MIN_DURATION, SUPER_RECHARGE } from '../src/blades/effects';
@@ -39,8 +39,9 @@ describe('roster (build spec §5)', () => {
     expect(avg('STAMINA', 'stamina')).toBeGreaterThan(avg('DEFENSE', 'stamina'));
   });
 
-  it('the MVP set is Ravok, Gravion and Phantom', () => {
+  it('the MVP trio is Ravok, Gravion and Phantom, and all 21 blades are playable', () => {
     expect([...MVP_BLADES].sort()).toEqual(['gravion', 'phantom', 'ravok']);
+    expect(PLAYABLE_BLADES.length).toBe(21);
   });
 
   it('the class triangle is a closed loop: Attack > Stamina > Defense > Attack', () => {
@@ -54,7 +55,13 @@ describe('Supers (build spec §10)', () => {
   const all = Object.values(SUPERS);
   const live = all.filter((s) => s.implemented);
 
-  it('ships Supers for the three MVP blades', () => {
+  it('ships a full Super pool for every blade: the spec lists 5 to 8 each, and every one is playable', () => {
+    for (const id of PLAYABLE_BLADES) {
+      const own = all.filter((s) => s.bladeId === id);
+      expect(own.length, id).toBeGreaterThanOrEqual(5);
+      expect(own.every((s) => s.implemented), id).toBe(true);
+      expect(own.length, id).toBe(BLADES[id].superPool.length);
+    }
     for (const id of MVP_BLADES) expect(live.filter((s) => s.bladeId === id).length, id).toBeGreaterThanOrEqual(7);
   });
 
@@ -78,7 +85,7 @@ describe('Supers (build spec §10)', () => {
 
   it('unlock levels run 1–7 and each blade has an ultimate', () => {
     for (const s of all) { expect(s.unlockLevel).toBeGreaterThanOrEqual(1); expect(s.unlockLevel).toBeLessThanOrEqual(7); }
-    for (const id of MVP_BLADES) expect(live.some((s) => s.bladeId === id && s.ultimate), id).toBe(true);
+    for (const id of PLAYABLE_BLADES) expect(live.some((s) => s.bladeId === id && s.ultimate), id).toBe(true);
   });
 });
 

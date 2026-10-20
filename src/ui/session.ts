@@ -3,7 +3,7 @@
 // from a known state.
 
 import type { AIDifficulty } from '../ai/AIStates';
-import { BLADE_ORDER, BLADES, MVP_BLADES } from '../blades/bladeData';
+import { BLADE_ORDER, BLADES, MVP_BLADES, PLAYABLE_BLADES } from '../blades/bladeData';
 import { buildBlade, MAX_LEVEL, sanitizeBuild, type BuiltBlade } from '../blades/BladeFactory';
 import type { Build } from '../core/types';
 import type { Score } from './HUD';
@@ -47,7 +47,7 @@ export class Session {
   }
 
   rollCpu(): void {
-    const pool = MVP_BLADES.filter((id) => id !== this.you || MVP_BLADES.length < 2);
+    const pool = PLAYABLE_BLADES.filter((id) => id !== this.you || PLAYABLE_BLADES.length < 2);
     this.cpu = pool[Math.floor(Math.random() * pool.length)] ?? MVP_BLADES[0];
   }
 

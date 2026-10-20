@@ -9,6 +9,9 @@ import type { Match } from '../combat/Match';
 import type { SimEvent } from '../combat/events';
 import { ImpactFX } from './ImpactFX';
 
+/** Zone colours by kind (trap takes its owner's class colour). */
+const ZONE_COLOR: Record<string, string | undefined> = { blackhole: '#a05cff', well: CLASS_COLORS.DEFENSE.light, repel: '#ffb066', orbit: '#c79bff', slow: '#8fe0ff' };
+
 interface ZoneVisual { group: THREE.Group; inner: THREE.Mesh; ring: THREE.Mesh; kind: string }
 
 export class SuperFX {
@@ -88,7 +91,7 @@ export class SuperFX {
       let v = this.zones.get(z.id);
       if (!v) {
         const group = new THREE.Group();
-        const color = z.kind === 'blackhole' ? '#a05cff' : z.kind === 'well' ? CLASS_COLORS.DEFENSE.light : CLASS_COLORS[this.clsOf(z.owner)].main;
+        const color = ZONE_COLOR[z.kind] ?? CLASS_COLORS[this.clsOf(z.owner)].main;
         const inner = new THREE.Mesh(
           new THREE.CircleGeometry(1, 36).rotateX(-Math.PI / 2),
           new THREE.MeshBasicMaterial({ color: z.kind === 'blackhole' ? '#12062a' : color, transparent: true, opacity: z.kind === 'blackhole' ? 0.7 : 0.16, depthWrite: false }),

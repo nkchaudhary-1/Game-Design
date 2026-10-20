@@ -67,11 +67,12 @@ describe('Super availability', () => {
     expect(superStatus(def, { ...stats, attack: 6 }, 7)).toMatchObject({ unlocked: false, reason: expect.stringMatching(/Attack 8\+/) });
     expect(superStatus(def, stats, 1).reason).toMatch(/Level 4/);
   });
-  it('unimplemented Supers are listed but locked as coming soon', () => {
-    const b = buildBlade('blazefang', { level: 7 });
-    expect(b.supers.length).toBeGreaterThan(0);
-    expect(b.supers.every((s) => !s.unlocked && /soon/i.test(s.reason ?? ''))).toBe(true);
-    expect(b.equippedSuper).toBeNull();
+  it('a Super that is not implemented yet is listed but locked as coming soon', () => {
+    const planned = { ...getSuper('ravok.dash-strike'), implemented: false };
+    expect(superStatus(planned, BLADES.ravok.stats, 7)).toMatchObject({ unlocked: false, reason: expect.stringMatching(/soon/i) });
+  });
+  it('every blade can equip a Super at Level 7', () => {
+    for (const id of Object.keys(BLADES)) expect(buildBlade(id, { level: 7 }).equippedSuper, id).not.toBeNull();
   });
   it('the equipped Super falls back when it becomes locked', () => {
     const b = buildBlade('ravok', { level: 1, equippedSuper: 'ravok.meteor-crash' });

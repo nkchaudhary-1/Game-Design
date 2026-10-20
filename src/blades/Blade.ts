@@ -17,6 +17,8 @@ export interface ActiveMod {
   mods: ModSet;
   flags: ModFlag[];
   spinLoss?: SpinLossScale;
+  /** How many stacks this holds (combo / momentum Supers). */
+  stacks?: number;
 }
 
 export type InputAction = { k: 'down' | 'up'; i: 0 | 1 | 2 } | { k: 'super' };
@@ -75,6 +77,8 @@ export class BladeRuntime {
   ghostApplied = false;
   lowSpinWarned = false;
   lastHurtAt = -99;
+  /** Recent positions and spin (every 0.1 s, last ~4 s) for Rewind. */
+  history: Array<{ t: number; x: number; z: number; spin: number }> = [];
 
   stats: BladeStats = { hits: 0, lostToHits: 0, lostToDecay: 0, lostToMoves: 0, damageDealt: 0, abilitiesUsed: 0, supersUsed: 0 };
 

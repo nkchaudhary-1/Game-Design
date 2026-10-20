@@ -89,7 +89,7 @@ add({
   supers: ['Inferno Rush', 'Flame Trail', 'Burnout', 'Fang Storm', 'Inferno Crash'],
   hints: ['Light attack ring', 'High-grip tip', 'Speed core'],
   recommended: { ring: 'ring.light-attack', tip: 'tip.high-grip', core: 'core.speed' },
-  visual: spikes('blazefang', 4, '#ff7a1f', '#4a0f0a', '#ffd23a', '#3a1f1f'),
+  visual: spikes('blazefang', 4, '#ff7a1f', '#4a0f0a', '#ffd23a', '#3a1f1f'), implemented: true,
 });
 add({
   id: 'riftclaw', name: 'Riftclaw', cls: 'ATTACK', role: 'Precision Attacker', fantasy: 'One perfect hit.', difficulty: 'HARD', rarity: 'RARE',
@@ -97,7 +97,7 @@ add({
   supers: ['Critical Strike', 'Rift Dash', 'Mark Target', 'Execution', 'Rift Breaker'],
   hints: ['Balanced weight', 'Precision tip', 'Agility core'],
   recommended: { weight: 'weight.balanced', tip: 'tip.precision', core: 'core.agility' },
-  visual: spikes('riftclaw', 3, '#eef1f7', '#101218', '#ff3d8b', '#2a2330'),
+  visual: spikes('riftclaw', 3, '#eef1f7', '#101218', '#ff3d8b', '#2a2330'), implemented: true,
 });
 add({
   id: 'volt-reaper', name: 'Volt Reaper', cls: 'ATTACK', role: 'Speed Attacker', fantasy: 'Never stop moving.', difficulty: 'HARD', rarity: 'RARE',
@@ -105,7 +105,7 @@ add({
   supers: ['Overcharge', 'Chain Strike', 'Electric Field', 'Flash Step', 'Volt Storm'],
   hints: ['Lightweight ring', 'Speed tip', 'Agility core'],
   recommended: { ring: 'ring.light', tip: 'tip.speed', core: 'core.agility' },
-  visual: spikes('volt-reaper', 6, '#f4e216', '#12151c', '#fff35a', '#1d2433'),
+  visual: spikes('volt-reaper', 6, '#f4e216', '#12151c', '#fff35a', '#1d2433'), implemented: true,
 });
 add({
   id: 'titan-breaker', name: 'Titan Breaker', cls: 'ATTACK', role: 'Heavy Destroyer', fantasy: 'Weight is power.', difficulty: 'EASY', rarity: 'EPIC',
@@ -113,7 +113,7 @@ add({
   supers: ['Earthquake', 'Crush Mode', 'Gravity Slam', 'Unstoppable', 'Titan Fall'],
   hints: ['Maximum weight', 'Heavy ring', 'Stability core'],
   recommended: { weight: 'weight.maximum', ring: 'ring.heavy', core: 'core.stability' },
-  visual: spikes('titan-breaker', 4, '#b5702a', '#22242c', '#ff8a3a', '#3a3f4a'),
+  visual: spikes('titan-breaker', 4, '#b5702a', '#22242c', '#ff8a3a', '#3a3f4a'), implemented: true,
 });
 add({
   id: 'inferno-x', name: 'Inferno X', cls: 'ATTACK', role: 'Sustained Attacker', fantasy: 'Constant pressure.', difficulty: 'MEDIUM', rarity: 'RARE',
@@ -121,7 +121,7 @@ add({
   supers: ['Heatwave', 'Burning Spin', 'Inferno Ring', 'Overheat', 'Inferno Core'],
   hints: ['Medium-heavy ring', 'Attack core', 'Balanced tip'],
   recommended: { ring: 'ring.medium-heavy', core: 'core.attack', tip: 'tip.balanced' },
-  visual: spikes('inferno-x', 6, '#b8101f', '#1c0a0d', '#ff9a2e', '#40201a'),
+  visual: spikes('inferno-x', 6, '#b8101f', '#1c0a0d', '#ff9a2e', '#40201a'), implemented: true,
 });
 add({
   id: 'stormfang', name: 'Stormfang', cls: 'ATTACK', role: 'Combo Attacker', fantasy: 'The more you hit, the stronger you become.', difficulty: 'HARD', rarity: 'EPIC',
@@ -129,7 +129,7 @@ add({
   supers: ['Combo Rush', 'Storm Chain', 'Cyclone Strike', 'Momentum', 'Storm Breaker'],
   hints: ['Agile ring', 'Combo core', 'Speed tip'],
   recommended: { ring: 'ring.agile', core: 'core.combo', tip: 'tip.speed' },
-  visual: spikes('stormfang', 6, '#1d5fd6', '#0a1230', '#4fd8ff', '#28303f'),
+  visual: spikes('stormfang', 6, '#1d5fd6', '#0a1230', '#4fd8ff', '#28303f'), implemented: true,
 });
 
 // ======================================================================================= DEFENSE (7)
@@ -148,7 +148,7 @@ add({
   supers: ['Perfect Reflect', 'Counter Zone', 'Iron Counter', 'Punish', 'Warden Protocol'],
   hints: ['Heavy defensive ring', 'Counter core'],
   recommended: { ring: 'ring.heavy-defensive', core: 'core.counter' },
-  visual: plates('iron-warden', 6, '#7d838f', '#2a2118', '#ffc94a', '#2a2f45', '#3b3f4a'),
+  visual: plates('iron-warden', 6, '#7d838f', '#2a2118', '#ffc94a', '#2a2f45', '#3b3f4a'), implemented: true,
 });
 add({
   id: 'bastion-x', name: 'Bastion X', cls: 'DEFENSE', role: 'Fortress', fantasy: 'You cannot push me out.', difficulty: 'EASY', rarity: 'RARE',
@@ -156,7 +156,7 @@ add({
   supers: ['Fortress', 'Anchor Field', 'Barrier', 'Unbreakable', 'Bastion Core'],
   hints: ['Maximum weight', 'Stability parts'],
   recommended: { weight: 'weight.maximum', core: 'core.stability' },
-  visual: plates('bastion-x', 8, '#eaf0fc', '#1c2a54', '#9ec2ff', '#1f2a4a'),
+  visual: plates('bastion-x', 8, '#eaf0fc', '#1c2a54', '#9ec2ff', '#1f2a4a'), implemented: true,
 });
 add({
   id: 'stonecore', name: 'Stonecore', cls: 'DEFENSE', role: 'Immovable Tank', fantasy: 'Become the arena.', difficulty: 'EASY', rarity: 'EPIC',
@@ -164,7 +164,7 @@ add({
   supers: ['Earth Anchor', 'Stone Skin', 'Gravity Lock', 'Core Recovery', 'Mountain Form'],
   hints: ['Maximum weight', 'Stamina core'],
   recommended: { weight: 'weight.maximum', core: 'core.stamina' },
-  visual: plates('stonecore', 5, '#8c6a46', '#4a3a2a', '#ff8a2a', '#2c3550', '#5a4630'),
+  visual: plates('stonecore', 5, '#8c6a46', '#4a3a2a', '#ff8a2a', '#2c3550', '#5a4630'), implemented: true,
 });
 add({
   id: 'aegiron', name: 'Aegiron', cls: 'DEFENSE', role: 'Energy Defender', fantasy: 'Turn defense into power.', difficulty: 'MEDIUM', rarity: 'RARE',
@@ -172,14 +172,14 @@ add({
   supers: ['Energy Shield', 'Reflect Pulse', 'Absorb', 'Energy Conversion', 'Aegis Nova'],
   hints: ['Balanced weight', 'Energy core', 'Defensive tip'],
   recommended: { weight: 'weight.balanced', core: 'core.energy', tip: 'tip.defensive' },
-  visual: plates('aegiron', 3, '#1766e0', '#0c2a66', '#36e6ff', '#1b2b55', '#e8f6ff'),
+  visual: plates('aegiron', 3, '#1766e0', '#0c2a66', '#36e6ff', '#1b2b55', '#e8f6ff'), implemented: true,
 });
 add({
   id: 'guardian-prime', name: 'Guardian Prime', cls: 'DEFENSE', role: 'Balanced Defender', fantasy: 'Ready for anything.', difficulty: 'EASY', rarity: 'COMMON',
   stats: st(6, 8, 8, 7, 5, 8, 5, 5, 8), moves: ['Prime Bash', 'Guard', 'Recover'],
   supers: ['Guardian Shield', 'Recovery Pulse', 'Counter Guard', 'Last Stand', 'Guardian Mode'],
   hints: ['Balanced parts'], recommended: {},
-  visual: plates('guardian-prime', 4, '#b3bdd3', '#1f3a8a', '#d7e0f5', '#26304f'),
+  visual: plates('guardian-prime', 4, '#b3bdd3', '#1f3a8a', '#d7e0f5', '#26304f'), implemented: true,
 });
 add({
   id: 'gravity-rex', name: 'Gravity Rex', cls: 'DEFENSE', role: 'Arena Controller', fantasy: 'Control where the fight happens.', difficulty: 'HARD', rarity: 'EPIC',
@@ -187,7 +187,7 @@ add({
   supers: ['Gravity Well', 'Heavy Field', 'Orbit Lock', 'Reverse Gravity', 'Gravity Collapse'],
   hints: ['Heavy ring', 'Control core'],
   recommended: { ring: 'ring.heavy', core: 'core.control' },
-  visual: plates('gravity-rex', 7, '#6a2fc9', '#1a1238', '#b072ff', '#1d2347'),
+  visual: plates('gravity-rex', 7, '#6a2fc9', '#1a1238', '#b072ff', '#1d2347'), implemented: true,
 });
 
 // ======================================================================================= STAMINA (7)
@@ -206,7 +206,7 @@ add({
   supers: ['Void Step', 'Speed Burst', 'Afterimage', 'Phase Run', 'Voidstorm'],
   hints: ['Ultra-light parts', 'Agility core'],
   recommended: { weight: 'weight.ultra-light', core: 'core.agility' },
-  visual: fins('voidrunner', 4, '#6a55e8', '#0e0b26', '#a79bff', '#231a4f'),
+  visual: fins('voidrunner', 4, '#6a55e8', '#0e0b26', '#a79bff', '#231a4f'), implemented: true,
 });
 add({
   id: 'nightveil', name: 'Nightveil', cls: 'STAMINA', role: 'Stealth Spinner', fantasy: 'Disappear. Reposition. Strike.', difficulty: 'HARD', rarity: 'RARE',
@@ -214,7 +214,7 @@ add({
   supers: ['Cloak', 'Hide & Seek', 'Shadow Clone', 'Night Dash', 'Nightfall'],
   hints: ['Lightweight', 'Stealth core'],
   recommended: { weight: 'weight.light', core: 'core.stealth' },
-  visual: fins('nightveil', 3, '#8d2fd6', '#160b30', '#d27bff', '#1f1442'),
+  visual: fins('nightveil', 3, '#8d2fd6', '#160b30', '#d27bff', '#1f1442'), implemented: true,
 });
 add({
   id: 'spectra', name: 'Spectra', cls: 'STAMINA', role: 'Illusion Spinner', fantasy: 'Make the opponent attack the wrong blade.', difficulty: 'HARD', rarity: 'EPIC',
@@ -222,7 +222,7 @@ add({
   supers: ['Decoy', 'Mirror Clone', 'Phase Shift', 'False Target', 'Spectral Storm'],
   hints: ['Agility parts', 'Lightweight', 'Deception core'],
   recommended: { ring: 'ring.agile', weight: 'weight.light', core: 'core.deception' },
-  visual: fins('spectra', 5, '#ff5cc8', '#3a1a66', '#ffa6e8', '#2a1650'),
+  visual: fins('spectra', 5, '#ff5cc8', '#3a1a66', '#ffa6e8', '#2a1650'), implemented: true,
 });
 add({
   id: 'ghost-viper', name: 'Ghost Viper', cls: 'STAMINA', role: 'Dodge / Counter Spinner', fantasy: 'Let them attack first.', difficulty: 'HARD', rarity: 'RARE',
@@ -230,7 +230,7 @@ add({
   supers: ['Venom Dash', 'Phase Shift', 'Counter Bite', 'Predator Mode', 'Ghost Strike'],
   hints: ['Agile attack ring', 'Speed tip'],
   recommended: { ring: 'ring.agile-attack', tip: 'tip.speed' },
-  visual: fins('ghost-viper', 3, '#1fbf5a', '#0b1a14', '#7bff9b', '#1c1a45'),
+  visual: fins('ghost-viper', 3, '#1fbf5a', '#0b1a14', '#7bff9b', '#1c1a45'), implemented: true,
 });
 add({
   id: 'chrono', name: 'Chrono', cls: 'STAMINA', role: 'Time Controller', fantasy: 'Control the pace.', difficulty: 'HARD', rarity: 'EPIC',
@@ -238,7 +238,7 @@ add({
   supers: ['Time Slow', 'Time Freeze', 'Rewind', 'Temporal Shift', 'Time Collapse'],
   hints: ['Spin core', 'Agile tip'],
   recommended: { core: 'core.spin', tip: 'tip.agile' },
-  visual: fins('chrono', 6, '#e2ba3a', '#1a1030', '#ffe27a', '#2a1a52'),
+  visual: fins('chrono', 6, '#e2ba3a', '#1a1030', '#ffe27a', '#2a1a52'), implemented: true,
 });
 add({
   id: 'nebula-drift', name: 'Nebula Drift', cls: 'STAMINA', role: 'Endurance Specialist', fantasy: 'The longer the fight, the stronger I become.', difficulty: 'MEDIUM', rarity: 'LEGENDARY',
@@ -246,11 +246,14 @@ add({
   supers: ['Spin Burst', 'Spin Drain', 'Endurance Mode', 'Energy Recover', 'Nebula Collapse'],
   hints: ['Maximum stamina', 'Balanced stability'],
   recommended: { core: 'core.max-stamina' },
-  visual: fins('nebula-drift', 4, '#3a62e0', '#0c1034', '#9fb8ff', '#1e1948'),
+  visual: fins('nebula-drift', 4, '#3a62e0', '#0c1034', '#9fb8ff', '#1e1948'), implemented: true,
 });
 
 // ------------------------------------------------------------------------------------------- queries
-export const MVP_BLADES = BLADE_ORDER.filter((id) => BLADES[id].implemented);
+/** The spec's MVP trio: the class-triangle reference used by the balance tool and the pairwise tests. */
+export const MVP_BLADES = ['ravok', 'gravion', 'phantom'];
+/** Every blade that can be played (all 21 now). */
+export const PLAYABLE_BLADES = BLADE_ORDER.filter((id) => BLADES[id].implemented);
 export const bladesByClass = (c: BladeClass): BladeDef[] => BLADE_ORDER.map((id) => BLADES[id]).filter((b) => b.class === c);
 export function getBlade(id: string): BladeDef {
   const b = BLADES[id];

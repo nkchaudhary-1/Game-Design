@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Spinblade Arena — 3D top-down spinning-blade arena battler (PRD v2 Phase 1 + build spec MVP)",
+  "description": "Spinblade Arena \u2014 3D top-down spinning-blade arena battler (PRD v2 Phase 1 + build spec MVP)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,7 +11,8 @@
     "build:single": "tsc --noEmit && SINGLE=1 vite build --outDir dist-single && node tools/inline.mjs dist-single",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "balance": "tsx tools/balance.ts"
+    "balance": "tsx tools/balance.ts",
+    "roster": "tsx tools/roster.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

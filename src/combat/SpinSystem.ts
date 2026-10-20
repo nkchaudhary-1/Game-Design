@@ -71,6 +71,10 @@ export function hurt(m: Match, victim: BladeRuntime, o: HurtOptions): number {
     victim.lowSpinWarned = true;
     m.emit({ type: 'spinLow', slot: victim.slot });
   }
+  if (lost > 0 && victim.hasFlag('absorb')) {
+    const got = gainSpin(victim, lost * 0.55);
+    if (got > 0) m.emit({ type: 'fx', kind: 'spinGain', slot: victim.slot, x: victim.x, z: victim.z, power: got });
+  }
   if (!o.reflected && o.attacker && victim.hasFlag('reflectDamage')) {
     hurt(m, o.attacker, { amount: o.amount * 0.8, attacker: victim, reflected: true });
   }

@@ -99,10 +99,15 @@ export function applyEffect(m: Match, src: BladeRuntime, e: EffectDef, ctx: Effe
       if (e.scaleByCharge) k *= lerp(0.25, 1, ctx.charge);
       let until = m.t + e.duration;
       if (ctx.capUntil !== undefined) until = Math.min(until, ctx.capUntil);
-      if (e.tag) target.mods = target.mods.filter((a) => a.tag !== e.tag);
+      let stacks = 1;
+      if (e.tag) {
+        const prev = target.mods.find((a) => a.tag === e.tag);
+        if (e.stack && prev) stacks = Math.min(e.stack, (prev.stacks ?? 1) + 1);
+        target.mods = target.mods.filter((a) => a.tag !== e.tag);
+      }
       const mod: ActiveMod = {
-        id: m.newId(), source: ctx.source, superId: ctx.superId, tag: e.tag, until,
-        mods: e.mods ? scaleMods(e.mods, k) : {}, flags: e.flags ? [...e.flags] : [],
+        id: m.newId(), source: ctx.source, superId: ctx.superId, tag: e.tag, until, stacks,
+        mods: e.mods ? scaleMods(e.mods, k * stacks) : {}, flags: e.flags ? [...e.flags] : [],
         spinLoss: e.spinLoss ? scaleSpinLoss(e.spinLoss, k) : undefined,
       };
       target.mods.push(mod);
@@ -140,7 +145,7 @@ export function applyEffect(m: Match, src: BladeRuntime, e: EffectDef, ctx: Effe
         id: m.newId(), kind: e.zone, owner: src.slot, x: at.x, z: at.z, radius: e.radius, until,
         strength: e.strength * ctx.strength, damage: e.damage * ctx.strength, follow: !!e.follow, hitCd: {},
       });
-      m.emit({ type: 'fx', kind: 'zoneStart', slot: src.slot, x: at.x, z: at.z, radius: e.radius, power: e.zone === 'trap' ? 0 : e.zone === 'well' ? 1 : 2 });
+      m.emit({ type: 'fx', kind: 'zoneStart', slot: src.slot, x: at.x, z: at.z, radius: e.radius, power: e.zone === 'trap' ? 0 : e.zone === 'well' ? 1 : e.zone === 'blackhole' ? 2 : e.zone === 'repel' ? 3 : e.zone === 'orbit' ? 4 : 5 });
       break;
     }
     case 'drain': {
@@ -182,6 +187,21 @@ export function applyEffect(m: Match, src: BladeRuntime, e: EffectDef, ctx: Effe
       m.emit({ type: 'fx', kind: 'decoy', slot: src.slot, x: src.x, z: src.z });
       break;
     }
+    case 'rewind': {
+      // back to where this blade was a moment ago, with some of the spin it has lost since
+      const want = m.t - e.seconds;
+      const h = src.history.find((s) => s.t >= want) ?? src.history[0];
+      if (!h) break;
+      m.emit({ type: 'fx', kind: 'teleport', slot: src.slot, x: src.x, z: src.z });
+      src.bb.body.setTranslation({ x: h.x, y: src.bb.y, z: h.z }, true);
+      src.bb.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      src.prevX = h.x; src.prevZ = h.z;
+      const back = Math.max(0, h.spin - src.spin) * e.spin * ctx.strength;
+      if (back > 0) gainSpin(src, back);
+      src.mods.push({ id: m.newId(), source: ctx.source, superId: ctx.superId, tag: 'rewind', until: m.t + 0.35, mods: {}, flags: ['invuln'] });
+      m.emit({ type: 'fx', kind: 'teleport', slot: src.slot, x: h.x, z: h.z, power: 1 });
+      break;
+    }
     case 'slam': {
       const o = m.opponentOf(src.slot);
       const tx = o ? o.x : src.x, tz = o ? o.z : src.z;
@@ -216,6 +236,20 @@ export function updateWorldEffects(m: Match, dt: number): void {
         knock(m, b, nx, nz, z.strength * TUNING.IMPULSE_SCALE * (owner?.mod('kbDealt') ?? 1), owner ?? null);
         hurt(m, b, { amount: z.damage * (owner?.mod('dmgDealt') ?? 1), attacker: owner ?? null });
         m.emit({ type: 'fx', kind: 'radial', slot: z.owner, x: b.x, z: b.z, radius: 2.2, power: z.strength });
+      } else if (z.kind === 'repel') {
+        const [nx, nz] = norm(-dx, -dz);
+        const f = 1 - clamp(d / (z.radius + b.radius), 0, 1) * 0.5;
+        addVelocity(b, nx * z.strength * f * ext * dt, nz * z.strength * f * ext * dt);
+      } else if (z.kind === 'orbit') {
+        // swing round the owner: mostly sideways, a little inwards, so the blade is flung in a curve
+        const [nx, nz] = norm(dx, dz);
+        const f = 1 - clamp(d / (z.radius + b.radius), 0, 1) * 0.5;
+        const tx = -nz, tz = nx;
+        addVelocity(b, (tx * 0.9 + nx * 0.35) * z.strength * f * ext * dt, (tz * 0.9 + nz * 0.35) * z.strength * f * ext * dt);
+      } else if (z.kind === 'slow') {
+        const k = Math.exp(-2.4 * dt);
+        const v = b.bb.body.linvel();
+        b.bb.body.setLinvel({ x: v.x * k, y: 0, z: v.z * k }, true);
       } else {
         const [nx, nz] = norm(dx, dz);
         const f = 1 - clamp(d / (z.radius + b.radius), 0, 1) * 0.5;
