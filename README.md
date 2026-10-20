@@ -18,7 +18,7 @@ npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve the production build
 npm run build:single   # ONE self-contained html file (dist-single/spinblade-arena.html) to open or host anywhere
-npm test           # 86 unit/simulation tests (Vitest)
+npm test           # 97 unit/simulation tests (Vitest)
 npm run balance    # headless CPU-vs-CPU balance check (see "Balance")
 ```
 
@@ -127,6 +127,25 @@ tools/       balance.ts
 * **One boundary for input.** The pad, the keyboard and the CPU only send `ControllerMsg`s; `Battle` consumes them and
   replies with light `PadFeedback`. Phase 2 swaps the transport (`LocalBus` → WebSocket) and nothing else.
 * **No universally best part.** Every non-stock part trades something away; a test enforces it.
+
+## Realism
+
+Everything here is visual or audio. The simulation is untouched, so the balance numbers below still hold.
+
+* **How a top moves** (`vfx/bladeDynamics.ts`). A fast blade stands upright. Under 38% spin it starts to lean and the lean *precesses* (sweeps
+  round), wider and faster as the spin dies, the way a real gyroscope does; a spun-out blade topples onto its rim. Hits kick the model up off the
+  floor and tilt it back towards the attacker on a damped spring; a blade knocked out of the arena pitches over as it falls. Fast blades get a
+  translucent spin-blur smear over the fins.
+* **Sparks** (`vfx/ImpactFX.ts`). Real 3D streaks that fly up, fall, skitter along the floor and cool from white-hot through orange to dull red.
+  Blades that stay in contact, and fast blades riding the lip of the pit, throw grinding sparks (`vfx/contact.ts`). Hard hits puff floor dust and
+  flash a warm light.
+* **Wear** (`vfx/Scuffs.ts`). Hits and grinding leave bright scratches on the concrete that fade over about half a minute.
+* **Sound** (`audio/AudioManager.ts`, still synthesised, no files). A collision is a struck metal plate (four inharmonic partials that ring and die
+  at different rates, heavier hits ring lower and longer) over a noise click. Rubbing blades play a grinding loop. Each blade has its own whirr
+  that follows its spin and develops a tremolo as it runs down; a spun-out blade topples and rattles to rest, the ticks speeding up; a ring-out
+  ends in clatters on the concrete outside. Everything is panned by where it happens and sent through a short arena reverb.
+* **Measured, not heard.** I checked the sounds by rendering them offline (level, decay, left/right placement) and the visuals in stills. I have
+  not heard them through speakers or seen them at real frame rates, so treat the mix and the spark brightness as a first pass.
 
 ## Pace and feel
 

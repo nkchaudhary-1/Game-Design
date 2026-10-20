@@ -4,12 +4,14 @@
 import * as THREE from 'three';
 import { ArenaView } from '../arenas/ArenaView';
 import { BladeView, visualSpecFor } from '../blades/BladeMesh';
-import { TUNING } from '../core/Balance';
 import { CLASS_COLORS, clamp, lerp, TAU } from '../core/types';
 import type { Match } from '../combat/Match';
 import type { SimEvent } from '../combat/events';
 import { CameraRig } from '../vfx/CameraRig';
 import { frameTurn } from '../vfx/motion';
+import { impact, newDyn, precessionRate, stepDyn, TOPPLE_TILT, wobbleTilt, type Dyn } from '../vfx/bladeDynamics';
+import { contactState, type ContactState } from '../vfx/contact';
+import { Scuffs } from '../vfx/Scuffs';
 import { ImpactFX } from '../vfx/ImpactFX';
 import { SuperFX } from '../vfx/SuperFX';
 import { Trail } from '../vfx/Trails';
@@ -39,6 +41,17 @@ export class BattleView {
   private readonly leanXs: number[] = [];
   private readonly leanZs: number[] = [];
   private lastHitStop = -9;
+  private readonly dyn: Dyn[] = [];
+  private readonly prec: number[] = [];
+  private readonly topple: number[] = [];
+  private readonly toppleDir: number[] = [];
+  private readonly outFor: number[] = [];
+  private readonly scuffs = new Scuffs();
+  private readonly flashes: THREE.PointLight[] = [];
+  private grindAcc = 0;
+  private scuffIn = 0;
+  /** Who is rubbing against what this frame (the audio reads it too). */
+  contacts: ContactState = { pairs: [], walls: [], level: 0, pan: 0 };
   private readonly aim: THREE.Group;
   private readonly aimMat: THREE.MeshBasicMaterial;
   private readonly aimShaft: THREE.Mesh;
@@ -84,10 +97,21 @@ export class BattleView {
       this.boost.push(0);
       this.leanXs.push(0);
       this.leanZs.push(0);
+      this.dyn.push(newDyn());
+      this.prec.push(Math.random() * TAU);
+      this.topple.push(0);
+      this.toppleDir.push(0);
+      this.outFor.push(0);
     });
     this.superFx = new SuperFX(this.fx, (slot) => match.blades[slot].built.def.class, match.blades.length);
     this.scene.add(this.superFx.root);
     this.scene.add(this.fx.root);
+    this.fx.ground = (x, z) => this.yAt(x, z);
+    this.scene.add(this.scuffs.root);
+    // two warm lights that flash on hard hits (always present, at zero, so no shader ever recompiles)
+    if (GFX.tier === 'high') {
+      for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xffd9a6, 0, 14, 2); this.scene.add(l); this.flashes.push(l); }
+    }
 
     // launch arrow
     this.aim = new THREE.Group();
@@ -138,6 +162,7 @@ export class BattleView {
         const a = this.match.blades[e.a], b = this.match.blades[e.b];
         this.fx.hit(e.x, this.yAt(e.x, e.z), e.z, e.nx, e.nz, e.strength, a.built.def.class, b.built.def.class);
         this.rig.shake(e.strength);
+        this.onHit(e.a, e.b, e.x, e.z, e.nx, e.nz, e.strength);
         // hit-stop is for the big hits only, and never back-to-back: a clash that keeps re-contacting must not stutter the whole fight
         if (!this.reduced && e.strength > 0.6 && this.time - this.lastHitStop > 0.45) {
           r.hitStop = Math.max(r.hitStop, 0.014 + 0.03 * e.strength);
@@ -183,8 +208,8 @@ export class BattleView {
       this.omegas[i] += (idle - this.omegas[i]) * (1 - Math.exp(-dt * (b.out === 'spin' ? 1.8 : 4)));
       this.angles[i] -= frameTurn(this.omegas[i], dt, v.symmetry); // capped per frame: no wagon-wheel strobing
 
-      // lean into the motion, and tilt with the dish slope
       const vx = b.vx, vz = b.vz;
+      // lean into the motion, and tilt with the dish slope
       const slope = Math.atan(((0.9 * 2) / arena.radius) * (r / arena.radius));
       const inv = r > 0.01 ? 1 / r : 0;
       const k = 0.022;
@@ -192,13 +217,40 @@ export class BattleView {
       const ease = 1 - Math.exp(-dt * 8);
       this.leanXs[i] += (clamp(vx * k, -0.2, 0.2) - this.leanXs[i]) * ease;
       this.leanZs[i] += (clamp(vz * k, -0.2, 0.2) - this.leanZs[i]) * ease;
-      const leanX = this.leanXs[i] + -x * inv * slope;
-      const leanZ = this.leanZs[i] + -z * inv * slope;
-      const lowSpin = b.out === 'spin' ? 1 : clamp(1 - b.spin / TUNING.WOBBLE_BELOW, 0, 1) * (b.out ? 0 : 1);
+
+      // how a real top behaves: it stands upright while it spins fast, then leans and the lean sweeps round
+      // (precession), faster and wider as the spin dies; a spun-out blade topples onto its rim. Hits kick it
+      // up off the floor and tilt it on a damped spring; a blade that leaves the arena pitches over as it falls.
+      const spin = Math.max(0, b.spin);
+      const d = this.dyn[i];
+      stepDyn(d, dt);
+      this.prec[i] -= precessionRate(spin) * dt;
+      let dirA = this.prec[i];
+      if (b.out === 'spin') {
+        if (this.topple[i] === 0) this.toppleDir[i] = this.prec[i];
+        this.topple[i] = Math.min(1, this.topple[i] + dt / 1.1);
+        dirA = this.toppleDir[i];
+      }
+      const tp = this.topple[i], tpE = tp * tp * (3 - 2 * tp);
+      const mag = lerp(b.out === 'ring' ? 0 : wobbleTilt(spin) * (0.6 + 0.4 * Math.sin(this.time * 9 + i)), TOPPLE_TILT, tpE);
+      let tiltX = Math.cos(dirA) * mag + d.tx, tiltZ = Math.sin(dirA) * mag + d.tz;
+      let fall = 0;
+      if (b.out === 'ring') {
+        this.outFor[i] += dt;
+        fall = Math.min(1.4, this.outFor[i] * 2.6);
+        const sv = Math.hypot(vx, vz) || 1;
+        tiltX += (vx / sv) * fall; tiltZ += (vz / sv) * fall;
+      }
+      const leanX = this.leanXs[i] + -x * inv * slope + tiltX;
+      const leanZ = this.leanZs[i] + -z * inv * slope + tiltZ;
+      // keep the rim above the floor when the model leans over, and add the hop
+      const lift = fall > 0 ? 0 : b.radius * Math.sin(Math.min(0.6, Math.hypot(tiltX, tiltZ))) * 0.85;
+      const yy = y + d.hop + lift;
+      const blur = b.out ? 0 : Math.pow(clamp(this.omegas[i] / 13, 0, 1), 1.3);
 
       const stealth = b.hasFlag('stealth') ? 0.35 : 1;
       const ghost = b.hasFlag('ghost') ? 0.3 : 1;
-      v.apply({ x, y, z, spinAngle: this.angles[i], leanX, leanZ, alpha: Math.min(stealth, ghost), wobble: lowSpin, scale: 1, leap: b.leap, shield: !!b.shield && b.shield.hits > 0 }, dt);
+      v.apply({ x, y: yy, z, spinAngle: this.angles[i], leanX, leanZ, alpha: Math.min(stealth, ghost), wobble: 0, blur, scale: 1, leap: b.leap, shield: !!b.shield && b.shield.hits > 0 }, dt);
 
       // trails: Stamina keeps afterimages; others streak when dashing or while a Super is active
       this.boost[i] = Math.max(0, this.boost[i] - dt * 1.6);
@@ -212,11 +264,53 @@ export class BattleView {
       this.trails[i].update(dt, x, y + 0.05, z, this.reduced ? intensity * 0.6 : intensity);
     });
 
+    this.updateContacts(dt);
+    for (const l of this.flashes) l.intensity *= Math.exp(-dt * 13);
+    this.scuffs.update(dt);
     this.arena.update(this.match.blades.filter((b) => b.alive).map((b) => ({ x: b.x, z: b.z })));
     this.arena.tick(dt);
     this.superFx.update(this.match, dt, this.yAt, this.views);
     this.fx.update(dt);
     this.rig.update(dt, this.focus(), this.reduced);
+  }
+
+  /** A hit: both blades are shoved apart, hop and tilt; the floor is scratched; hard hits flash a light. */
+  private onHit(a: number, b: number, x: number, z: number, nx: number, nz: number, strength: number): void {
+    const A = this.match.blades[a], B = this.match.blades[b];
+    const dx = A.x - B.x, dz = A.z - B.z, l = Math.hypot(dx, dz) || 1;
+    impact(this.dyn[a], dx / l, dz / l, strength);
+    impact(this.dyn[b], -dx / l, -dz / l, strength);
+    if (!this.reduced) this.scuffs.add(x, this.yAt(x, z), z, -nz, nx, 0.9 + 1.5 * strength, strength);
+    if (strength > 0.3 && this.flashes.length) {
+      const f = this.flashes[0].intensity <= this.flashes[1].intensity ? this.flashes[0] : this.flashes[1];
+      f.position.set(x, this.yAt(x, z) + 1.6, z);
+      f.intensity = Math.max(f.intensity, 1.5 + 5 * strength);
+    }
+  }
+
+  /** Sustained contact: grinding sparks and scratches where blades rub together or ride the lip of the pit. */
+  private updateContacts(dt: number): void {
+    const cs = this.contacts = contactState(this.match);
+    if (this.reduced || cs.level < 0.06) return;
+    const list: Array<{ x: number; z: number; tx: number; tz: number; level: number; slot: number }> = [
+      ...cs.pairs.map((p) => ({ x: p.x, z: p.z, tx: -p.nz, tz: p.nx, level: p.level, slot: p.a })),
+      ...cs.walls.map((w) => ({ x: w.x, z: w.z, tx: w.tx, tz: w.tz, level: w.level, slot: w.slot })),
+    ];
+    const total = list.reduce((s, c) => s + c.level, 0);
+    if (total <= 0) return;
+    this.grindAcc += Math.min(1, total) * dt * 60;
+    while (this.grindAcc >= 1) {
+      this.grindAcc -= 1;
+      let pick = Math.random() * total, c = list[0];
+      for (const it of list) { pick -= it.level; if (pick <= 0) { c = it; break; } }
+      this.fx.grind(c.x, this.yAt(c.x, c.z), c.z, c.tx, c.tz, c.level, this.match.blades[c.slot].built.def.class);
+    }
+    this.scuffIn -= dt;
+    if (this.scuffIn <= 0 && cs.level > 0.25) {
+      this.scuffIn = 0.16;
+      const c = list[Math.floor(Math.random() * list.length)];
+      this.scuffs.add(c.x, this.yAt(c.x, c.z), c.z, c.tx, c.tz, 0.8 + Math.random() * 0.9, c.level);
+    }
   }
 
   /** Where a blade is on screen, for HUD anchors. */
@@ -230,6 +324,7 @@ export class BattleView {
     this.trails.forEach((t) => t.dispose());
     this.superFx.dispose();
     this.fx.dispose();
+    this.scuffs.dispose();
     this.arena.dispose();
     this.scene.traverse((o) => { if (o instanceof THREE.Light) o.dispose(); });
     void glow;

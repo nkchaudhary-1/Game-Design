@@ -134,8 +134,10 @@ export class Battle {
     // audio that tracks state
     const me = this.match.blades[0];
     if (this.match.phase === 'live') {
-      const avg = (Math.max(0, me.spin) + Math.max(0, this.match.blades[1].spin)) / 200;
-      this.o.audio.humSet(avg);
+      // each blade sings at its own pitch from its own spin, panned to where it is; blades that rub, grind
+      const R = this.match.arena.radius;
+      this.match.blades.forEach((b, i) => this.o.audio.whirrSet(i, Math.max(0, b.spin) / 100, clamp01((b.x / R + 1) / 2) * 1.6 - 0.8, !b.out));
+      this.o.audio.grindSet(this.view.contacts.level, this.view.contacts.pan * 0.8);
       if (me.charge.index >= 0) {
         const ch = me.built.moves[me.charge.index].charge!;
         if (!this.chargingAudio) { this.chargingAudio = true; this.o.audio.chargeStart(); }
@@ -151,13 +153,15 @@ export class Battle {
     const a = this.o.audio;
     for (const e of events) {
       switch (e.type) {
-        case 'hit':
-          a.play('blade_collision', e.strength);
-          if (e.heavy) a.play('heavy_collision');
+        case 'hit': {
+          const pan = this.panAt(e.x);
+          a.play('blade_collision', e.strength, undefined, pan);
+          if (e.heavy) a.play('heavy_collision', 0.5, undefined, pan);
           break;
+        }
         case 'ko':
           a.humStop();
-          a.play(e.cause === 'ring' ? 'ring_out' : 'spin_out');
+          a.play(e.cause === 'ring' ? 'ring_out' : 'spin_out', 0.5, undefined, this.panAt(this.match.blades[e.slot].x));
           break;
         case 'super':
           if (e.state === 'activate') a.play('super_activate', 0.5, this.match.blades[e.slot].built.def.class);
@@ -178,6 +182,9 @@ export class Battle {
       }
     }
   }
+
+  /** Stereo position (−0.8…0.8) of a point on the arena floor. */
+  private panAt(x: number): number { return clamp01((x / this.match.arena.radius + 1) / 2) * 1.6 - 0.8; }
 
   render(): void {
     this.o.rr.render(this.view.scene, this.view.rig.camera);

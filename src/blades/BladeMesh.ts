@@ -69,6 +69,29 @@ function emblemTexture(color: string): THREE.CanvasTexture {
 }
 
 // ----------------------------------------------------------------------------------------------- view
+/** Greyscale smear of soft arcs: what a fast-spinning blade looks like when the eye can't resolve the fins. */
+let blurTex: THREE.CanvasTexture | null = null;
+function blurTexture(): THREE.CanvasTexture {
+  if (blurTex) return blurTex;
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d')!;
+  const rnd = (() => { let s = 11; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
+  g.translate(128, 128);
+  for (let i = 0; i < 90; i++) {
+    const r = 58 + rnd() * 66, a0 = rnd() * TAU, span = 0.35 + rnd() * 1.1;
+    g.strokeStyle = `rgba(255,255,255,${0.05 + rnd() * 0.12})`;
+    g.lineWidth = 2 + rnd() * 9;
+    g.beginPath(); g.arc(0, 0, r, a0, a0 + span); g.stroke();
+  }
+  // fade towards the hub and the outer edge so the smear sits on the fins, not beyond them
+  const mask = g.createRadialGradient(0, 0, 40, 0, 0, 128);
+  mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(0.3, 'rgba(0,0,0,0.2)'); mask.addColorStop(0.55, 'rgba(0,0,0,0)'); mask.addColorStop(0.88, 'rgba(0,0,0,0)'); mask.addColorStop(1, 'rgba(0,0,0,1)');
+  g.globalCompositeOperation = 'destination-out'; g.fillStyle = mask; g.fillRect(-128, -128, 256, 256);
+  blurTex = new THREE.CanvasTexture(c);
+  blurTex.colorSpace = THREE.SRGBColorSpace;
+  return blurTex;
+}
+
 // ----------------------------------------------------------------------------------------------- view
 export interface BladeViewState {
   x: number; y: number; z: number;
@@ -78,6 +101,8 @@ export interface BladeViewState {
   alpha: number;
   /** 0–1 wobble amount (low spin). */
   wobble: number;
+  /** 0–1 spin blur: a translucent smear over the fins that grows with rotation speed (default 0). */
+  blur?: number;
   scale: number;
   /** 0–1 leap height (Meteor Crash). */
   leap: number;
@@ -92,6 +117,8 @@ export class BladeView {
   private readonly halo: THREE.Mesh;
   private readonly shadow: THREE.Mesh;
   private shieldMesh: THREE.Mesh | null = null;
+  private blurMesh: THREE.Mesh | null = null;
+  private blurMat: THREE.MeshBasicMaterial | null = null;
   private fadeMats: THREE.Material[] = [];
   private ownedGeo: THREE.BufferGeometry[] = [];
   private spec: BladeVisualSpec;
@@ -234,6 +261,18 @@ export class BladeView {
     const tip = tipLathe(s.tip.shape, R);
     this.add(tip, steelMat('#b4bccc', 1), y0 - discH);
 
+    // spin blur: a flat translucent smear just above the fins
+    if (!this.blurMesh) {
+      this.blurMat = new THREE.MeshBasicMaterial({ map: blurTexture(), transparent: true, depthWrite: false, opacity: 0, color: '#ffffff', toneMapped: false });
+      this.blurMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), this.blurMat);
+      this.blurMesh.renderOrder = 2;
+      this.blurMesh.visible = false;
+      this.lean.add(this.blurMesh);
+    }
+    this.blurMat!.color.set(glowCol);
+    this.blurMesh.scale.setScalar(R * 1.02);
+    this.blurMesh.position.y = y0 + top * 0.92;
+
     this.halfH = 0.17;
     const shadowR = R * 1.18;
     this.shadow.scale.setScalar(shadowR);
@@ -275,6 +314,12 @@ export class BladeView {
       -s.leanX + Math.cos(this.time * 13) * 0.11 * wob,
     );
     this.spinGroup.rotation.y = s.spinAngle;
+    if (this.blurMesh && this.blurMat) {
+      const k = s.blur ?? 0;
+      this.blurMesh.visible = k > 0.02;
+      this.blurMat.opacity = 0.42 * k * s.alpha;
+      this.blurMesh.rotation.y = s.spinAngle * 0.4;
+    }
     this.setAlpha(s.alpha);
     if (this.shieldMesh) {
       this.shieldMesh.visible = s.shield;
@@ -292,5 +337,7 @@ export class BladeView {
     this.clear();
     this.shadow.geometry.dispose();
     this.halo.geometry.dispose();
+    this.blurMesh?.geometry.dispose();
+    this.blurMat?.dispose();
   }
 }
