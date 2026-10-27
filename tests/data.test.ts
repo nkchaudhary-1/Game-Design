@@ -129,10 +129,9 @@ describe('parts (build spec §12)', () => {
 });
 
 describe('arenas (build spec §11)', () => {
-  it('has the eight arenas, with Core Pit playable', () => {
+  it('has the eight arenas, all playable', () => {
     expect(ARENA_ORDER).toHaveLength(8);
-    expect(ARENAS['core-pit'].implemented).toBe(true);
-    expect(ARENA_ORDER.filter((id) => ARENAS[id].implemented)).toEqual(['core-pit']);
+    expect(ARENA_ORDER.filter((id) => ARENAS[id].implemented)).toEqual(ARENA_ORDER);
     for (const id of ARENA_ORDER) {
       const a = ARENAS[id];
       expect(a.mechanic.length).toBeGreaterThan(10);

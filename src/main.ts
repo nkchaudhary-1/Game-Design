@@ -5,6 +5,7 @@ import '@fontsource/barlow/latin-500.css';
 import '@fontsource/barlow/latin-600.css';
 import '@fontsource/barlow/latin-700.css';
 import './ui/ui.css';
+import { loadBladeModels } from './blades/models';
 import { initPhysics } from './core/Physics';
 import { detectTier, setTier } from './render/quality';
 import { mountControllerPage } from './ui/ControllerPage';
@@ -33,6 +34,8 @@ try {
     mountControllerPage(root, q);
   } else {
   await initPhysics();
+  // the blade models (Blender): if they cannot load, the blades fall back to the procedural ones
+  if (q.get('models') !== 'off') await loadBladeModels().catch((e) => console.warn('Blade models unavailable, using procedural blades', e));
   const game = new Game(root, {
     reduced: q.has('reduced') || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     touch: window.matchMedia('(pointer: coarse)').matches,

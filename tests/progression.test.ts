@@ -83,15 +83,17 @@ describe('profile', () => {
     expect(p.isBladeUnlocked('titan-breaker')).toBe(false);
   });
 
-  it('jumping several ranks in one go lists every unlock', () => {
+  it('winning your way to the top unlocks every blade and arena exactly once', () => {
     const p = career();
-    p.data.wins = RANK_WINS[3] - 1;
-    const r = p.recordBattle('win', 'EASY');
-    expect(r.rankBefore).toBe(3); expect(r.rankAfter).toBe(4);
-    p.data.wins = RANK_WINS[5] - 1;
-    const r2 = p.recordBattle('win', 'EASY');
-    expect(r2.rankBefore).toBe(4); expect(r2.rankAfter).toBe(6);
-    expect(r2.newBlades.length).toBe(RANK_REWARDS[4].blades.length + RANK_REWARDS[5].blades.length);
+    const blades: string[] = [], arenas: string[] = [];
+    for (let i = 0; i < RANK_WINS[MAX_RANK - 1]; i++) {
+      const r = p.recordBattle('win', 'EASY');
+      blades.push(...r.newBlades);
+      if (r.newArena) arenas.push(r.newArena);
+    }
+    expect(p.rank).toBe(MAX_RANK);
+    expect([...blades, ...MVP_BLADES].sort()).toEqual([...BLADE_ORDER].sort());
+    expect(arenas).toEqual(ARENA_ORDER.slice(1));
   });
 
   it('upgrades cost cores, one level at a time, and explain why not', () => {

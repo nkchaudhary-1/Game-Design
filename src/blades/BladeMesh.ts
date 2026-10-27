@@ -15,13 +15,16 @@ import { blobTexture, hdr } from '../render/materials';
 import { brushedMetal } from '../render/procTex';
 import { GFX } from '../render/quality';
 import { boltRing, capProfile, discProfile, lathe, merge, radialSegs, tipLathe, torusSegs } from './partGeometry';
+import { bladeModel, MODEL, type BladeParts } from './models';
 import { LOOKS, layers } from './shapes';
 import type { BuiltBlade } from './BladeFactory';
 import type { PartVisual } from './parts';
 import { getPart } from './parts';
-import type { VisualProfile } from './bladeData';
+import { crownColor, type VisualProfile } from './bladeData';
 
 export interface BladeVisualSpec {
+  /** Blade id: picks its Blender model. */
+  id: string;
   cls: BladeClass;
   profile: VisualProfile;
   /** Physical radius from the Balance; the model is drawn to match it. */
@@ -34,6 +37,7 @@ export interface BladeVisualSpec {
 
 export function visualSpecFor(b: BuiltBlade): BladeVisualSpec {
   return {
+    id: b.def.id,
     cls: b.def.class,
     profile: b.def.visualProfile,
     radius: b.combat.radius,
@@ -183,7 +187,137 @@ export class BladeView {
     return m;
   }
 
+  /** Where a tip of this shape ends, below its own origin, in wheel radii (so the lowest point can be put on the floor). */
+  private static tipDepth(shape: string | undefined): number {
+    switch (shape) { case 'pin': return 0.36; case 'ball': return 0.17; case 'flat': return 0.1; case 'stub': return 0.2; default: return 0.3; }
+  }
+
   private build(): void {
+    const parts = bladeModel(this.spec.id);
+    if (parts) this.buildFromModel(parts);
+    else this.buildProcedural();
+  }
+
+  /** The Blender models: a stack of named parts painted by role, with the swappable parts (weight disc, tip, emblem cap) added here. */
+  private buildFromModel(parts: BladeParts): void {
+    const s = this.spec;
+    const cc = CLASS_COLORS[s.cls];
+    const p = s.profile;
+    const R = s.radius * (s.ring.scale ?? 1);
+    const thick = s.ring.thickness ?? 1;
+    const sy = R * (1 + (thick - 1) * 0.5);                  // ring thickness stretches the stack a little, never the footprint
+    const wScale = s.weight.scale ?? 1;
+    const tint = s.core.tint ?? cc.light;
+    const metal = brushedMetal();
+    const light = crownColor(p);
+    const darken = (c: string, k: number): string => new THREE.Color(c).multiplyScalar(k).getStyle();
+
+    const paint = (color: string, rough = 0.28, metalness = 0.12): THREE.MeshPhysicalMaterial => this.own(new THREE.MeshPhysicalMaterial({
+      color, metalness, roughness: rough, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.0, bumpMap: metal.bump, bumpScale: 0.1,
+    }));
+    const steel = (color: string, m = 0.9): THREE.MeshPhysicalMaterial => this.own(new THREE.MeshPhysicalMaterial({
+      color, metalness: m, roughness: 1, roughnessMap: metal.rough, envMapIntensity: 1.25, bumpMap: metal.bump, bumpScale: 0.4,
+    }));
+    const M: Record<string, THREE.Material> = {
+      base: steel(darken(p.mid, 1.4), 0.75),
+      blades: paint(p.main),
+      crown: paint(light, 0.26),
+      inlay: this.own(new THREE.MeshPhysicalMaterial({ color: p.accent2, emissive: p.accent2, emissiveIntensity: 0.9, metalness: 0.2, roughness: 0.3, clearcoat: 0.8 })),
+      plates_a: paint(light, 0.3),
+      plates_b: paint(p.main, 0.3),
+      bezel: steel(darken(p.trim, 0.55), 0.85),
+      ticks: this.own(new THREE.MeshBasicMaterial({ color: new THREE.Color(light).multiplyScalar(1.3), toneMapped: false })),
+      rim: steel(light, 0.8),
+    };
+
+    // the modelled stack: wheel radius 1 -> R, tip at the floor
+    const stack = new THREE.Group();
+    stack.scale.set(R, sy, R);
+    for (const [name, geo] of parts) {
+      const mesh = new THREE.Mesh(geo, M[name] ?? M.base);
+      mesh.castShadow = GFX.shadows;
+      stack.add(mesh);
+    }
+    this.spinGroup.add(stack);
+
+    // ---- weight disc under the base plate, a short spin track, and the tip
+    const baseY = MODEL.baseZ * sy;
+    const discR = R * 0.6 * wScale, discH = R * 0.07 * wScale;
+    this.addAt(lathe(discProfile(discR, discH)), steel(darken(p.trim, 0.9), 0.85), baseY - discH);
+    this.addAt(new THREE.TorusGeometry(discR * 0.985, R * 0.008, 6, torusSegs()).rotateX(Math.PI / 2), M.ticks, baseY - discH * 0.45);
+    const depth = BladeView.tipDepth(s.tip.shape) * R;
+    const tipMat = steel('#b4bccc', 1);
+    const tipGeo = tipLathe(s.tip.shape, R);
+    this.addAt(tipGeo, tipMat, depth);
+    const trackTop = baseY - discH;
+    if (trackTop - depth > 0.01 * R) {
+      this.addAt(new THREE.CylinderGeometry(R * 0.13, R * 0.17, trackTop - depth + 0.02 * R, Math.max(14, radialSegs() / 2)), steel(darken(p.trim, 0.8), 0.7), depth - 0.01 * R + (trackTop - depth + 0.02 * R) / 2);
+    }
+
+    // ---- the emblem cap sits in the bezel; the core part decides its shape and tint
+    const capR = R * 0.272, capH = R * 0.17;
+    const capY = (MODEL.baseTop + 0.07) * sy;
+    this.addAt(lathe(capProfile(capR, capH, s.core.shape)), this.own(new THREE.MeshPhysicalMaterial({ color: '#0b0d11', metalness: 0.9, roughness: 0.28, clearcoat: 0.6, clearcoatRoughness: 0.15, envMapIntensity: 1.2 })), capY);
+    const dome = s.core.shape === 'orb' ? 0.22 : s.core.shape === 'gem' ? 0.14 : 0.04;
+    const topY = capY + capH * (0.95 + dome);
+    this.addAt(new THREE.TorusGeometry(capR * 0.9, R * 0.013, 6, torusSegs()).rotateX(Math.PI / 2), this.own(hdr(tint, 2.2)), capY + capH * 0.74);
+    const emb = new THREE.Mesh(
+      new THREE.CircleGeometry(capR * 0.84, Math.max(24, radialSegs() / 2)).rotateX(-Math.PI / 2),
+      this.own(new THREE.MeshBasicMaterial({ map: emblemTexture(tint), toneMapped: false })),
+    );
+    this.ownedGeo.push(emb.geometry);
+    emb.position.y = topY + 0.002;
+    this.spinGroup.add(emb);
+
+    this.finishBuild(R, sy);
+  }
+
+  /** Add an owned geometry at height y (models are floor-based, so there is no extra offset). `mat` must already be owned. */
+  private addAt(geo: THREE.BufferGeometry, mat: THREE.Material, y: number): void {
+    this.ownedGeo.push(geo);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = y;
+    m.castShadow = GFX.shadows;
+    this.spinGroup.add(m);
+  }
+
+  /** Spin blur, shadow, halo and shield: sized to the blade that was just built. */
+  private finishBuild(R: number, sy: number): void {
+    if (!this.blurMesh) {
+      this.blurMat = new THREE.MeshBasicMaterial({ map: blurTexture(), transparent: true, depthWrite: false, opacity: 0, color: '#ffffff', toneMapped: false });
+      this.blurMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), this.blurMat);
+      this.blurMesh.renderOrder = 2;
+      this.blurMesh.visible = false;
+      this.lean.add(this.blurMesh);
+    }
+    this.blurMat!.color.set(this.spec.profile.accent2);
+    this.blurMesh.scale.setScalar(R * 1.02);
+    this.blurMesh.position.y = (MODEL.baseTop + 0.2) * sy;
+    this.layoutAround(R, sy);
+  }
+
+  private layoutAround(R: number, sy: number): void {
+    // the blade stands on its tip: pivot at the floor, so leaning and wobbling swing the top, as a real top does
+    this.lean.position.y = -this.halfH;
+    const shadowR = R * 1.18;
+    this.shadow.scale.setScalar(shadowR);
+    this.halo.scale.setScalar(R);
+    this.shadow.position.y = -this.halfH + 0.012;
+    this.halo.position.y = -this.halfH + 0.02;
+    if (!this.shieldMesh) {
+      const sh = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 24, 14),
+        new THREE.MeshBasicMaterial({ color: CLASS_COLORS.DEFENSE.light, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }),
+      );
+      sh.visible = false;
+      this.lean.add(sh);
+      this.shieldMesh = sh;
+    }
+    this.shieldMesh.scale.setScalar(R * 1.35);
+    this.shieldMesh.position.y = 0.34 * sy;
+  }
+
+  private buildProcedural(): void {
     const s = this.spec;
     const cc = CLASS_COLORS[s.cls];
     const R = s.radius * (s.ring.scale ?? 1);

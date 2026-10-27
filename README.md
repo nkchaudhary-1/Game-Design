@@ -128,6 +128,27 @@ tools/       balance.ts
   replies with light `PadFeedback`. Phase 2 swaps the transport (`LocalBus` → WebSocket) and nothing else.
 * **No universally best part.** Every non-stock part trades something away; a test enforces it.
 
+## Blade models (Blender)
+
+The 21 blades are modelled in Blender (headless `bpy`) and packed into one small file the game loads at start-up.
+Each blade is a stack of layers, the way the layered turbine-style spinners are built: a dark base plate with a jagged rim,
+a layer of swept blades in the main colour, a layer of long jagged blades on top, a ring of chunky plates round a bezelled
+emblem disc, and (for the round Stamina blades) a smooth outer rim. Designs are data in `tools/blender/blades.py`
+(blade count, sweep, width, notches, flame waves, armour plates, battlements, rough rock…); `tools/blender/blade_geo.py` is the
+geometry kit; `tools/blender/build_blades.py` builds, renders previews and exports.
+
+```
+python3.11 -m venv venv && venv/bin/pip install bpy          # Blender as a Python module (about 370 MB)
+cd tools/blender
+../../venv/bin/python -I build_blades.py --all --export ../../src/assets/models/blades.sbm            # the game's model pack
+../../venv/bin/python -I build_blades.py --ids ravok,gravion --render /tmp/previews --views iso,top   # Cycles previews
+```
+
+`blades.sbm` is a zlib-compressed binary (int16 positions, int8 normals, uint16 indices; about 2.4 MB, 4.3 MB inflated, roughly
+5k–10k triangles a blade). `src/blades/models.ts` inflates it with the browser's `DecompressionStream`. The weight disc, emblem cap
+and tip are still built in code, because the player can swap those parts; the ring part scales the model. If the pack cannot be
+loaded the game falls back to the older procedural blades. `tests/models.test.ts` checks every blade has every part and sane geometry.
+
 ## Realism
 
 Everything here is visual or audio. The simulation is untouched, so the balance numbers below still hold.

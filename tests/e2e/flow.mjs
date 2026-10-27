@@ -63,9 +63,12 @@ await page.waitForFunction(() => document.querySelector('.sbtn[data-state="ACTIV
 ok(await page.locator('.sbtn[data-state="ACTIVE"]').count() === 1, 'pad shows ACTIVE');
 await page.screenshot({ path: `${SP}/${tag}-4-super.png` });
 // fast-forward to a result
-await ev(() => { window.__battle.speed = 8; });
+// (software-rendered CI draws only a frame or two a second, so step the battle by hand: same code, no waiting on frames)
+for (let i = 0; i < 40 && !(await page.locator('.result .sheet h2').count()); i++) {
+  await ev(() => { for (let k = 0; k < 150 && window.__battle.currentPhase !== 'done'; k++) window.__battle.update(0.05); });
+  await page.waitForTimeout(200);
+}
 await page.waitForSelector('.result .sheet h2', { timeout: 120000 });
-await ev(() => { window.__battle.speed = 1; });
 await page.waitForTimeout(500);
 const title = await page.locator('.result h2').innerText();
 const cause = await page.locator('.result .cause').innerText();

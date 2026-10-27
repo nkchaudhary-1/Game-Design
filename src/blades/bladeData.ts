@@ -24,6 +24,16 @@ export interface VisualProfile {
   alt?: string;
 }
 
+/** The paint of the long jagged blades on top: the blade's second paint, a tint of its main colour, or dark steel when the main colour is already pale. */
+export function crownColor(p: VisualProfile): string {
+  if (p.alt) return p.alt;
+  const h = p.main.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  if ((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.62) return '#3a4256';
+  const mix = (v: number): string => Math.round(v + (255 - v) * 0.84).toString(16).padStart(2, '0');
+  return `#${mix(r)}${mix(g)}${mix(b)}`;
+}
+
 export interface BladeDef {
   id: string;
   name: string;
