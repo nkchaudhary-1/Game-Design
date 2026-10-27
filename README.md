@@ -10,6 +10,8 @@ Built from two documents:
 
 The earlier single-file 2D prototype (PRD v1) is kept, still playable, in [`v1-solo/`](v1-solo/README.md).
 
+Also in this repo: **[Hostile Skies](hostile-skies/README.md)**, an arcade flight simulator against an alien invasion fleet (`npm run skies`).
+
 ## Run it
 
 ```bash

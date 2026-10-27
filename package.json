@@ -12,7 +12,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "balance": "tsx tools/balance.ts",
-    "roster": "tsx tools/roster.ts"
+    "roster": "tsx tools/roster.ts",
+    "skies": "vite --config hostile-skies/vite.config.ts",
+    "skies:build": "tsc --noEmit && vite build --config hostile-skies/vite.config.ts",
+    "skies:preview": "vite preview --config hostile-skies/vite.config.ts",
+    "skies:single": "tsc --noEmit && SINGLE=1 vite build --config hostile-skies/vite.config.ts && node hostile-skies/tools/inline.mjs dist-skies-single",
+    "skies:test": "vitest run hostile-skies"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
