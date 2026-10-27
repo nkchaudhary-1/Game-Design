@@ -72,6 +72,10 @@ export interface WorldOptions {
   startWave?: number;
   /** Take no damage. QA aid. */
   god?: boolean;
+  /** Override the difficulty's cannon aim assist (0..1). */
+  aimAssist?: number;
+  /** Demo reel: no damage, strong aim assist, fast missile resupply. Driven by the autopilot. */
+  demo?: boolean;
 }
 
 export const CANNON = { rate: 18, speed: 1050, life: 1.4, damage: 9, heatPerShot: 1.15, cool: 26 } as const;
@@ -96,6 +100,13 @@ export class World implements AiHost {
   difficulty: Difficulty;
   assist: boolean;
   god: boolean;
+  aimAssist: number;
+  private demo: boolean;
+  /** Runs right after the flight model each step; the demo pilot uses it to fly the aircraft directly. */
+  pilotHook: ((w: World, dt: number) => void) | null = null;
+  /** Multipliers on the player's weapon damage (the demo reel hits harder so its fights are short). */
+  private cannonDmg: number = CANNON.damage;
+  private missileDmg: number = MISSILE.damage;
 
   // ---- player ----
   ac: Aircraft = newAircraft(SPAWN.x, SPAWN.y, SPAWN.z);
@@ -157,7 +168,10 @@ export class World implements AiHost {
     this.difficulty = opts.difficulty ?? 'pilot';
     this.tuning = TUNING[this.difficulty];
     this.assist = opts.assist ?? true;
-    this.god = opts.god ?? false;
+    this.demo = opts.demo ?? false;
+    this.god = opts.god ?? this.demo;
+    this.aimAssist = opts.aimAssist ?? (this.demo ? 0.9 : this.tuning.aimAssist);
+    if (this.demo) { this.cannonDmg = CANNON.damage * 2.4; this.missileDmg = MISSILE.damage * 1.7; }
     this.cities = CITY_SITES.map((site) => ({ site, hp: site.hp, maxHp: site.hp, alive: true, hurtT: 99, warnT: 0 }));
     if (opts.startWave && opts.startWave > 1) {
       this.wave = Math.min(opts.startWave, WAVES.length) - 1;
@@ -560,7 +574,7 @@ export class World implements AiHost {
       const reach = MISSILE.blast + a.radius;
       if (d < reach) {
         this.stats.hits++;
-        this.damageAlien(a, MISSILE.damage * (1 - 0.55 * (d / reach)), m.pos);
+        this.damageAlien(a, this.missileDmg * (1 - 0.55 * (d / reach)), m.pos);
       }
     }
   }
@@ -570,6 +584,7 @@ export class World implements AiHost {
     // cannon rounds
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i]!;
+      if (this.aimAssist > 0 && this.target && this.target.dying <= 0) this.assistRound(b, this.target, dt);
       b.prev.copy(b.pos);
       b.pos.addScaledVector(b.vel, dt);
       b.life -= dt;
@@ -589,7 +604,7 @@ export class World implements AiHost {
       if (who && bestT <= hullT) {
         this.stats.hits++;
         _a.copy(b.prev).lerp(b.pos, bestT);
-        this.damageAlien(who, CANNON.damage, _a);
+        this.damageAlien(who, this.cannonDmg, _a);
         hit = true;
       } else if (hullT < 2) {
         _a.copy(b.prev).lerp(b.pos, hullT);
@@ -652,6 +667,19 @@ export class World implements AiHost {
     }
   }
 
+  /** Aim assist: a round already close to the selected target bends gently towards it. Keeps its speed. */
+  private assistRound(b: Bullet, t: Alien, dt: number): void {
+    _a.copy(t.pos).addScaledVector(t.vel, 0.05).sub(b.pos);
+    const d = _a.length();
+    if (d > 1600 || d < 5) return;
+    const sp = b.vel.length();
+    _b.copy(b.vel).multiplyScalar(1 / sp);
+    _a.multiplyScalar(1 / d);
+    if (_b.dot(_a) < Math.cos((this.demo ? 18 : 11) * DEG)) return; // only when you were already aiming close
+    _b.lerp(_a, clamp(this.aimAssist * 7 * dt, 0, 1)).normalize();
+    b.vel.copy(_b).multiplyScalar(sp);
+  }
+
   /** First hit (0..1) of segment p0->p1 with the Leviathan's hull, or -1. */
   private segEllipsoid(p0: Vector3, p1: Vector3, c: Vector3): number {
     const { rx, ry, rz } = MOTHERSHIP_HULL;
@@ -677,6 +705,7 @@ export class World implements AiHost {
     // ---- player ----
     if (this.playerAlive) {
       stepAircraft(ac, c, dt, this.assist);
+      this.pilotHook?.(this, dt);
       this.tti = timeToImpact(ac.pos.x, ac.pos.y, ac.pos.z, ac.vel.x, ac.vel.y, ac.vel.z, 20, 5);
 
       const cycle = c.cycleTarget && !this.prevCycle;
@@ -689,7 +718,7 @@ export class World implements AiHost {
       this.prevMissile = c.missile;
       if (this.missiles < 6) {
         this.missileRegen += dt;
-        if (this.missileRegen >= MISSILE.regen) { this.missileRegen = 0; this.missiles++; }
+        if (this.missileRegen >= (this.demo ? 2.5 : MISSILE.regen)) { this.missileRegen = 0; this.missiles++; }
       } else this.missileRegen = 0;
 
       if (this.shieldDelay > 0) this.shieldDelay -= dt;

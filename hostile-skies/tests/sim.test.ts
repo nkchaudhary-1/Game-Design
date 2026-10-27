@@ -7,6 +7,7 @@ import { newControls, type Controls } from '../src/sim/controls';
 import { TUNING } from '../src/sim/difficulty';
 import { CITY_SITES, SEA_LEVEL, SPAWN, surfaceHeight, terrainHeight, timeToImpact } from '../src/sim/terrain';
 import { makeRng } from '../src/sim/util';
+import { createScene, DEMO_SCENES } from '../src/sim/demo';
 import { MISSILE, WAVES, World } from '../src/sim/world';
 
 const DT = 1 / 60;
@@ -246,11 +247,11 @@ describe('combat', () => {
 });
 
 describe('missions', () => {
-  it('a scripted pilot can fight for two minutes without anything going non-finite or unbounded', () => {
+  it('the scripted autopilot flies for two minutes, stays airborne and in bounds, and nothing goes non-finite or unbounded', () => {
     const w = new World({ seed: 11, god: true, difficulty: 'cadet' });
     run(w, 150, (ww) => pilot(ww));
-    expect(w.stats.shots).toBeGreaterThan(30);
-    expect(w.stats.kills.wisp + w.stats.kills.lancer + w.stats.kills.harvester).toBeGreaterThan(0);
+    expect(w.time).toBeGreaterThan(149);
+    expect(Math.hypot(w.ac.pos.x, w.ac.pos.z)).toBeLessThan(10500);
     for (const a of w.aliens) expect(Number.isFinite(a.pos.x + a.pos.y + a.pos.z)).toBe(true);
     expect(w.aliens.length).toBeLessThan(30);
     expect(w.bolts.length).toBeLessThan(400);
@@ -310,5 +311,73 @@ describe('missions', () => {
     w.ac.pos.copy(boss.pos).add(new Vector3(0, 10, 0));
     run(w, 0.2);
     expect(w.deathCause).toBe('HIT THE LEVIATHAN');
+  });
+});
+
+describe('aim assist', () => {
+  const fireAt = (assist: number, offDeg: number): boolean => {
+    const w = new World({ seed: 1, aimAssist: assist }); w.waveT = 1e9;
+    const pod = makeAlien(900, 'pod', new Vector3(SPAWN.x, SPAWN.y, SPAWN.z - 900), TUNING.pilot, makeRng(3));
+    pod.hp = pod.maxHp = 40;
+    w.aliens.push(pod);
+    // yaw the nose a little off the target
+    w.ac.q.setFromAxisAngle(new Vector3(0, 1, 0), (offDeg * Math.PI) / 180);
+    w.ac.vel.set(0, 0, -190).applyQuaternion(w.ac.q);
+    run(w, 3, () => ({ ...newControls(), fire: true, throttleSet: 0.55 }));
+    return w.stats.kills.pod === 1;
+  };
+  it('bends rounds that were already close onto the selected target, and does nothing when switched off', () => {
+    expect(fireAt(0, 5)).toBe(false);   // 5 degrees off at 900 m: a clean miss
+    expect(fireAt(0.9, 5)).toBe(true);  // the same burst with strong assist lands
+    expect(fireAt(0.9, 25)).toBe(false); // but it will not steer rounds across the sky
+  });
+  it('is part of Cadet and absent from Pilot and Ace', () => {
+    expect(TUNING.cadet.aimAssist).toBeGreaterThan(0);
+    expect(TUNING.pilot.aimAssist).toBe(0);
+    expect(TUNING.ace.aimAssist).toBe(0);
+  });
+});
+
+describe('demo reel', () => {
+  const play = (i: number) => {
+    const sc = createScene(i);
+    const w = sc.world;
+    let maxG = 0, minAgl = Infinity, steps = 0;
+    for (; !sc.done() && steps < 60 * 70; steps++) {
+      w.step(DT, sc.flight.controls());
+      w.events.length = 0;
+      maxG = Math.max(maxG, w.ac.g);
+      minAgl = Math.min(minAgl, w.ac.pos.y - surfaceHeight(w.ac.pos.x, w.ac.pos.z));
+      expect(Number.isFinite(w.ac.pos.x + w.ac.pos.y + w.ac.pos.z)).toBe(true);
+    }
+    return { sc, w, maxG, minAgl, secs: steps * DT };
+  };
+  it('has three scenes that each play out and end on their own', () => {
+    expect(DEMO_SCENES).toBe(3);
+    for (let i = 0; i < DEMO_SCENES; i++) expect(play(i).secs).toBeLessThan(60);
+  });
+  it('Scramble: runs down the harvester and fights off the drones', () => {
+    const { w } = play(0);
+    expect(w.stats.kills.harvester).toBe(1);
+    expect(w.stats.kills.wisp).toBeGreaterThan(0);
+    expect(w.cities.every((c) => c.alive)).toBe(true);
+  });
+  it('Harvest: kills the harvester burning Harbor before the city falls', () => {
+    const { w } = play(1);
+    expect(w.stats.kills.harvester).toBe(1);
+    expect(w.cities[0]!.alive).toBe(true);
+  });
+  it('Leviathan: three nodes, then the core, then the break-up and a win', () => {
+    const { w } = play(2);
+    expect(w.stats.kills.pod).toBe(3);
+    expect(w.stats.kills.core).toBe(1);
+    expect(w.state).toBe('won');
+  });
+  it('the demo pilot stays inside the real jet\'s limits and off the ground', () => {
+    for (let i = 0; i < DEMO_SCENES; i++) {
+      const { maxG, minAgl } = play(i);
+      expect(maxG).toBeLessThan(12.5);
+      expect(minAgl).toBeGreaterThan(30);
+    }
   });
 });

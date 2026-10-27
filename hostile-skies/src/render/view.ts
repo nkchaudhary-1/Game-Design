@@ -160,7 +160,7 @@ export class GameView {
       this.rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: GFX.msaa });
       this.composer = new EffectComposer(this.renderer, this.rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.bloom = new UnrealBloomPass(new Vector2(1, 1), 0.62, 0.7, 0.95);
+      this.bloom = new UnrealBloomPass(new Vector2(1, 1), 0.34, 0.5, 1.08);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
     }

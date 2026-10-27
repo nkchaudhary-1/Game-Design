@@ -28,6 +28,8 @@ export class Input {
   onCommand: (c: Command) => void = () => undefined;
   /** First user gesture (browsers gate audio on it). */
   onGesture: () => void = () => undefined;
+  /** Any key press or pointer press, with its code ('Pointer' for a press). Used to leave the demo. */
+  onAnyKey: (code: string) => void = () => undefined;
   /** When false the keyboard/mouse/pad do not drive the aircraft (menus, paused). */
   get active(): boolean { return this._active; }
   set active(v: boolean) {
@@ -68,6 +70,7 @@ export class Input {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('wheel', (e) => { if (this.active) { e.preventDefault(); this.wheel += clamp(-e.deltaY / 400, -1, 1); } }, { passive: false });
     target.addEventListener('pointerdown', () => this.onGesture(), { once: true });
+    target.addEventListener('pointerdown', () => this.onAnyKey('Pointer'));
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -75,6 +78,7 @@ export class Input {
     this.onGesture();
     if (GAME_KEYS.has(e.code) && this.active) e.preventDefault();
     if (e.repeat) return;
+    if (!['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) this.onAnyKey(e.code);
     this.keys.add(e.code);
     const cmd = KEY_COMMANDS[e.code];
     if (cmd) this.onCommand(cmd);

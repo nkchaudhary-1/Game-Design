@@ -22,6 +22,7 @@ button { font: inherit; color: inherit; }
 kbd { font-family: var(--num); font-size: 0.78em; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--dim); margin-left: 8px; }
 
 #ui { position: fixed; inset: 0; pointer-events: none; }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 8; }
 .screen { position: absolute; inset: 0; pointer-events: auto; opacity: 0; transition: opacity 0.35s ease; display: flex; }
 .screen.in { opacity: 1; }
 .scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(6, 8, 24, 0.9) 0%, rgba(6, 8, 24, 0.55) 38%, rgba(6, 8, 24, 0) 72%); }

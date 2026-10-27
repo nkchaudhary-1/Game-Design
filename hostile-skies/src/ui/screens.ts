@@ -73,6 +73,7 @@ export class Ui {
   onRestart: () => void = () => undefined;
   onQuit: () => void = () => undefined;
   onSettings: (s: Settings) => void = () => undefined;
+  onDemo: () => void = () => undefined;
 
   constructor(root: HTMLElement, settings: Settings) {
     this.root = root;
@@ -149,6 +150,7 @@ export class Ui {
 
         <div class="cta">
           <button class="primary" data-act="launch">Launch <kbd>Enter</kbd></button>
+          <button class="ghost" data-act="demo">Watch demo</button>
           <button class="ghost" data-act="help">How to fly</button>
         </div>
         <div class="best" data-best>${best ? `Best on ${TUNING[s.difficulty].label}: <b>${fmt(best)}</b>` : ''}</div>
@@ -172,6 +174,7 @@ export class Ui {
     this.seg(el, 'pitch', s.flightStick ? 'stick' : 'arcade', (v) => { this.change({ flightStick: v === 'stick' }); hints(); });
     hints();
     el.querySelector('[data-act="launch"]')!.addEventListener('click', () => this.onLaunch(this.settings));
+    el.querySelector('[data-act="demo"]')!.addEventListener('click', () => this.onDemo());
     el.querySelector('[data-act="help"]')!.addEventListener('click', () => this.showHelp('title'));
     (el.querySelector('[data-act="launch"]') as HTMLButtonElement).focus({ preventScroll: true });
   }

@@ -28,6 +28,8 @@ export interface HudState {
   /** Seconds since the mission started (drives the first-flight hints). */
   missionTime: number;
   touch: boolean;
+  /** Set while the demo reel is playing. */
+  demo?: { title: string; caption: string };
 }
 
 interface Popup { text: string; pos: Vector3; age: number; color: string }
@@ -177,7 +179,8 @@ export class Hud {
     this.popupsDraw(dt);
     this.bannerDraw(dt);
     this.hintsDraw(s);
-    this.statusChips(s);
+    if (s.demo) this.demoChip(s.demo);
+    else this.statusChips(s);
     this.hitMark = Math.max(0, this.hitMark - dt);
   }
 
@@ -731,6 +734,26 @@ export class Hud {
     let y = (this.compact ? 70 : 128) * u;
     for (const l of lines) { this.text(l, this.w / 2, y, 13, CY_DIM, 'center'); y += 20 * u; }
     this.ctx.globalAlpha = 1;
+  }
+
+  /** The demo reel's label and the way out. */
+  private demoChip(d: { title: string; caption: string }): void {
+    const u = this.u, g = this.ctx;
+    // top-left, under the city bars, clear of the heading tape, wave banner and boss bar
+    const x = 24 * u, y = (this.compact ? 92 : 132) * u;
+    g.font = `600 ${Math.round(13 * u)}px "Chakra Petch", system-ui, sans-serif`;
+    const label = `DEMO · ${d.title.toUpperCase()}`;
+    g.font = `500 ${Math.round(12 * u)}px "Chakra Petch", system-ui, sans-serif`;
+    const w = Math.min(Math.max(g.measureText(label).width, g.measureText(d.caption).width) + 28 * u, this.w * 0.3);
+    g.fillStyle = 'rgba(6,16,30,0.62)';
+    g.fillRect(x, y - 16 * u, w, 40 * u);
+    g.strokeStyle = CY_DIM; g.lineWidth = 1.2; g.strokeRect(x + 0.5, y - 16 * u + 0.5, w - 1, 40 * u - 1);
+    this.text(label, x + 12 * u, y - 2 * u, 13, CY, 'left', 700);
+    this.text(d.caption, x + 12 * u, y + 14 * u, 11, CY_DIM, 'left');
+    const blink = 0.55 + 0.45 * Math.sin(this.t * 3.2);
+    g.globalAlpha = blink;
+    this.text(this.compact ? 'TAP TO FLY' : 'PRESS ANY KEY TO FLY', this.w / 2, this.h - 12 * u, 11, WHITE, 'center');
+    g.globalAlpha = 1;
   }
 
   private statusChips(s: HudState): void {

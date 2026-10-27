@@ -40,7 +40,7 @@ void main() {
   col = mix(col, zenith, smoothstep(0.12, 0.85, h));
   float s = max(dot(d, sunDir), 0.0);
   col += glowCol * (pow(s, 5.0) * 0.34 + pow(s, 36.0) * 0.55);
-  col += sunCol * smoothstep(0.9991, 0.9997, s) * 9.0;
+  col += sunCol * smoothstep(0.9991, 0.9997, s) * 3.0;
   col = mix(col, fogCol, smoothstep(0.02, -0.12, h));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>

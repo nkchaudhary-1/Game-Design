@@ -37,8 +37,25 @@ export class Sound {
     if (this.ctx) { if (this.ctx.state === 'suspended') void this.ctx.resume(); return; }
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
-    const ctx = new AC();
-    this.ctx = ctx;
+    this.init(new AC());
+  }
+
+  /**
+   * Render sound into a buffer instead of the speakers (used to record the demo video). Drive it with
+   * `setClock(t)` once per simulated frame, then call `startRendering()` on the context.
+   */
+  attachOffline(ctx: OfflineAudioContext): void {
+    this.offline = true;
+    this.virtual = 0;
+    this.init(ctx);
+  }
+  setClock(t: number): void { this.virtual = t; }
+  private offline = false;
+  private virtual = 0;
+  private now(): number { return this.offline ? this.virtual : this.ctx!.currentTime; }
+
+  private init(ctx: AudioContext | OfflineAudioContext): void {
+    this.ctx = ctx as AudioContext;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.2;
     this.master = ctx.createGain();
@@ -52,12 +69,12 @@ export class Sound {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
 
-    this.buildContinuous(ctx);
+    this.buildContinuous(ctx as AudioContext);
   }
 
   setMuted(m: boolean): void {
     this.muted = m;
-    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.7, this.ctx.currentTime, 0.05);
+    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.7, this.now(), 0.05);
   }
 
   private loopNoise(ctx: AudioContext): AudioBufferSourceNode {
@@ -112,7 +129,7 @@ export class Sound {
 
   private out(listener: Listener | null, pos: Vector3 | null, ref: number, base: number): { node: AudioNode; gain: number } | null {
     const ctx = this.ctx!;
-    if (this.voices > 46) return null;
+    if (!this.offline && this.voices > 46) return null;
     let gain = base, pan = 0;
     if (pos && listener) {
       const dx = pos.x - listener.pos.x, dy = pos.y - listener.pos.y, dz = pos.z - listener.pos.z;
@@ -128,7 +145,7 @@ export class Sound {
   }
 
   private noiseHit(o: { node: AudioNode; gain: number }, dur: number, type: FilterType, f0: number, f1: number, q: number, delay = 0, attack = 0.004): void {
-    const ctx = this.ctx!, t = ctx.currentTime + delay;
+    const ctx = this.ctx!, t = this.now() + delay;
     const s = ctx.createBufferSource(); s.buffer = this.noise;
     const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q;
     f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
@@ -141,7 +158,7 @@ export class Sound {
   }
 
   private tone(o: { node: AudioNode; gain: number }, type: OscillatorType, f0: number, f1: number, dur: number, delay = 0, attack = 0.004): void {
-    const ctx = this.ctx!, t = ctx.currentTime + delay;
+    const ctx = this.ctx!, t = this.now() + delay;
     const osc = ctx.createOscillator(); osc.type = type;
     osc.frequency.setValueAtTime(f0, t); osc.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     const g = ctx.createGain();
@@ -154,7 +171,7 @@ export class Sound {
 
   /** Rate limiter for chatty effects. */
   private ok(key: string, every: number): boolean {
-    const now = this.ctx!.currentTime;
+    const now = this.now();
     if (now - (this.last[key] ?? -9) < every) return false;
     this.last[key] = now;
     return true;
@@ -264,7 +281,7 @@ export class Sound {
   update(w: World, dt: number, l: Listener, flags: { incoming: boolean; lock: 0 | 1 | 2; playing: boolean }): void {
     const ctx = this.ctx;
     if (!ctx) return;
-    const now = ctx.currentTime;
+    const now = this.now();
     const ac = w.ac;
     const alive = w.playerAlive && flags.playing;
     const E = this.engine;

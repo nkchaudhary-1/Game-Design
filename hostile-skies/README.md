@@ -13,7 +13,7 @@ npm install
 npm run skies            # dev server: http://localhost:5174
 npm run skies:build      # production build into dist-skies/
 npm run skies:single     # ONE self-contained file: dist-skies-single/hostile-skies.html (open from disk, or host anywhere)
-npm run skies:test       # 27 simulation tests (Vitest)
+npm run skies:test       # 34 simulation tests (Vitest)
 ```
 
 Needs a browser with WebGL. Fonts and everything else are bundled; nothing is fetched at runtime.
@@ -59,7 +59,23 @@ plus a bonus for city health, and a big bonus per surviving city at the end. Bes
 (in `localStorage`; everything works without it).
 
 **Difficulty** changes the aliens, not your aircraft: hit points, damage, aim error and lead, rate of fire, group size.
+Cadet also adds light cannon **aim assist** (rounds that were already close bend gently onto the selected target).
 *Cadet · Pilot (intended) · Ace.* **Flight model** is separate: *Assisted* or *Manual*.
+
+## Demo
+
+**Watch demo** on the title screen (or `?demo`) plays a hands-off reel on the real engine, with the real HUD and sound.
+Press any key or tap to fly. Three scenes, about 75 seconds: *Scramble* (wave one: run down a harvester, shake the
+drones), *Harvest* (a harvester burning Harbor), *Leviathan* (nodes, core, break-up).
+
+The reel is flown by `src/sim/demo.ts`, a scripted pilot that steers like an alien ship and writes the aircraft state
+directly. It is held to 8 g and the real jet's speeds so the HUD stays honest, but the world gives it strong cannon aim
+assist, extra damage and fast missile resupply, so every scene lands. It is not a replay of a human, and not a
+benchmark of the real fight. The title screen's moving backdrop is the first scene on a loop.
+
+**Record it** with `node hostile-skies/tools/record-demo.mjs` (needs Playwright and ffmpeg; see the header of that file).
+The game opened with `?record` steps the reel at a fixed rate and exposes `window.__rec`, so frames are captured one by
+one and the sound is rendered offline, which gives a smooth MP4 with audio even on a machine with no GPU.
 
 ## Flight model
 
@@ -90,10 +106,11 @@ The jet is rate-commanded (like a fly-by-wire fighter) but everything else is re
 
 ```
 hostile-skies/
-  index.html  vite.config.ts  tools/inline.mjs
+  index.html  vite.config.ts  tools/inline.mjs  tools/record-demo.mjs
   src/
     main.ts            state machine (title / playing / paused / ended), fixed sub-stepping, wiring
     sim/               PURE simulation (tested)
+      demo.ts          the demo reel: scripted pilot + three scenes
       aircraft.ts      flight model + assist
       aliens.ts        ship classes, AI, Leviathan parts
       world.ts         player weapons, projectiles, collisions, cities, waves, scoring, win/lose, events
@@ -131,7 +148,7 @@ and phones start lower; the game steps down by itself if frames stay slow. Force
 
 ## QA URL switches
 
-`?autostart` (skip the title) · `?god` (take no damage) · `?wave=5` (start at a wave; 5 = the Leviathan) · `?seed=123` ·
+`?demo` (play the reel) · `?record` (fixed-step recorder, see above) · `?autostart` (skip the title) · `?god` (take no damage) · `?wave=5` (start at a wave; 5 = the Leviathan) · `?seed=123` ·
 `?quality=low` · `?shot` (keeps the WebGL buffer so headless screenshots are not blank). `window.__game` exposes the
 world, view and sound for debugging.
 
@@ -139,7 +156,7 @@ world, view and sound for debugging.
 
 **In the MVP:** the full loop (title, five waves, boss, result with stats and best score), three alien classes plus the
 boss, assisted and manual flight, chase and cockpit cameras, three input schemes, procedural audio, three graphics tiers,
-27 simulation tests.
+34 simulation tests.
 
 **Later, in the order I would do it:**
 1. *Checkpoint / continue from wave N.* One life over a ~10 minute run is the sharpest edge in the current design.
