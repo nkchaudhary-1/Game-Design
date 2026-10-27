@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark; /* the game is one deliberate dark look */
   --bg: #0a0e24;
   --ink: #eaf6ff;
   --dim: rgba(204, 228, 255, 0.62);
