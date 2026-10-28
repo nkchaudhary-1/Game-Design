@@ -11,7 +11,7 @@ const canvas = document.getElementById('confetti');
 // ---------- host key + vote URL ----------
 
 const params = new URLSearchParams(location.search);
-let hostKey = params.get('key');
+let hostKey = params.get('key') || globalThis.__BV_HOST_KEY || null; // the global is set by the embedded demo, which has no URL
 try {
   if (hostKey) sessionStorage.setItem('bv:key', hostKey);
   else hostKey = sessionStorage.getItem('bv:key');
@@ -23,7 +23,7 @@ if (hostKey) api('/api/host/ping', { hostKey }).then(() => { canControl = true; 
 let voteUrls = [];
 const URL_KEY = 'bv:voteUrl';
 const savedUrl = () => { try { return localStorage.getItem(URL_KEY) || ''; } catch { return ''; } };
-const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const isLocal = !location.hostname || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
 function voteUrl() {
   return savedUrl() || (isLocal ? voteUrls[0] : `${location.origin}/`) || `${location.origin}/`;

@@ -45,6 +45,11 @@ The control bar fades out after a few seconds so the projector stays clean; move
 * Standings stay on the server until you reveal. Turn on **Live standings** in the bar if you'd rather show a running tally.
 * Votes are saved to `data/state.json`, so restarting the server mid-party loses nothing. **Reset everything** (Settings) wipes it.
 
+## Click-through demo
+
+`npm run build:demo` builds `demo/dist/demo.html`: the real guest and host screens side by side in one page, wired to the same
+voting rules (`lib/core.js`) with 20 dummy guests you can trigger. No server needed; open `demo/dist/standalone.html` in a browser.
+
 ## Tests
 
 ```bash

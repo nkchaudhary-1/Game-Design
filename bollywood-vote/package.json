@@ -6,7 +6,10 @@
   "description": "Live 'Best Dressed' voting for a Bollywood-night party. Zero dependencies.",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build:demo": "node tools/build-demo.mjs"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }
