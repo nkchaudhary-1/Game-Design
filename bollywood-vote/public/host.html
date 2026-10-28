@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Best Dressed — Host Screen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Yatra+One&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="marquee" aria-hidden="true"></div>
+  <div class="stage">
+    <header class="stage-head">
+      <div>
+        <div class="kicker">Bollywood Night</div>
+        <h1 class="display">Best <em>Dressed</em></h1>
+      </div>
+      <div class="phase-pill" id="pill"><i></i><span></span></div>
+    </header>
+    <main id="main"></main>
+  </div>
+
+  <div class="bar idle" id="bar"></div>
+  <aside class="drawer" id="drawer" aria-label="Host settings"></aside>
+  <canvas id="confetti"></canvas>
+
+  <script src="/vendor/qrcode.js"></script>
+  <script type="module" src="/js/host.js"></script>
+</body>
+</html>

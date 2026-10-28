@@ -1,0 +1,12 @@
+{
+  "name": "bollywood-vote",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live 'Best Dressed' voting for a Bollywood-night party. Zero dependencies.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=18" }
+}
