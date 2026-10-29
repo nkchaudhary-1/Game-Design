@@ -107,17 +107,18 @@
     <div>
       <h2>Try it</h2>
       <ol>
-        <li>On the phone, tap a name, then "I'm …".</li>
-        <li>Click <b>Dummy guests join</b> and watch the names light up on the projector.</li>
-        <li>On the projector, click <b>Open voting</b>.</li>
-        <li>On the phone, pick someone and vote. You can change your vote until voting closes.</li>
-        <li>Click <b>Dummy guests vote</b> to fill the room.</li>
-        <li>On the projector, click <b>Close voting</b>, then <b>Reveal winner</b>.</li>
+        <li>On the projector, click <b>Try it with 20 sample names</b>, then <b>Save guest list</b>. On the night you type your own.</li>
+        <li>Click <b>Start voting</b>. The QR code and a 5-minute clock appear.</li>
+        <li>On the phone, tap your name, then "I'm …", then vote. You can change your vote until the clock runs out.</li>
+        <li>Click <b>Dummy guests join</b>, then <b>Dummy guests vote</b> to fill the room. Voting closes by itself when time is up or everyone has voted.</li>
+        <li>On the projector, click <b>Reveal winner</b> and watch the curtain.</li>
+        <li>To see a tie-break, restart, then use <b>Make it a tie</b> in place of <b>Dummy guests vote</b>. Leave the phone unvoted, or vote for someone else.</li>
       </ol>
     </div>
     <div class="actions">
       <button class="btn" id="join" type="button">Dummy guests join</button>
       <button class="btn" id="vote" type="button">Dummy guests vote</button>
+      <button class="btn ghost" id="tie" type="button">Make it a tie</button>
       <button class="btn ghost" id="restart" type="button">Restart demo</button>
       <p id="status" role="status"></p>
     </div>
@@ -127,13 +128,12 @@
 <script>
 /*__CORE__*/
 
-const ROSTER = /*__ROSTER__*/ [];
 const DOCS = /*__DOCS__*/ {};
 const HOST_KEY = 'demo';
 const DEMO_URL = 'http://192.168.1.23:3000/';
 
 const core = createCore({
-  roster: parseRoster(ROSTER),
+  roster: [], // the host types the names in on the projector, like on the night
   hostKey: HOST_KEY,
   randomId: () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(16).slice(2) + Date.now().toString(16)),
 });
@@ -195,14 +195,15 @@ let favourites = [];
 function pickFavourites() {
   favourites = shuffle(core.state().roster).slice(0, 3).map((p) => p.id);
 }
-pickFavourites();
 
 $('join').addEventListener('click', () => {
   const st = core.publicState();
+  if (!st.roster.length) return say('Add the guest list on the projector first.');
   if (st.phase === 'closed' || st.phase === 'revealed') return say('Voting has closed. Restart the demo to let guests join.');
   const free = shuffle(st.roster.filter((p) => !st.claimed.includes(p.id)));
   const take = Math.min(12, free.length - 4); // always leave a few names for you
   if (take <= 0) return say('The room is full. Pick one of the free names on the phone, or restart the demo.');
+  if (!favourites.length) pickFavourites();
   for (const p of free.slice(0, take)) {
     const r = call('POST', '/api/claim', { voterId: p.id });
     if (r.status === 200) dummies.set(p.id, r.body.token);
@@ -210,27 +211,48 @@ $('join').addEventListener('click', () => {
   say(`${take} dummy guests joined.`);
 });
 
-$('vote').addEventListener('click', () => {
+function castDummyVotes(mode) {
   const st = core.publicState();
-  if (st.phase !== 'open') return say(st.phase === 'waiting' ? 'Open voting on the projector first.' : 'Voting is not open. Use Reopen voting on the projector.');
+  if (!st.roster.length) return say('Add the guest list on the projector first.');
+  if (st.phase !== 'open') return say(st.phase === 'waiting' ? 'Start voting on the projector first.' : 'Voting is not open. Use Reopen on the projector.');
+  const pool = st.contenders ?? st.roster.map((p) => p.id); // in a tie-break only the tied people can be voted for
+  const favs = st.contenders ?? favourites;
+  const pending = [...dummies].filter(([id]) => !st.voted.includes(id));
+  const counts = Object.fromEntries(pool.map((id) => [id, 0]));
   let cast = 0;
-  for (const [voterId, token] of dummies) {
-    if (st.voted.includes(voterId)) continue;
-    const others = st.roster.filter((p) => p.id !== voterId).map((p) => p.id);
-    const fav = favourites.filter((id) => id !== voterId);
-    const r = Math.random(); // most guests back one of three favourites, so the reveal has a clear shape
-    const candidateId = (r < 0.4 ? fav[0] : r < 0.6 ? fav[1] : r < 0.7 ? fav[2] : undefined) ?? others[Math.floor(Math.random() * others.length)];
-    if (call('POST', '/api/vote', { voterId, token, candidateId }).status === 200) cast += 1;
-  }
-  say(cast ? `${cast} dummy votes cast.` : 'Every dummy guest has already voted. Click Dummy guests join to add more.');
-});
+  pending.forEach(([voterId, token], i) => {
+    const options = pool.filter((id) => id !== voterId);
+    let candidateId;
+    if (mode === 'tie') {
+      const duo = favs.slice(0, 2);
+      const left = pending.length - i;
+      const odd = pending.length % 2 === 1 && left === 1; // an odd one out votes elsewhere so the split stays level
+      candidateId = odd ? options.find((id) => !duo.includes(id)) : duo.filter((id) => id !== voterId).sort((a, b) => counts[a] - counts[b])[0];
+    } else {
+      const r = Math.random(); // most guests back one of three favourites, so the reveal has a clear shape
+      candidateId = st.contenders ? undefined : r < 0.4 ? favs[0] : r < 0.6 ? favs[1] : r < 0.7 ? favs[2] : undefined;
+    }
+    if (!options.includes(candidateId)) candidateId = options[Math.floor(Math.random() * options.length)];
+    if (call('POST', '/api/vote', { voterId, token, candidateId }).status === 200) {
+      cast += 1;
+      counts[candidateId] = (counts[candidateId] ?? 0) + 1;
+    }
+  });
+  if (!cast) return say('Every dummy guest has already voted. Click Dummy guests join to add more.');
+  const name = (id) => core.state().roster.find((p) => p.id === id)?.name;
+  say(mode === 'tie' ? `${cast} dummy votes cast, split between ${favs.slice(0, 2).map(name).join(' and ')}. Leave the phone unvoted to keep it tied.` : `${cast} dummy votes cast.`);
+}
+$('vote').addEventListener('click', () => castDummyVotes('spread'));
+$('tie').addEventListener('click', () => castDummyVotes('tie'));
+
+setInterval(() => core.tick(), 1000); // closes the vote when time is up, like the real server does
 
 $('restart').addEventListener('click', () => {
   call('POST', '/api/host/reset', {}, HOST_KEY);
   dummies.clear();
-  pickFavourites();
+  favourites = [];
   say('Demo restarted.');
 });
 
-say(`${core.state().roster.length} dummy names loaded.`);
+say('Start on the projector: add the guest list.');
 </script>

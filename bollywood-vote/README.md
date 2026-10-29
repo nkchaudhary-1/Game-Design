@@ -31,19 +31,42 @@ You can also change the link any time from the host screen: **Settings → Votin
 
 ## Running the night
 
-1. **Before guests arrive:** host screen → move the mouse → **⚙ Settings → Roster**, paste your 20 people, one per line:
-   `Name | Character` (the character is optional). Save. Guests can start scanning and picking their name while still **Opening soon**.
-2. **Awards done:** **Open voting ▶**. The screen shows how many have voted, and whose chip has lit up (never *who they voted for*).
-3. **When everyone's in:** **Close voting ■** → **Reveal winner 🏆**. Drumroll, winner card, confetti, full ranking. A tie shows joint winners.
+1. **Guest list.** Open the host screen. The first screen is **Who's coming?**: type one guest per line (`Name | Character`, the
+   character is optional) and save. You can reopen it later with **Edit names** until voting starts.
+2. **Ready.** The list is on screen. Run your awards. Nothing is shown to guests yet.
+3. **Start voting.** The QR code appears with a **5:00 clock** (change it in Settings). Guests scan, tap their own name, vote.
+   Voting closes by itself when the clock hits zero or everyone has voted. **+1 min** and **Close now** are in the control bar.
+4. **Reveal.** The curtain hangs closed over "Voting closed". Press **Reveal winner**: drumroll, curtain opens, confetti.
 
 The control bar fades out after a few seconds so the projector stays clean; move the mouse to bring it back.
+
+### There is never a tie
+If two or more people finish level at the top, **Reveal winner** doesn't reveal. It starts a **60-second tie-break** instead: phones
+switch to a ballot with only the tied people, the projector shows who's tied and a new clock. If the tie-break is level too, a
+random draw picks one. So there is always exactly one winner (or none, if nobody voted).
 
 ### Rules the app enforces
 * One vote per person. Guests pick **who they are** first, so nobody can vote for themselves or vote twice.
   A name can be claimed by one phone only; if someone picked wrong or switched phones, **Settings → Guests → Release**.
-* Guests can change their vote until voting closes.
+* Guests can change their vote until the clock runs out.
 * Standings stay on the server until you reveal. Turn on **Live standings** in the bar if you'd rather show a running tally.
-* Votes are saved to `data/state.json`, so restarting the server mid-party loses nothing. **Reset everything** (Settings) wipes it.
+* The Node server saves to `data/state.json`, so restarting it mid-party loses nothing. **Reset everything** (Settings) wipes it.
+* Optional: put a `roster.json` (`[{ "name": "Priya", "character": "Geet" }]`) next to `server.js` to pre-fill the guest list.
+
+## Host it on Vercel (a real public link)
+
+Vercel runs functions, not a long-lived server, so this repo ships a second, serverless mode: the same rules (`lib/core.js`),
+state kept in a Redis hash (`lib/redis-store.js`), and phones **poll** every 2 seconds instead of being pushed to.
+Each vote is its own Redis field, so 20 people voting at once can't overwrite each other.
+
+1. **Vercel → Add New → Project → import this GitHub repo.** Set **Root Directory** to `bollywood-vote`. Leave everything else as is.
+2. **Storage → Create → Upstash Redis** (free plan), connect it to the project. This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+3. **Settings → Environment Variables:** add `HOST_KEY` with any long random string. This is the password for the host screen.
+4. **Deploy** (or Redeploy, if you added the variables after the first deploy). The guest list is typed into the host screen and
+   stored in Redis, so there is nothing else to configure.
+
+Then open `https://<your-project>.vercel.app/host?key=<HOST_KEY>` on the projector laptop. The QR points at the same site, so
+guests need no WiFi tricks, just any internet. Until steps 2 and 3 are done the site answers `not_configured`.
 
 ## Click-through demo
 

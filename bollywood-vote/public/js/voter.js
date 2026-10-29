@@ -1,6 +1,6 @@
 // Guest (phone) flow: pick who you are -> vote for the best dressed -> wait for the big screen.
 
-import { h, api, avatar, connect } from './common.js';
+import { h, api, avatar, connect, clock } from './common.js';
 
 const KEY = 'bollywood-vote:v1';
 const app = document.getElementById('app');
@@ -8,6 +8,7 @@ const cta = document.getElementById('cta');
 const ctaInner = document.getElementById('cta-inner');
 const toastEl = document.getElementById('toast');
 const connEl = document.getElementById('conn');
+const countdown = document.getElementById('countdown');
 
 const load = () => {
   try { return JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { return {}; }
@@ -191,7 +192,8 @@ function viewWaiting() {
 }
 
 function viewPick() {
-  const others = state.roster.filter((p) => p.id !== me.voterId);
+  const tieBreak = state.round > 1 && state.contenders;
+  const others = state.roster.filter((p) => p.id !== me.voterId && (!tieBreak || state.contenders.includes(p.id)));
   const btn = h('button', { class: 'btn', disabled: !ui.pick || ui.busy }, ui.pick ? `Vote for ${first(byId(ui.pick))}` : 'Pick someone');
   btn.addEventListener('click', castVote);
   const list = pickList(others, {
@@ -205,7 +207,9 @@ function viewPick() {
   const back = ui.editing && me.candidateId ? h('button', { class: 'btn ghost', onclick: () => { ui.editing = false; ui.pick = null; render(true); } }, 'Keep my current vote') : null;
   setCta(btn, back);
   return [
-    hero(`Hi ${first(byId(me.voterId))}`, ['Who’s ', h('em', {}, 'best dressed'), '?'], 'Pick one. You can change your vote until voting closes.'),
+    tieBreak
+      ? hero('Tie-break', ['It’s a ', h('em', {}, 'tie'), '!'], 'These two finished level. Your vote settles it. You can change it until the clock runs out.')
+      : hero(`Hi ${first(byId(me.voterId))}`, ['Who’s ', h('em', {}, 'best dressed'), '?'], 'Pick one. You can change your vote until voting closes.'),
     list,
   ];
 }
@@ -257,7 +261,7 @@ function render(force = false) {
   const dep = state
     ? JSON.stringify([state.roster, name === 'who' ? state.claimed : null, state.phase === 'revealed' ? state.revealedAt : null])
     : '';
-  const sig = `${name}|${dep}|${me.voterId}|${me.candidateId}|${ui.editing}|${ui.busy}|${state?.epoch}`;
+  const sig = `${name}|${dep}|${me.voterId}|${me.candidateId}|${ui.editing}|${ui.busy}|${state?.epoch}|${state?.round}`;
   if (!force && sig === lastSig) return;
   lastSig = sig;
   const out = view();
@@ -274,3 +278,15 @@ connect(
   (ok) => { connEl.hidden = ok; },
 );
 render(true);
+
+// Countdown strip: server time, so every phone and the projector agree.
+setInterval(() => {
+  const running = state?.phase === 'open' && state.endsAt > 0;
+  countdown.hidden = !running;
+  if (!running) return;
+  const left = state.endsAt - clock.now();
+  const s = Math.max(0, Math.ceil(left / 1000));
+  countdown.firstElementChild.textContent = state.round > 1 ? 'Tie-break closes in' : 'Voting closes in';
+  countdown.querySelector('b').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  countdown.classList.toggle('low', left <= 30000);
+}, 500);

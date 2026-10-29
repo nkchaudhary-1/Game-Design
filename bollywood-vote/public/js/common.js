@@ -43,23 +43,38 @@ export function avatar(person, size) {
   );
 }
 
+/** The server's clock, as seen from this device: clock.now() is "now" in server time, for countdowns that agree on every screen. */
+export const clock = { offset: 0, now: () => Date.now() + clock.offset };
+
 /**
- * Live state: Server-Sent Events with a slow poll as a safety net (venue WiFi is not always kind).
+ * Live state. The Node server pushes over Server-Sent Events (with a slow poll as a safety net); a serverless host
+ * (/api/config says transport "poll") is polled every couple of seconds, pausing while the tab is hidden.
  * onState(state) fires for every change; onConn(true|false) reports link health.
  */
 export function connect(onState, onConn = () => {}) {
   let last = '';
   const push = (state) => {
-    const sig = JSON.stringify(state);
+    if (state.serverNow) clock.offset = state.serverNow - Date.now();
+    const { serverNow, ...rest } = state; // the server's clock changes on every response and must not defeat de-duplication
+    const sig = JSON.stringify(rest);
     if (sig === last) return;
     last = sig;
     onState(state);
   };
   const poll = () => api('/api/state').then((st) => { onConn(true); push(st); }).catch(() => onConn(false));
 
-  const es = new EventSource('/api/stream');
-  es.onmessage = (e) => { onConn(true); push(JSON.parse(e.data)); };
-  es.onerror = () => onConn(false);
-  setInterval(poll, 8000);
   poll();
+  api('/api/config')
+    .catch(() => ({}))
+    .then((cfg) => {
+      if (cfg.transport === 'poll') {
+        setInterval(() => { if (!document.hidden) poll(); }, cfg.pollMs || 2000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+        return;
+      }
+      const es = new EventSource('/api/stream');
+      es.onmessage = (e) => { onConn(true); push(JSON.parse(e.data)); };
+      es.onerror = () => onConn(false);
+      setInterval(poll, 8000);
+    });
 }

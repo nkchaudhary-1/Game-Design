@@ -37,7 +37,16 @@ function lanAddresses() {
   return out.sort((a, b) => rank(a) - rank(b));
 }
 
-export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), hostKey, publicUrl } = {}) {
+/** Optional pre-filled guest list (roster.json: [{ "name", "character" }]). Without it the host types the names in. */
+function seedRoster() {
+  try {
+    return parseRoster(JSON.parse(fs.readFileSync(path.join(ROOT, 'roster.json'), 'utf8')));
+  } catch {
+    return [];
+  }
+}
+
+export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), hostKey, publicUrl, defaultRoster } = {}) {
   const stateFile = path.join(dataDir, 'state.json');
 
   let saved = {};
@@ -58,7 +67,7 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
   };
 
   const core = createCore({
-    roster: parseRoster(JSON.parse(fs.readFileSync(path.join(ROOT, 'roster.json'), 'utf8'))),
+    roster: defaultRoster ?? seedRoster(),
     saved,
     hostKey,
     randomId: () => crypto.randomUUID(),
@@ -76,6 +85,8 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
     for (const res of streams) res.write(': ping\n\n');
   }, 20000);
   heartbeat.unref();
+  const clock = setInterval(core.tick, 1000); // closes the vote the moment time is up, even with nobody polling
+  clock.unref();
 
   // ---------- http helpers ----------
 
@@ -111,7 +122,7 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
 
     if (route === 'GET /api/config') {
       const voteUrls = publicUrl ? [publicUrl] : lanAddresses().map((ip) => `http://${ip}:${port}/`);
-      return json(res, 200, { voteUrls });
+      return json(res, 200, { transport: 'sse', voteUrls });
     }
 
     if (route === 'GET /api/stream') {
@@ -170,6 +181,7 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
     hostKey: core.hostKey,
     close: () => {
       clearInterval(heartbeat);
+      clearInterval(clock);
       for (const res of streams) res.end();
       server.close();
     },

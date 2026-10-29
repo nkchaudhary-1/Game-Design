@@ -21,7 +21,7 @@ const call = async (method, url, body, headers = {}) => {
 const host = (url, body) => call('POST', url, body, { 'X-Host-Key': KEY });
 
 before(async () => {
-  app = createServer({ port: 0, dataDir, hostKey: KEY });
+  app = createServer({ port: 0, dataDir, hostKey: KEY, defaultRoster: parseRoster(Array.from({ length: 20 }, (_, i) => ({ name: `Guest ${i + 1}`, character: '' }))) });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
 });
@@ -79,34 +79,28 @@ test('host endpoints require the key', async () => {
   assert.equal((await call('POST', '/api/host/phase', { phase: 'closed' }, { 'X-Host-Key': 'wrong' })).status, 401);
 });
 
-test('closed phase rejects votes; reveal returns winner and ties', async () => {
+test('closed phase rejects votes; reveal returns the winner', async () => {
   await host('/api/host/phase', { phase: 'closed' });
   const { body: c } = await call('POST', '/api/claim', { voterId: 'p5' });
   assert.equal(c.error, 'closed');
 
   await host('/api/host/phase', { phase: 'revealed' });
-  let st = (await call('GET', '/api/state')).body;
+  const st = (await call('GET', '/api/state')).body;
   assert.deepEqual(st.winners, ['p4']);
   assert.equal(st.tallies.p4, 1);
-
-  // add a second equal vote for p3 -> tie
-  await host('/api/host/phase', { phase: 'open' });
-  const { body: p6 } = await call('POST', '/api/claim', { voterId: 'p6' });
-  await call('POST', '/api/vote', { voterId: 'p6', token: p6.token, candidateId: 'p3' });
-  await host('/api/host/phase', { phase: 'revealed' });
-  st = (await call('GET', '/api/state')).body;
-  assert.deepEqual(st.winners.sort(), ['p3', 'p4']);
 });
 
 test('release frees a name and drops its vote; unclaim is blocked after voting', async () => {
+  await host('/api/host/phase', { phase: 'open' });
+  const { body: p6 } = await call('POST', '/api/claim', { voterId: 'p6' });
+  await call('POST', '/api/vote', { voterId: 'p6', token: p6.token, candidateId: 'p3' });
   const before = (await call('GET', '/api/state')).body;
-  assert.ok(before.claimed.includes('p6'));
+  assert.ok(before.claimed.includes('p6') && before.voted.includes('p6'));
   assert.equal((await host('/api/host/release', { voterId: 'p6' })).status, 200);
   const after = (await call('GET', '/api/state')).body;
   assert.ok(!after.claimed.includes('p6'));
   assert.ok(!after.voted.includes('p6'));
 
-  await host('/api/host/phase', { phase: 'open' });
   const { body: p7 } = await call('POST', '/api/claim', { voterId: 'p7' });
   assert.equal((await call('POST', '/api/unclaim', { voterId: 'p7', token: p7.token })).status, 200, 'unclaim before voting');
   const { body: p8 } = await call('POST', '/api/claim', { voterId: 'p8' });

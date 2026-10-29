@@ -66,7 +66,6 @@ const embed = (value) => JSON.stringify(value).replace(/<\/script/gi, '<\\/scrip
 
 const content = read('demo/shell.html')
   .replace('/*__CORE__*/', () => plain(read('lib/core.js')))
-  .replace('/*__ROSTER__*/ []', () => embed(JSON.parse(read('roster.json'))))
   .replace('/*__DOCS__*/ {}', () => embed(docs));
 
 const out = path.join(ROOT, 'demo/dist');
