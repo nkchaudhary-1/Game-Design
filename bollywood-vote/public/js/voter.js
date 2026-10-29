@@ -246,7 +246,7 @@ function viewLoading() {
 
 function currentView() {
   if (!state) return ['loading', viewLoading];
-  if (state.roster.length === 0) return ['empty', () => message('🎬', 'Nothing to vote on yet', 'The host is still setting up.')];
+  if (state.roster.length === 0) return ['empty', () => message('🎬', 'Nothing to vote on yet', 'The host is still setting up.', h('a', { class: 'link-btn', href: '/host' }, 'I’m the host →'))];
   if (state.phase === 'revealed') return ['revealed', viewRevealed];
   if (state.phase === 'closed') return ['closed', viewClosed];
   if (!me.voterId) return ['who', viewWho];

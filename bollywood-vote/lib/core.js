@@ -26,7 +26,7 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
     hostKey: hostKey || randomId().slice(0, 6),
     epoch: 1,
     phase: 'waiting',
-    showLive: false,
+    showLive: true, // the projector shows who is winning while votes come in; the host can hide it for suspense
     revealedAt: 0,
     endsAt: 0, // ms timestamp when the open vote closes by itself; 0 when no vote is running
     round: 1, // 1 = the main vote, 2 = the tie-break runoff

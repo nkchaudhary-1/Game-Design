@@ -6,6 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { exec } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createCore, parseRoster } from './lib/core.js';
@@ -46,7 +47,7 @@ function seedRoster() {
   }
 }
 
-export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), hostKey, publicUrl, defaultRoster } = {}) {
+export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), hostKey, publicUrl, defaultRoster, trustLocal = false } = {}) {
   const stateFile = path.join(dataDir, 'state.json');
 
   let saved = {};
@@ -115,6 +116,19 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
       req.on('error', reject);
     });
 
+  // ---------- who is the host ----------
+
+  /**
+   * Run on one laptop, the machine itself is the host and everyone else (phones on the WiFi) is a guest, so there is no
+   * password to type. A tunnel or reverse proxy also connects from this machine, so any proxy header turns this off.
+   */
+  function isHostMachine(req) {
+    if (!trustLocal) return false;
+    if (['x-forwarded-for', 'forwarded', 'x-real-ip', 'cf-connecting-ip'].some((h) => req.headers[h])) return false;
+    const addr = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+    return addr === '127.0.0.1' || addr === '::1' || lanAddresses().includes(addr);
+  }
+
   // ---------- API ----------
 
   async function api(req, res, url) {
@@ -143,7 +157,7 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
       path: url.pathname,
       query: Object.fromEntries(url.searchParams),
       body: req.method === 'POST' ? await readBody(req) : {},
-      hostKey: req.headers['x-host-key'],
+      hostKey: isHostMachine(req) ? core.hostKey() : req.headers['x-host-key'],
     });
     json(res, out.status, out.body);
   }
@@ -190,17 +204,29 @@ export function createServer({ port = 3000, dataDir = path.join(ROOT, 'data'), h
 
 // ---------- run ----------
 
+function openBrowser(url) {
+  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
+  exec(`${cmd} "${url}"`, () => {}); // best effort: the link is printed too
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT) || 3000;
   const publicUrl = process.env.PUBLIC_URL ? process.env.PUBLIC_URL.replace(/\/?$/, '/') : undefined;
-  const app = createServer({ port, publicUrl, hostKey: process.env.HOST_KEY, dataDir: process.env.DATA_DIR });
+  // Behind a public tunnel the "local" shortcut is off and the host link carries a key instead.
+  const app = createServer({ port, publicUrl, hostKey: process.env.HOST_KEY, dataDir: process.env.DATA_DIR, trustLocal: !publicUrl });
+  app.server.on('error', (err) => {
+    console.error(err.code === 'EADDRINUSE' ? `\n  Port ${port} is already in use. Close the other copy, or run with PORT=3001.\n` : err);
+    process.exit(1);
+  });
   app.server.listen(port, '0.0.0.0', () => {
     const guests = publicUrl ? [publicUrl] : lanAddresses().map((ip) => `http://${ip}:${port}/`);
+    const hostUrl = publicUrl ? `http://localhost:${port}/host?key=${app.hostKey()}` : `http://localhost:${port}/host`;
     console.log('\n  Bollywood Night — Best Dressed voting\n');
-    console.log(`  Host screen (open on the projector laptop):`);
-    console.log(`    http://localhost:${port}/host?key=${app.hostKey()}\n`);
-    console.log(`  Guests scan the QR on that screen, which points to:`);
-    for (const u of guests.length ? guests : [`http://localhost:${port}/  (no WiFi/LAN address found)`]) console.log(`    ${u}`);
-    console.log('');
+    console.log('  1. Host screen (this laptop, shared on the projector):');
+    console.log(`       ${hostUrl}\n`);
+    console.log('  2. Guests scan the QR code on that screen. It points to:');
+    for (const u of guests.length ? guests : [`http://localhost:${port}/  (no WiFi address found: connect to WiFi first)`]) console.log(`       ${u}`);
+    console.log('\n  Phones must be on the same WiFi as this laptop. Press Ctrl+C here to stop.\n');
+    if (process.argv.includes('--open')) openBrowser(hostUrl);
   });
 }

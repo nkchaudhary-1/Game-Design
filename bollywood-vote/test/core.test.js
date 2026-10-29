@@ -73,7 +73,10 @@ test('a tie goes to a 60s runoff among the tied people, and never reaches the re
   assert.deepEqual(st.tie, { ids: ['p1', 'p2'], votes: 3 });
   assert.equal(st.endsAt - st.serverNow, 60_000);
   assert.deepEqual(st.voted, [], 'first-round ballots are cleared');
-  assert.equal(st.tallies, null, 'standings stay hidden');
+  assert.ok(Object.values(st.tallies).every((n) => n === 0), 'live standings start from zero in the runoff');
+  g.host('/api/host/live', { showLive: false });
+  assert.equal(g.state().tallies, null, 'the host can hide standings for suspense');
+  g.host('/api/host/live', { showLive: true });
   assert.equal(st.winners, null);
   assert.ok(st.claimed.length === 6, 'phones keep their identity');
 

@@ -61,17 +61,18 @@ test('voting only works while open, with a valid token, never for yourself', asy
   assert.equal(st.voted.filter((id) => id === 'p2').length, 1, 'one vote per person');
 });
 
-test('standings stay hidden until revealed or live standings is on', async () => {
+test('live standings are on by default, and the host can hide them until the reveal', async () => {
   let st = (await call('GET', '/api/state')).body;
-  assert.equal(st.tallies, null);
-  assert.equal(st.winners, null);
+  assert.equal(st.showLive, true);
+  assert.equal(st.tallies.p4, 1);
   assert.ok(!JSON.stringify(st).includes('"candidateId"'), 'no per-person ballots in public state');
 
-  await host('/api/host/live', { showLive: true });
-  st = (await call('GET', '/api/state')).body;
-  assert.equal(st.tallies.p4, 1);
   await host('/api/host/live', { showLive: false });
-  assert.equal((await call('GET', '/api/state')).body.tallies, null);
+  st = (await call('GET', '/api/state')).body;
+  assert.equal(st.tallies, null);
+  assert.equal(st.winners, null);
+  await host('/api/host/live', { showLive: true });
+  assert.equal((await call('GET', '/api/state')).body.tallies.p4, 1);
 });
 
 test('host endpoints require the key', async () => {
@@ -147,4 +148,16 @@ test('static pages are served and path traversal is refused', async () => {
     });
   });
   assert.notEqual(raw, 200);
+});
+
+test('on the host laptop no password is needed, but anything arriving through a proxy still is', async () => {
+  const local = createServer({ port: 0, dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'bv-local-')), trustLocal: true, defaultRoster: [] });
+  await new Promise((r) => local.server.listen(0, '127.0.0.1', r));
+  const b = `http://127.0.0.1:${local.server.address().port}`;
+  const post = (headers = {}) => fetch(`${b}/api/host/roster`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ text: 'Ria\nSam' }) });
+
+  assert.equal((await post()).status, 200, 'this machine is the host');
+  assert.equal((await post({ 'X-Forwarded-For': '203.0.113.9' })).status, 401, 'a tunnel makes every request look local, so it is not trusted');
+  assert.equal((await fetch(`${b}/api/host/ping`, { headers: { 'X-Forwarded-For': '203.0.113.9' } })).status, 401);
+  local.close();
 });

@@ -27,11 +27,16 @@ try {
 } catch { /* sessionStorage blocked: the key in the URL still works for this load */ }
 
 let canControl = false;
-if (hostKey) {
-  api('/api/host/ping', { hostKey })
-    .then(() => { canControl = true; if (state) { mountOrUpdate(); renderBar(); } })
-    .catch(() => {});
+let checked = false; // until the server has said whether this screen is the host, show nothing rather than flash the wrong thing
+
+/** Asks the server whether this screen is the host. Locally the laptop itself always is; hosted, it needs ?key=. */
+function checkHost() {
+  return api('/api/host/ping', { hostKey })
+    .then(() => { canControl = true; })
+    .catch(() => { canControl = false; })
+    .finally(() => { checked = true; if (state) { renderPill(); mountOrUpdate(); renderBar(); } });
 }
+checkHost();
 
 let voteUrls = [];
 const URL_KEY = 'bv:voteUrl';
@@ -78,7 +83,7 @@ function applyState(s) {
   renderBar();
   updateGuests();
 }
-connect(applyState);
+connect(applyState, undefined, { pollMs: 1000 }); // the projector polls faster so the leaderboard feels live
 const refresh = () => api('/api/state').then(applyState).catch(() => {});
 
 function renderPill() {
@@ -94,6 +99,7 @@ function renderPill() {
 
 /** Identity of the view the current state calls for; a change means rebuild, otherwise update in place. */
 function viewKey() {
+  if (!checked) return 'checking';
   const base = `${state.epoch}|${state.roster.map((p) => p.id + p.name).join()}`;
   switch (state.phase) {
     case 'waiting':
@@ -105,6 +111,7 @@ function viewKey() {
 }
 
 function build() {
+  if (!checked) return { key: viewKey(), el: h('div'), update() {} };
   switch (state.phase) {
     case 'waiting': return state.roster.length === 0 || editing ? setupView() : readyView();
     case 'open': return voteView();
@@ -131,13 +138,31 @@ function remountVote() {
   if (state && view?.key.startsWith('vote')) mount();
 }
 
+// ---------- 0. unavailable ----------
+
+/** Shown when the first state request fails: a fresh deploy that isn't connected yet, or no connection. */
+function showUnavailable(e) {
+  const card = e.code === 'not_configured'
+    ? h('div', { class: 'signin' },
+        h('div', { class: 'kicker' }, 'Almost there'),
+        h('h2', { class: 'display' }, 'Finish ', h('em', {}, 'setup')),
+        h('p', { class: 'muted' }, 'The site is running but not connected to a database yet. In your Vercel project:'),
+        h('ol', { class: 'muted' },
+          h('li', {}, 'Storage → create an ', h('b', {}, 'Upstash Redis'), ' database and connect it to the project.'),
+          h('li', {}, 'Deployments → ', h('b', {}, 'Redeploy'), '.')))
+    : h('div', { class: 'signin' }, h('h2', { class: 'display' }, 'Can’t reach the server'), h('p', { class: 'muted' }, 'Retrying…'));
+  main.replaceChildren(h('div', { class: 'signin-wrap' }, card));
+  pill.querySelector('span').textContent = e.code === 'not_configured' ? 'Not set up' : 'Offline';
+}
+api('/api/state').catch((e) => { if (!state) showUnavailable(e); });
+
 // ---------- 1. names ----------
 
 const countNames = (text) => text.split(/\r?\n/).filter((l) => l.split('|')[0].trim()).length;
 
 function setupView() {
   if (!canControl) {
-    return { key: viewKey(), el: h('div', { class: 'closed-card' }, h('div', { class: 'big' }, 'Getting ', h('em', {}, 'ready'), '…'), h('p', { class: 'muted' }, 'The host is adding the guest list.')), update() {} };
+    return { key: viewKey(), el: h('div', { class: 'signin-wrap' }, h('div', { class: 'signin' }, h('h2', { class: 'display' }, 'Getting ', h('em', {}, 'ready'), '…'), h('p', { class: 'muted' }, 'The host is adding the guest list.'))), update() {} };
   }
   const existing = state.roster.map((p) => (p.character ? `${p.name} | ${p.character}` : p.name)).join('\n');
   const ta = h('textarea', { id: 'names', spellcheck: 'false', 'aria-label': 'Guest names', placeholder: 'Priya\nRahul | Raj from DDLJ\nSneha | Geet' }, existing);
@@ -229,12 +254,15 @@ function voteView() {
   const of = h('span', { class: 'of' }, '');
   const meter = h('b');
   const chips = h('div', { class: 'chips' }, state.roster.map(chip));
-  const live = h('div', { class: 'live' });
+  // One row per guest, kept for the whole vote: updates reorder and resize them instead of rebuilding, so bars glide.
+  const liveRows = new Map(state.roster.map((p) => [p.id, barRow(0, p, 0, 0, false)]));
+  const liveEmpty = h('div', { class: 'live-empty' }, 'Waiting for the first vote…');
+  const live = h('div', { class: 'live' }, h('h3', { class: 'kicker' }, 'Who’s winning'), liveEmpty, ...liveRows.values());
   const warn = h('div', { class: 'notice', hidden: true }, '');
   const versus = runoff
     ? h('div', { class: 'versus' }, (state.contenders ?? []).flatMap((id, i) => {
         const p = byId(id);
-        const card = h('div', { class: 'vs-card' }, avatar(p), h('div', { class: 'vs-name' }, p.name), p.character && h('div', { class: 'vs-char' }, p.character));
+        const card = h('div', { class: 'vs-card', 'data-id': p.id }, avatar(p), h('div', { class: 'vs-name' }, p.name), p.character && h('div', { class: 'vs-char' }, p.character), h('div', { class: 'vs-count' }, '0'));
         return i ? [h('div', { class: 'vs-sep' }, 'vs'), card] : [card];
       }))
     : null;
@@ -276,9 +304,21 @@ function voteView() {
       prev = on;
       firstPaint = false;
       if (liveOn && s.tallies) {
-        const rows = s.roster.map((p) => [p, s.tallies[p.id] ?? 0]).sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name)).slice(0, 6);
-        const max = rows[0]?.[1] ?? 0;
-        live.replaceChildren(h('h3', { class: 'kicker' }, 'Live standings'), ...rows.map(([p, n], i) => barRow(i + 1, p, n, max, false)));
+        const ranked = s.roster.map((p) => [p, s.tallies[p.id] ?? 0]).sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name));
+        const max = ranked[0]?.[1] ?? 0;
+        liveEmpty.hidden = max > 0;
+        ranked.forEach(([p, n], i) => {
+          const row = liveRows.get(p.id);
+          row.style.order = i + 1;
+          row.hidden = n === 0 || i >= 6; // the top six with at least one vote
+          row.classList.toggle('win', i === 0 && n > 0);
+          row.querySelector('.rank').textContent = i + 1;
+          row.querySelector('.ct').textContent = n;
+          row.querySelector('.track b').style.width = `${max ? (n / max) * 100 : 0}%`;
+        });
+      }
+      if (runoff && s.tallies) {
+        for (const c of el.querySelectorAll('.vs-card')) c.querySelector('.vs-count').textContent = s.tallies[c.dataset.id] ?? 0;
       }
       const local = /^https?:\/\/(localhost|127\.|\[::1\])/.test(voteUrl());
       warn.hidden = !local;

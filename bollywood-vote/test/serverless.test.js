@@ -120,7 +120,7 @@ test('full flow through the store: claim, vote, close, reveal', async () => {
   const st = (await call(other, 'GET', '/api/state')).body;
   assert.equal(st.phase, 'open');
   assert.deepEqual(st.voted, ['p1']);
-  assert.equal(st.tallies, null, 'standings stay hidden');
+  assert.deepEqual([st.showLive, st.tallies.p2], [true, 1], 'live standings are on by default');
 
   await host(other, '/api/host/phase', { phase: 'revealed' });
   const done = (await call(a, 'GET', '/api/state')).body;
@@ -170,12 +170,17 @@ test('reset and roster edits clear votes and claims in the store', async () => {
   assert.deepEqual((await call(api(), 'GET', '/api/state')).body.roster.map((p) => p.name), ['Ria', 'Sam']);
 });
 
-test('host calls need the key; missing config is a clear error', async () => {
+test('host calls need the key when one is set; without one the link is open; no database is a clear error', async () => {
   assert.equal((await call(api(), 'POST', '/api/host/reset', {}, 'wrong')).status, 401);
-  const bad = await call(api({ hostKey: undefined }), 'GET', '/api/state');
+  assert.equal((await call(api(), 'POST', '/api/host/reset', {})).status, 401, 'no key at all');
+
+  const open = api({ hostKey: undefined });
+  assert.equal((await call(open, 'POST', '/api/host/reset', {})).status, 200, 'no HOST_KEY: anyone with the link can host');
+  assert.equal((await call(open, 'GET', '/api/state')).status, 200);
+
+  const bad = await call(api({ store: null }), 'GET', '/api/state');
   assert.equal(bad.status, 500);
   assert.equal(bad.body.error, 'not_configured');
-  assert.equal((await call(api({ store: null }), 'GET', '/api/state')).body.error, 'not_configured');
 });
 
 test('the Vercel entry file serves requests end to end', async () => {

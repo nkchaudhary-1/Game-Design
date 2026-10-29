@@ -51,7 +51,7 @@ export const clock = { offset: 0, now: () => Date.now() + clock.offset };
  * (/api/config says transport "poll") is polled every couple of seconds, pausing while the tab is hidden.
  * onState(state) fires for every change; onConn(true|false) reports link health.
  */
-export function connect(onState, onConn = () => {}) {
+export function connect(onState, onConn = () => {}, { pollMs } = {}) {
   let last = '';
   const push = (state) => {
     if (state.serverNow) clock.offset = state.serverNow - Date.now();
@@ -68,7 +68,7 @@ export function connect(onState, onConn = () => {}) {
     .catch(() => ({}))
     .then((cfg) => {
       if (cfg.transport === 'poll') {
-        setInterval(() => { if (!document.hidden) poll(); }, cfg.pollMs || 2000);
+        setInterval(() => { if (!document.hidden) poll(); }, pollMs || cfg.pollMs || 2000);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
         return;
       }

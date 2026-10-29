@@ -15,17 +15,19 @@ export function createApi({ store, defaultRoster, hostKey, randomId, now = Date.
   }
 
   return async function dispatch(req) {
-    if (!store || !hostKey) {
-      return { status: 500, body: { error: 'not_configured', detail: 'Set HOST_KEY and connect a Redis database (see README).' } };
+    if (!store) {
+      return { status: 500, body: { error: 'not_configured', detail: 'Connect a Redis database (see README).' } };
     }
     if (req.method === 'GET' && req.path === '/api/config') {
       return { status: 200, body: { transport: 'poll', pollMs, voteUrls: [] } };
     }
 
     const readOnly = req.method === 'GET';
-    const core = createCore({ roster: defaultRoster, saved: fromFields(await load(readOnly)), hostKey, randomId, now, random });
+    // Without a HOST_KEY every visitor of /host is the host: fine for a one-off link you only share with the room.
+    const key = hostKey || 'open';
+    const core = createCore({ roster: defaultRoster, saved: fromFields(await load(readOnly)), hostKey: key, randomId, now, random });
     const before = structuredClone(core.state());
-    const out = core.handle(req);
+    const out = core.handle(hostKey ? req : { ...req, hostKey: key });
 
     // Even a read can change state: the first request after the deadline closes the vote.
     const ops = diff(before, core.state());
