@@ -8,8 +8,5 @@
     "dev": "node tools/dev-server.mjs",
     "test": "node --test test/*.test.js",
     "build:demo": "node tools/build-demo.mjs"
-  },
-  "engines": {
-    "node": ">=18"
   }
 }
