@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Yatra+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Rozha+One&display=swap">
 <style>
   /* Layout: a quiet workbench. The two real screens (projector + phone) are the content; the chrome around them stays out of the way. */
   :root {
@@ -11,11 +11,11 @@
     --ink: #26142f;
     --muted: #675573;
     --line: #d9d0e3;
-    --gold: #f6c453;
+    --gold: #f7be4a;
     --gold-ink: #2a1100;
     --bezel: #0b0511;
-    --font-display: 'Yatra One', Georgia, 'Times New Roman', serif;
-    --font-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Rozha One', Georgia, 'Times New Roman', serif;
+    --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -189,9 +189,18 @@ const say = (msg) => { $('status').textContent = msg; };
 const call = (method, path, body) => core.handle({ method, path, body });
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 let favourites = [];
+let seenEpoch = core.publicState().epoch;
+/** A new award night (or a changed guest list) makes every old dummy token invalid: forget them. */
+function syncRound(st) {
+  if (st.epoch === seenEpoch) return;
+  seenEpoch = st.epoch;
+  dummies.clear();
+  favourites = [];
+}
 
 $('join').addEventListener('click', () => {
   const st = core.publicState();
+  syncRound(st);
   if (st.roster.length < 2) return say('Save the guest list on the host screen first.');
   if (st.phase === 'closed' || st.phase === 'revealed') return say('Voting has closed. Start a new award night to let guests join.');
   const free = shuffle(st.roster.filter((p) => !st.claimed.includes(p.id)));
@@ -207,19 +216,21 @@ $('join').addEventListener('click', () => {
 
 function castDummyVotes(mode) {
   const st = core.publicState();
+  syncRound(st);
   if (st.roster.length < 2) return say('Save the guest list on the host screen first.');
   if (st.phase !== 'open') return say(st.phase === 'waiting' ? 'Start voting on the host screen first.' : 'Voting is not open right now.');
   if (!dummies.size) return say('Click Dummy guests join first.');
   const pool = st.contenders ?? st.roster.map((p) => p.id); // in a tie-break only the tied people can be voted for
   const favs = st.contenders ?? favourites;
-  const pending = [...dummies].filter(([id]) => !st.voted.includes(id));
+  const duo = favs.slice(0, 2);
+  // The two front-runners can only vote for each other, so their votes go first; the rest then even out the split.
+  const pending = [...dummies].filter(([id]) => st.claimed.includes(id) && !st.voted.includes(id)).sort((a, b) => Number(duo.includes(b[0])) - Number(duo.includes(a[0])));
   const counts = Object.fromEntries(pool.map((id) => [id, 0]));
   let cast = 0;
   pending.forEach(([voterId, token], i) => {
     const options = pool.filter((id) => id !== voterId);
     let candidateId;
     if (mode === 'tie') {
-      const duo = favs.slice(0, 2);
       const odd = pending.length % 2 === 1 && pending.length - i === 1; // an odd one out votes elsewhere so the split stays level
       candidateId = odd ? options.find((id) => !duo.includes(id)) : duo.filter((id) => id !== voterId).sort((a, b) => counts[a] - counts[b])[0];
     } else {

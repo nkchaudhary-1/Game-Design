@@ -58,6 +58,16 @@ Guests first tap **their own name**. A name can be picked on one phone only, and
 That also stops people voting for themselves. It is client-side, so it is honest-system protection: if someone picks the wrong
 name or switches phones, open **Options → Release** on the host screen.
 
+## Look and backdrop
+
+Fonts are Rozha One (titles, numbers, winner names) and Plus Jakarta Sans (everything else), loaded from Google Fonts. The palette
+is midnight plum with marigold gold, rani pink and a velvet-maroon curtain.
+
+**Stage backdrop (optional).** Save a 16:9 picture (about 1920 x 1080) as `public/img/backdrop.jpg` (`.png` or `.webp` also work).
+When it is there, the whole site uses it behind a dark veil: the host screen puts its toolbar under the picture's title sign and keeps
+the panels between the side curtains, and phones show the stage-floor area. Without it the site shows a plain stage glow.
+Details in `public/img/README.md`.
+
 ## Develop
 
 ```bash

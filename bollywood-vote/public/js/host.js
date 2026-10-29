@@ -435,9 +435,10 @@ function resultContent() {
   const rows = standings().filter(([, n]) => n > 0).slice(0, tie ? 4 : 8);
   const max = rows[0]?.[1] ?? 0;
   const wonTieBreak = state.round > 1 && !tie;
+  const ranked = rows.length > 1; // a ranking of one person only repeats the winner card
   return h(
     'div',
-    { class: `reveal${tie ? ' multi' : ''}` },
+    { class: `reveal${tie ? ' multi' : ranked ? '' : ' solo'}` },
     tie && h('div', { class: 'tie-head' }, 'It’s a tie!', h('span', {}, ` ${winners.length} guests share the top spot with ${max} ${max === 1 ? 'vote' : 'votes'} each.`)),
     h('div', { class: 'winners' }, winners.map((p) =>
       h('div', { class: 'winner' },
@@ -447,7 +448,7 @@ function resultContent() {
         p.character && h('div', { class: 'wchar' }, p.character),
         h('div', { class: 'wvotes' }, `${max} ${max === 1 ? 'vote' : 'votes'}`),
         wonTieBreak && h('div', { class: 'wnote' }, 'Won the tie-break')))),
-    h('div', { class: 'ranking' }, rows.map(([p, n], i) => barRow(i + 1, p, n, max, winners.includes(p)))),
+    ranked && h('div', { class: 'ranking' }, rows.map(([p, n], i) => barRow(i + 1, p, n, max, winners.includes(p)))),
   );
 }
 
