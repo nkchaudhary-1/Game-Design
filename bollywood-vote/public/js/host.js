@@ -1,94 +1,85 @@
-// Host / projector screen. The night in four steps:
-//   1. type the guest names   2. "ready" (awards happen)   3. QR + 5-minute clock   4. curtain reveal
-// Controls fade out when idle so the projector stays clean.
+// Host app. Two pages: (1) Guest details  (2) Best Dressed Award: QR code, countdown, hidden votes, curtain reveal.
+// The host's browser is the server (host-runtime.js), so there is no backend: details and votes live in localStorage here.
 
-import { h, api, avatar, connect, clock } from './common.js';
+import { h, api, avatar, connect, clock, setTransport } from './common.js';
+import { startHostRuntime } from './host-runtime.js';
 
 const main = document.getElementById('main');
 const pill = document.getElementById('pill');
-const bar = document.getElementById('bar');
+const tabsEl = document.getElementById('tabs');
 const drawer = document.getElementById('drawer');
 const canvas = document.getElementById('confetti');
+const banner = document.getElementById('banner');
 
-const SAMPLE_NAMES = [
-  'Aarav | Raj — DDLJ', 'Ananya | Simran — DDLJ', 'Rohan | Gabbar — Sholay', 'Meera | Basanti — Sholay', 'Kabir | Munna Bhai',
-  'Isha | Geet — Jab We Met', 'Vikram | Rancho — 3 Idiots', 'Tara | Piku', 'Dev | Devdas', 'Naina | Naina — Kal Ho Naa Ho',
-  'Arjun | Don', 'Riya | Anjali — Kuch Kuch Hota Hai', 'Sameer | Chulbul Pandey — Dabangg', 'Zoya | Zoya — ZNMD', 'Karan | Rocky — KKHH',
-  'Pooja | Poo — K3G', 'Nikhil | Bhaiyyaji', 'Sana | Mastani — Bajirao Mastani', 'Yash | Veeru — Sholay', 'Diya | Chandni',
-];
+const runtime = globalThis.__BN_HOST_RUNTIME ?? startHostRuntime(); // the click-through demo supplies its own runtime
+setTransport(runtime.transport);
 
-// ---------- host key + vote URL ----------
-
-const params = new URLSearchParams(location.search);
-let hostKey = params.get('key') || globalThis.__BV_HOST_KEY || null; // the global is set by the embedded demo, which has no URL
-try {
-  if (hostKey) sessionStorage.setItem('bv:key', hostKey);
-  else hostKey = sessionStorage.getItem('bv:key');
-} catch { /* sessionStorage blocked: the key in the URL still works for this load */ }
-
-let canControl = false;
-let checked = false; // until the server has said whether this screen is the host, show nothing rather than flash the wrong thing
-
-/** Asks the server whether this screen is the host. Locally the laptop itself always is; hosted, it needs ?key=. */
-function checkHost() {
-  return api('/api/host/ping', { hostKey })
-    .then(() => { canControl = true; })
-    .catch(() => { canControl = false; })
-    .finally(() => { checked = true; if (state) { renderPill(); mountOrUpdate(); renderBar(); } });
-}
-checkHost();
-
-let voteUrls = [];
-const URL_KEY = 'bv:voteUrl';
-const MIN_KEY = 'bv:minutes';
+const MIN_KEY = 'bn:minutes';
 const store = {
   get: (k, d = '') => { try { return localStorage.getItem(k) || d; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
 };
-const isLocal = !location.hostname || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
-function voteUrl() {
-  return store.get(URL_KEY) || (isLocal ? voteUrls[0] : `${location.origin}/`) || `${location.origin}/`;
-}
-api('/api/config').then((c) => { voteUrls = c.voteUrls ?? []; remountVote(); }).catch(() => {});
+const SAMPLE_GUESTS = [
+  ['Aarav', 'Raj — DDLJ'], ['Ananya', 'Simran — DDLJ'], ['Rohan', 'Gabbar — Sholay'], ['Meera', 'Basanti — Sholay'], ['Kabir', 'Munna Bhai'],
+  ['Isha', 'Geet — Jab We Met'], ['Vikram', 'Rancho — 3 Idiots'], ['Tara', 'Piku'], ['Dev', 'Devdas'], ['Naina', 'Naina — Kal Ho Naa Ho'],
+  ['Arjun', 'Don'], ['Riya', 'Anjali — Kuch Kuch Hota Hai'], ['Sameer', 'Chulbul Pandey — Dabangg'], ['Zoya', 'Zoya — ZNMD'], ['Karan', 'Rocky — KKHH'],
+  ['Pooja', 'Poo — K3G'], ['Nikhil', 'Bhaiyyaji'], ['Sana', 'Mastani — Bajirao Mastani'], ['Yash', 'Veeru — Sholay'], ['Diya', 'Chandni'],
+].map(([name, character]) => ({ name, character }));
 
-const voteMinutes = () => Number(store.get(MIN_KEY, '5')) || 5;
-
-// ---------- state ----------
+// ---------- state + pages ----------
 
 let state = null;
-let view = null; // { key, el, update(state), clockEl? } for what is mounted
+let link = runtime.link();
+let view = null; // { key, el, update(state), updateLink(link), clockEl? } for what is mounted
+let page = null; // the page the host chose; null means "decide from the state"
 let prevPhase = null;
 let prevRevealedAt = null;
 let revealRun = 0;
-let editing = false; // the names screen reopened from "Edit names"
+let confettiRun = 0;
 
 const byId = (id) => state.roster.find((p) => p.id === id);
+const rosterSig = () => state.roster.map((p) => `${p.id}${p.name}${p.character}`).join('|');
+const minutesChoice = () => (Number(store.get(MIN_KEY, '5')) === 2 ? 2 : 5);
 const mmss = (ms) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+function currentPage() {
+  const wanted = page ?? (['guests', 'award'].includes(location.hash.slice(1)) ? location.hash.slice(1) : null);
+  const canAward = state.roster.length >= 2;
+  if (wanted === 'guests') return 'guests';
+  if (wanted === 'award' && canAward) return 'award';
+  return canAward && state.phase !== 'waiting' ? 'award' : 'guests'; // a refresh mid-vote lands on the vote
+}
+
+function go(next) {
+  page = next;
+  try { history.replaceState(null, '', `#${next}`); } catch { /* sandboxed frames cannot change the URL */ }
+  mountOrUpdate();
+  renderTabs();
+}
+
 function applyState(s) {
   const first = !state;
   state = s;
   const replay = s.phase === 'revealed' && prevRevealedAt !== null && s.revealedAt !== prevRevealedAt;
-  const toReveal = s.phase === 'revealed' && !first && (s.phase !== prevPhase || replay);
+  const toReveal = s.phase === 'revealed' && !first && (s.phase !== prevPhase || replay) && currentPage() === 'award';
   prevPhase = s.phase;
   prevRevealedAt = s.revealedAt;
-  if (s.phase !== 'waiting') editing = false;
   renderPill();
+  renderTabs();
   if (toReveal) playReveal();
-  else if (s.phase !== 'revealed' || first) mountOrUpdate();
-  renderBar();
+  else if (s.phase !== 'revealed' || first || currentPage() !== 'award') mountOrUpdate();
   updateGuests();
 }
-connect(applyState, undefined, { pollMs: 1000 }); // the projector polls faster so the leaderboard feels live
-const refresh = () => api('/api/state').then(applyState).catch(() => {});
+connect(applyState);
+runtime.onLink((l) => { link = l; view?.updateLink?.(l); });
 
 function renderPill() {
   const label = {
-    waiting: state.roster.length ? 'Ready' : 'Setting up',
+    waiting: state.roster.length >= 2 ? 'Ready' : 'Setting up',
     open: state.round > 1 ? 'Tie-break' : 'Voting open',
     closed: 'Voting closed',
     revealed: 'Results',
@@ -97,23 +88,25 @@ function renderPill() {
   pill.querySelector('span').textContent = label;
 }
 
-/** Identity of the view the current state calls for; a change means rebuild, otherwise update in place. */
+function renderTabs() {
+  const cur = currentPage();
+  const canAward = state.roster.length >= 2;
+  const tab = (id, n, label, disabled) =>
+    h('button', { class: `tab${cur === id ? ' on' : ''}`, type: 'button', 'aria-current': cur === id ? 'page' : null, disabled, onclick: () => go(id) }, h('span', { class: 'tn' }, n), label);
+  tabsEl.replaceChildren(tab('guests', '1', 'Guest details', false), tab('award', '2', 'Best Dressed Award', !canAward));
+}
+
+/** Identity of what the state calls for; a change means rebuild, otherwise update in place. */
 function viewKey() {
-  if (!checked) return 'checking';
-  const base = `${state.epoch}|${state.roster.map((p) => p.id + p.name).join()}`;
-  switch (state.phase) {
-    case 'waiting':
-      return state.roster.length === 0 || editing ? `setup|${state.epoch}|${canControl}|${editing}` : `ready|${base}|${canControl}`;
-    case 'open': return `vote|${base}|${state.round}|${state.showLive && state.round === 1}`;
-    case 'closed': return `closed|${base}`;
-    default: return `revealed|${state.epoch}|${state.revealedAt}`;
-  }
+  if (currentPage() === 'guests') return state.phase === 'waiting' ? 'guests|edit' : `guests|locked|${rosterSig()}`;
+  const base = `award|${state.phase}|${state.epoch}|${state.round}|${rosterSig()}`;
+  return state.phase === 'revealed' ? `${base}|${state.revealedAt}` : base;
 }
 
 function build() {
-  if (!checked) return { key: viewKey(), el: h('div'), update() {} };
+  if (currentPage() === 'guests') return state.phase === 'waiting' ? guestsView() : lockedGuestsView();
   switch (state.phase) {
-    case 'waiting': return state.roster.length === 0 || editing ? setupView() : readyView();
+    case 'waiting': return lobbyView();
     case 'open': return voteView();
     case 'closed': return closedView();
     default: return resultView();
@@ -129,97 +122,161 @@ function mount() {
   revealRun += 1; // cancels a drumroll in flight
   confettiRun += 1;
   canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  const first = !view;
   view = build();
   main.replaceChildren(view.el);
   view.update(state);
+  view.updateLink?.(link);
+  if (!first) window.scrollTo(0, 0); // a new page or phase starts at its top, not wherever the last one was scrolled
 }
 
-function remountVote() {
-  if (state && view?.key.startsWith('vote')) mount();
+function note(message, ms = 5000) {
+  banner.textContent = message;
+  banner.hidden = false;
+  clearTimeout(note.timer);
+  note.timer = setTimeout(() => { banner.hidden = true; }, ms);
 }
 
-// ---------- 0. unavailable ----------
-
-/** Shown when the first state request fails: a fresh deploy that isn't connected yet, or no connection. */
-function showUnavailable(e) {
-  const card = e.code === 'not_configured'
-    ? h('div', { class: 'signin' },
-        h('div', { class: 'kicker' }, 'Almost there'),
-        h('h2', { class: 'display' }, 'Finish ', h('em', {}, 'setup')),
-        h('p', { class: 'muted' }, 'The site is running but not connected to a database yet. In your Vercel project:'),
-        h('ol', { class: 'muted' },
-          h('li', {}, 'Storage → create an ', h('b', {}, 'Upstash Redis'), ' database and connect it to the project.'),
-          h('li', {}, 'Deployments → ', h('b', {}, 'Redeploy'), '.')))
-    : h('div', { class: 'signin' }, h('h2', { class: 'display' }, 'Can’t reach the server'), h('p', { class: 'muted' }, 'Retrying…'));
-  main.replaceChildren(h('div', { class: 'signin-wrap' }, card));
-  pill.querySelector('span').textContent = e.code === 'not_configured' ? 'Not set up' : 'Offline';
+/** A button that needs a second tap to confirm (the viewer environment never shows confirm() dialogs). */
+function confirmButton(label, armedLabel, run, cls = 'btn ghost') {
+  const b = h('button', { class: cls, type: 'button' }, label);
+  let armed = false;
+  b.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      b.textContent = armedLabel;
+      setTimeout(() => { armed = false; b.textContent = label; }, 4000);
+      return;
+    }
+    armed = false;
+    b.textContent = label;
+    run();
+  });
+  return b;
 }
-api('/api/state').catch((e) => { if (!state) showUnavailable(e); });
 
-// ---------- 1. names ----------
-
-const countNames = (text) => text.split(/\r?\n/).filter((l) => l.split('|')[0].trim()).length;
-
-function setupView() {
-  if (!canControl) {
-    return { key: viewKey(), el: h('div', { class: 'signin-wrap' }, h('div', { class: 'signin' }, h('h2', { class: 'display' }, 'Getting ', h('em', {}, 'ready'), '…'), h('p', { class: 'muted' }, 'The host is adding the guest list.'))), update() {} };
+const friendly = { locked: 'The guest list is locked once voting starts.', no_tie: 'There is no tie to settle.', need_two: 'Add at least two guests.' };
+async function act(path, body = {}) {
+  sound.unlock();
+  try {
+    await api(path, { method: 'POST', body });
+  } catch (e) {
+    note(friendly[e.code] ?? `That didn’t work (${e.message}).`);
   }
-  const existing = state.roster.map((p) => (p.character ? `${p.name} | ${p.character}` : p.name)).join('\n');
-  const ta = h('textarea', { id: 'names', spellcheck: 'false', 'aria-label': 'Guest names', placeholder: 'Priya\nRahul | Raj from DDLJ\nSneha | Geet' }, existing);
-  const count = h('span', { class: 'count' });
-  const save = h('button', { class: 'btn', type: 'button' }, 'Save guest list ▸');
-  const err = h('p', { class: 'form-error', role: 'alert' });
-  const sync = () => {
-    const n = countNames(ta.value);
-    count.textContent = n === 1 ? '1 guest' : `${n} guests`;
-    save.disabled = n < 2;
-    err.textContent = n < 2 ? 'Add at least two guests.' : '';
+}
+
+// ---------- page 1: guest details ----------
+
+function guestsView() {
+  const saved = state.roster.length >= 2;
+  const rowsEl = h('div', { class: 'guest-rows' });
+  const status = h('p', { class: 'form-status', role: 'status' });
+  const next = h('button', { class: 'btn ghost', type: 'button', onclick: () => go('award') }, 'Go to Best Dressed Award ▸');
+  const save = h('button', { class: 'btn', type: 'button' }, 'Save details');
+
+  const renumber = () => {
+    [...rowsEl.children].forEach((row, i) => {
+      row.querySelector('.idx').textContent = i + 1;
+      row.querySelector('.name-in').setAttribute('aria-label', `Guest ${i + 1} name`);
+      row.querySelector('.char-in').setAttribute('aria-label', `Guest ${i + 1} Bollywood character`);
+      row.querySelector('.del').setAttribute('aria-label', `Remove guest ${i + 1}`);
+    });
   };
-  ta.addEventListener('input', sync);
+  const dirty = () => {
+    status.textContent = 'Unsaved changes';
+    status.className = 'form-status warn';
+    next.disabled = true;
+  };
+  const addRow = (name = '', character = '', focus = false) => {
+    const nameIn = h('input', { class: 'in name-in', type: 'text', placeholder: 'Name', maxlength: '40', value: name, autocomplete: 'off', enterkeyhint: 'next' });
+    const charIn = h('input', { class: 'in char-in', type: 'text', placeholder: 'Bollywood character', maxlength: '60', value: character, autocomplete: 'off' });
+    const del = h('button', { class: 'icon-btn del', type: 'button', onclick: () => { row.remove(); renumber(); dirty(); } }, '✕');
+    const row = h('div', { class: 'guest-row' }, h('span', { class: 'idx' }), nameIn, charIn, del);
+    row.addEventListener('input', dirty);
+    rowsEl.append(row);
+    renumber();
+    if (focus) nameIn.focus();
+  };
+  const collect = () => [...rowsEl.children]
+    .map((row) => ({ name: row.querySelector('.name-in').value.trim(), character: row.querySelector('.char-in').value.trim() }))
+    .filter((g) => g.name || g.character);
+
+  (saved ? state.roster : [{}, {}, {}]).forEach((p) => addRow(p.name, p.character));
+
+  const paste = h('textarea', { class: 'in paste-in', id: 'paste', rows: '5', placeholder: 'Priya | Geet\nRahul | Raj\nSneha | Simran', 'aria-label': 'Paste guests, one per line' });
+  const pasteBox = h('details', { class: 'paste' },
+    h('summary', {}, 'Paste a list instead'),
+    h('p', { class: 'muted' }, 'One guest per line: name, a bar (|), then the character.'),
+    paste,
+    h('button', { class: 'btn ghost small', type: 'button', onclick: () => {
+      for (const line of paste.value.split(/\r?\n/)) {
+        const [name, ...rest] = line.split('|');
+        if (name.trim()) addRow(name.trim(), rest.join('|').trim());
+      }
+      paste.value = '';
+      pasteBox.open = false;
+      dirty();
+    } }, 'Add to the list'));
+
   save.addEventListener('click', async () => {
-    save.disabled = true;
+    const guests = collect();
+    const bad = [...rowsEl.children].findIndex((row) => !row.querySelector('.name-in').value.trim() && row.querySelector('.char-in').value.trim());
+    if (bad >= 0) {
+      status.textContent = `Guest ${bad + 1} has a character but no name.`;
+      status.className = 'form-status err';
+      rowsEl.children[bad].querySelector('.name-in').focus();
+      return;
+    }
+    if (guests.length < 2) {
+      status.textContent = 'Add at least two guests.';
+      status.className = 'form-status err';
+      return;
+    }
+    const unchanged = JSON.stringify(guests.map((g) => [g.name, g.character])) === JSON.stringify(state.roster.map((p) => [p.name, p.character]));
     try {
-      await api('/api/host/roster', { method: 'POST', body: { text: ta.value }, hostKey });
-      editing = false;
-      await refresh();
+      // Re-saving an identical list must not wipe the names guests have already picked on their phones.
+      if (!unchanged) await api('/api/host/roster', { method: 'POST', body: { roster: guests } });
+      status.textContent = `Saved ${guests.length} guests ✓`;
+      status.className = 'form-status ok';
+      next.disabled = false;
+      if (!runtime.canSave()) note('This browser is blocking saved data (private window?). Your details will be lost on refresh.', 12000);
     } catch (e) {
-      err.textContent = e.code === 'locked' ? 'Names are locked once voting has started.' : `Could not save: ${e.message}`;
-      save.disabled = false;
+      status.textContent = friendly[e.code] ?? `Could not save (${e.message}).`;
+      status.className = 'form-status err';
     }
   });
-  const sample = h('button', { class: 'link-btn', type: 'button', onclick: () => { ta.value = SAMPLE_NAMES.join('\n'); sync(); } }, 'Try it with 20 sample names');
-  const cancel = state.roster.length ? h('button', { class: 'btn ghost', type: 'button', onclick: () => { editing = false; mountOrUpdate(); renderBar(); } }, 'Cancel') : null;
 
-  const el = h(
-    'div',
-    { class: 'setup' },
-    h('div', { class: 'setup-copy' },
-      h('div', { class: 'kicker' }, 'Step 1 of 3'),
-      h('h2', { class: 'display' }, 'Who’s ', h('em', {}, 'coming'), '?'),
-      h('p', { class: 'muted' }, 'One guest per line. After a | you can add the character they dressed as, so the ballot reads “Priya · Geet”. Everyone on this list can vote and be voted for.'),
-      sample),
-    h('div', { class: 'setup-form' }, ta, h('div', { class: 'setup-foot' }, count, err), h('div', { class: 'setup-actions' }, cancel, save)),
-  );
-  sync();
-  return { key: viewKey(), el, update() {} };
-}
+  if (saved) { status.textContent = `Saved ${state.roster.length} guests ✓`; status.className = 'form-status ok'; } else next.disabled = true;
 
-// ---------- 2. ready ----------
-
-function readyView() {
-  const start = canControl ? h('button', { class: 'btn big-cta', type: 'button', onclick: () => startVote() }, `Start voting · ${voteMinutes()} min ▶`) : null;
-  const el = h(
-    'div',
-    { class: 'ready' },
-    h('div', { class: 'big' }, h('em', {}, state.roster.length), state.roster.length === 1 ? ' guest' : ' guests', ' on the list'),
-    h('div', { class: 'chips ready-chips' }, state.roster.map((p) => h('div', { class: 'chip on' }, avatar(p), h('span', { class: 'n' }, p.name)))),
-    h('p', { class: 'muted ready-note' }, `When the awards are done, start the vote. The QR code appears and everyone has ${voteMinutes()} minutes.`),
-    start,
+  const el = h('section', { class: 'form-page' },
+    h('div', { class: 'kicker' }, 'Step 1'),
+    h('h2', { class: 'display h2' }, 'Guest ', h('em', {}, 'details')),
+    h('p', { class: 'muted lead' }, 'Who is coming, and which Bollywood character is each one dressed as? Everyone on this list can vote and be voted for.'),
+    h('div', { class: 'guest-head', 'aria-hidden': 'true' }, h('span'), h('span', {}, 'Name'), h('span', {}, 'Character'), h('span')),
+    rowsEl,
+    h('div', { class: 'form-tools' },
+      h('button', { class: 'btn ghost small', type: 'button', onclick: () => { addRow('', '', true); dirty(); } }, '+ Add guest'),
+      h('button', { class: 'link-btn', type: 'button', onclick: () => { rowsEl.replaceChildren(); SAMPLE_GUESTS.forEach((g) => addRow(g.name, g.character)); dirty(); } }, 'Fill with 20 sample guests')),
+    pasteBox,
+    h('div', { class: 'form-actions' }, save, next, status),
   );
   return { key: viewKey(), el, update() {} };
 }
 
-// ---------- 3. vote: QR + clock ----------
+function lockedGuestsView() {
+  const el = h('section', { class: 'form-page' },
+    h('div', { class: 'kicker' }, 'Step 1'),
+    h('h2', { class: 'display h2' }, 'Guest ', h('em', {}, 'details')),
+    h('p', { class: 'muted lead' }, 'Voting has started, so the guest list is locked. To change it, start a new award night: this clears the votes.'),
+    h('div', { class: 'contestants' }, state.roster.map((p) => h('div', { class: 'contestant' }, avatar(p), h('div', { class: 'who' }, h('div', { class: 'cn' }, p.name), h('div', { class: 'cc' }, p.character || ' '))))),
+    h('div', { class: 'form-actions' },
+      h('button', { class: 'btn', type: 'button', onclick: () => go('award') }, 'Back to the award ▸'),
+      confirmButton('Start a new award night', 'Tap again to clear all votes', async () => { await act('/api/host/reset'); go('guests'); })),
+  );
+  return { key: viewKey(), el, update() {} };
+}
+
+// ---------- page 2: Best Dressed Award ----------
 
 function qrSvg(url) {
   const qr = window.qrcode(0, 'M');
@@ -228,8 +285,131 @@ function qrSvg(url) {
   return qr.createSvgTag({ cellSize: 4, margin: 8, scalable: true });
 }
 
+/** The QR code, the short link under it, and whether phones can reach this screen. */
+function qrPanel({ compact = false } = {}) {
+  const box = h('div', { class: 'qr-card', role: 'img' });
+  const urlLine = h('div', { class: 'url' });
+  const chip = h('div', { class: 'link-chip' }, h('i'), h('span'));
+  const el = h('div', { class: `qr-col${compact ? ' compact' : ''}` }, box, h('div', { class: 'scan' }, 'Scan to ', h('em', {}, 'vote')), urlLine, chip);
+  let shown = '';
+  function update(l = link) {
+    const url = runtime.joinUrl();
+    if (url !== shown) {
+      shown = url;
+      box.innerHTML = qrSvg(url); // markup comes from the QR library, built only from our own URL string
+      box.setAttribute('aria-label', `QR code for ${url}`);
+      urlLine.replaceChildren(h('span', {}, url.replace(/^https?:\/\//, '')));
+    }
+    chip.className = `link-chip ${l.state}`;
+    chip.querySelector('span').textContent = l.state === 'ready'
+      ? (l.guests ? `Ready · ${l.guests} ${l.guests === 1 ? 'phone' : 'phones'} connected` : 'Ready · waiting for phones')
+      : (l.detail || 'Connecting…');
+  }
+  update();
+  return { el, update };
+}
+
 function chip(p) {
   return h('div', { class: 'chip', 'data-id': p.id }, avatar(p), h('span', { class: 'n' }, p.name), h('span', { class: 'tick' }, ''));
+}
+
+function lobbyView() {
+  const qr = qrPanel();
+  const seg = h('fieldset', { class: 'seg' },
+    h('legend', {}, 'Voting time'),
+    h('div', { class: 'seg-opts' }, [2, 5].map((m) => h('label', { class: 'seg-opt' },
+      h('input', { type: 'radio', name: 'duration', value: String(m), checked: m === minutesChoice(), onchange: () => store.set(MIN_KEY, String(m)) }),
+      h('span', {}, `${m} minutes`)))));
+  const start = h('button', { class: 'btn big-cta', type: 'button', onclick: () => act('/api/host/phase', { phase: 'open', seconds: minutesChoice() * 60 }) }, 'Start voting ▶');
+  const items = state.roster.map((p) => h('div', { class: 'contestant', 'data-id': p.id }, avatar(p), h('div', { class: 'who' }, h('div', { class: 'cn' }, p.name), h('div', { class: 'cc' }, p.character || ' ')), h('i', { class: 'dot', title: 'On their phone' })));
+  const joined = h('p', { class: 'muted joined-note' });
+
+  const el = h('div', { class: 'stage-main award' },
+    qr.el,
+    h('div', { class: 'board' },
+      h('div', { class: 'kicker' }, 'Step 2'),
+      h('h2', { class: 'display h2' }, 'Best Dressed ', h('em', {}, 'Award')),
+      h('p', { class: 'muted lead' }, 'Guests scan the QR code, tap their name and vote for their favourite. Nobody sees any scores until you reveal the winner.'),
+      h('div', { class: 'start-row' }, seg, start),
+      joined,
+      h('div', { class: 'contestants' }, items)),
+  );
+  return {
+    key: viewKey(),
+    el,
+    updateLink: qr.update,
+    update(s) {
+      let n = 0;
+      for (const c of items) { const on = s.claimed.includes(c.dataset.id); c.classList.toggle('joined', on); n += on ? 1 : 0; }
+      joined.textContent = n ? `${n} of ${s.roster.length} guests have picked their name.` : 'Guests who scan now can pick their name and wait for voting to start.';
+    },
+  };
+}
+
+function voteView() {
+  const runoff = state.round > 1;
+  const qr = qrPanel({ compact: true });
+  const clockEl = h('div', { class: 'clock', role: 'timer' }, '–:––');
+  const chips = h('div', { class: 'chips' }, state.roster.map(chip));
+  const versus = runoff
+    ? h('div', { class: 'versus' }, (state.contenders ?? []).flatMap((id, i) => {
+        const p = byId(id);
+        const card = h('div', { class: 'vs-card' }, avatar(p), h('div', { class: 'vs-name' }, p.name), p.character && h('div', { class: 'vs-char' }, p.character));
+        return i ? [h('div', { class: 'vs-sep' }, 'vs'), card] : [card];
+      }))
+    : null;
+
+  const el = h('div', { class: 'stage-main award' },
+    qr.el,
+    h('div', { class: 'board' },
+      runoff && h('div', { class: 'tie-head' }, 'It’s a tie!', h('span', {}, ' The tied guests go head to head. One more vote settles it.')),
+      h('div', { class: 'clock-row' }, clockEl, h('div', { class: 'clock-label' }, runoff ? 'to settle the tie' : 'left to vote')),
+      h('p', { class: 'secret' }, '🔒 Votes stay secret until you reveal the winner. Names light up when a guest has voted.'),
+      versus ?? chips,
+      h('div', { class: 'vote-actions' }, h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/host/phase', { phase: 'closed' }) }, 'Close voting now'))),
+  );
+  return {
+    key: viewKey(),
+    el,
+    clockEl,
+    updateLink: qr.update,
+    update(s) {
+      const on = new Set(s.voted);
+      for (const c of chips.children) {
+        const isOn = on.has(c.dataset.id);
+        c.classList.toggle('on', isOn);
+        c.querySelector('.tick').textContent = isOn ? '✓' : '';
+      }
+      tickClock();
+    },
+  };
+}
+
+function tickClock() {
+  if (!state || state.phase !== 'open' || !view?.clockEl) return;
+  const left = state.endsAt - clock.now();
+  view.clockEl.textContent = mmss(left);
+  view.clockEl.classList.toggle('low', left <= 30000);
+}
+setInterval(tickClock, 250);
+
+// ---------- the curtain ----------
+
+/** A stage with a closed curtain; `behind` holds what the curtain hides, `caption` what is written on it. */
+function curtainStage({ opened = false } = {}) {
+  const behind = h('div', { class: 'behind' });
+  const caption = h('div', { class: 'curtain-caption' });
+  const el = h('div', { class: `curtain-stage${opened ? ' open instant' : ''}` }, behind, h('div', { class: 'panel left' }), h('div', { class: 'panel right' }), h('div', { class: 'valance' }), caption);
+  return { el, behind, caption, open: () => el.classList.add('open') };
+}
+
+function closedView() {
+  const stage = curtainStage();
+  stage.caption.replaceChildren(
+    h('div', { class: 'cap-line' }, 'Voting ', h('em', {}, 'closed')),
+    h('div', { class: 'cap-sub' }, 'The votes are in and still secret.'),
+    h('button', { class: 'btn big-cta', type: 'button', onclick: () => act('/api/host/phase', { phase: 'revealed' }) }, 'Reveal Winner 🏆'));
+  return { key: viewKey(), el: stage.el, update() {} };
 }
 
 function barRow(rank, p, count, max, win) {
@@ -243,174 +423,76 @@ function barRow(rank, p, count, max, win) {
   );
 }
 
-function voteView() {
-  const url = voteUrl();
-  const runoff = state.round > 1;
-  const liveOn = state.showLive && !runoff;
-  const qrBox = h('div', { class: 'qr-card', role: 'img', 'aria-label': `QR code for ${url}` });
-  qrBox.innerHTML = qrSvg(url); // markup comes from the QR library, built only from our own URL string
-  const clockEl = h('div', { class: 'clock', role: 'timer' }, '–:––');
-  const num = h('span', { class: 'num' }, '0');
-  const of = h('span', { class: 'of' }, '');
-  const meter = h('b');
-  const chips = h('div', { class: 'chips' }, state.roster.map(chip));
-  // One row per guest, kept for the whole vote: updates reorder and resize them instead of rebuilding, so bars glide.
-  const liveRows = new Map(state.roster.map((p) => [p.id, barRow(0, p, 0, 0, false)]));
-  const liveEmpty = h('div', { class: 'live-empty' }, 'Waiting for the first vote…');
-  const live = h('div', { class: 'live' }, h('h3', { class: 'kicker' }, 'Who’s winning'), liveEmpty, ...liveRows.values());
-  const warn = h('div', { class: 'notice', hidden: true }, '');
-  const versus = runoff
-    ? h('div', { class: 'versus' }, (state.contenders ?? []).flatMap((id, i) => {
-        const p = byId(id);
-        const card = h('div', { class: 'vs-card', 'data-id': p.id }, avatar(p), h('div', { class: 'vs-name' }, p.name), p.character && h('div', { class: 'vs-char' }, p.character), h('div', { class: 'vs-count' }, '0'));
-        return i ? [h('div', { class: 'vs-sep' }, 'vs'), card] : [card];
-      }))
-    : null;
-
-  const el = h(
-    'div',
-    { class: 'stage-main' },
-    h('div', { class: 'qr-col' }, qrBox, h('div', { class: 'scan' }, 'Scan & ', h('em', {}, 'vote')), h('div', { class: 'url' }, h('span', {}, url.replace(/^https?:\/\//, '')))),
-    h('div', { class: 'board' },
-      runoff && h('div', { class: 'tie-head' }, 'It’s a tie!', h('span', {}, ` ${state.tie?.votes ?? ''} votes each. One more vote settles it.`)),
-      h('div', { class: 'clock-row' }, clockEl, h('div', { class: 'clock-label' }, runoff ? 'to settle the tie' : 'left to vote')),
-      h('div', { class: 'turnout' }, num, of, h('span', { class: 'label' }, 'have voted')),
-      h('div', { class: 'meter' }, meter),
-      versus ?? (liveOn ? live : chips),
-      warn),
-  );
-
-  let prev = new Set();
-  let firstPaint = true;
-  return {
-    key: viewKey(),
-    el,
-    clockEl,
-    update(s) {
-      const on = new Set(s.voted);
-      num.textContent = on.size;
-      of.textContent = `/ ${s.roster.length}`;
-      meter.style.width = `${s.roster.length ? (on.size / s.roster.length) * 100 : 0}%`;
-      for (const c of chips.children) {
-        const isOn = on.has(c.dataset.id);
-        c.classList.toggle('on', isOn);
-        c.querySelector('.tick').textContent = isOn ? '✓' : '';
-        if (isOn && !firstPaint && !prev.has(c.dataset.id)) {
-          c.classList.remove('pop');
-          void c.offsetWidth; // restart the animation
-          c.classList.add('pop');
-        }
-      }
-      prev = on;
-      firstPaint = false;
-      if (liveOn && s.tallies) {
-        const ranked = s.roster.map((p) => [p, s.tallies[p.id] ?? 0]).sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name));
-        const max = ranked[0]?.[1] ?? 0;
-        liveEmpty.hidden = max > 0;
-        ranked.forEach(([p, n], i) => {
-          const row = liveRows.get(p.id);
-          row.style.order = i + 1;
-          row.hidden = n === 0 || i >= 6; // the top six with at least one vote
-          row.classList.toggle('win', i === 0 && n > 0);
-          row.querySelector('.rank').textContent = i + 1;
-          row.querySelector('.ct').textContent = n;
-          row.querySelector('.track b').style.width = `${max ? (n / max) * 100 : 0}%`;
-        });
-      }
-      if (runoff && s.tallies) {
-        for (const c of el.querySelectorAll('.vs-card')) c.querySelector('.vs-count').textContent = s.tallies[c.dataset.id] ?? 0;
-      }
-      const local = /^https?:\/\/(localhost|127\.|\[::1\])/.test(voteUrl());
-      warn.hidden = !local;
-      warn.textContent = local ? 'No WiFi address found, so phones cannot reach this link. Open Settings and set the voting link.' : '';
-      tickClock();
-    },
-  };
-}
-
-let lastPull = 0;
-function tickClock() {
-  if (!state || state.phase !== 'open' || !view?.clockEl) return;
-  const left = state.endsAt - clock.now();
-  view.clockEl.textContent = mmss(left);
-  view.clockEl.classList.toggle('low', left <= 30000);
-  if (left <= 0 && Date.now() - lastPull > 1000) {
-    lastPull = Date.now();
-    refresh(); // the server closes the vote on the first request after the deadline
-  }
-}
-setInterval(tickClock, 250);
-
-// ---------- 4. curtain ----------
-
-/** A stage with a closed curtain; `behind` holds what the curtain hides. */
-function curtainStage({ opened = false } = {}) {
-  const behind = h('div', { class: 'behind' });
-  const caption = h('div', { class: 'curtain-caption' });
-  const el = h('div', { class: `curtain-stage${opened ? ' open instant' : ''}` }, behind, h('div', { class: 'panel left' }), h('div', { class: 'panel right' }), h('div', { class: 'valance' }), caption);
-  return { el, behind, caption, open: () => el.classList.add('open') };
-}
-
-function closedView() {
-  const stage = curtainStage();
-  const sub = h('div', { class: 'cap-sub' });
-  stage.caption.replaceChildren(h('div', { class: 'cap-line' }, 'Voting ', h('em', {}, 'closed')), h('div', { class: 'cap-sub' }, 'Counting the votes…'), sub);
-  return { key: viewKey(), el: stage.el, update: (s) => { sub.textContent = `${s.voted.length} of ${s.roster.length} votes in`; } };
-}
-
 function standings() {
   const t = state.tallies ?? {};
   return state.roster.map((p) => [p, t[p.id] ?? 0]).sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name));
 }
 
 function resultContent() {
-  const winner = byId((state.winners ?? [])[0]);
-  if (!winner) return h('div', { class: 'empty-note' }, 'No votes were cast.');
-  const rows = standings().filter(([, n]) => n > 0).slice(0, 8);
+  const winners = (state.winners ?? []).map(byId).filter(Boolean);
+  if (!winners.length) return h('div', { class: 'empty-note' }, 'No votes were cast.');
+  const tie = winners.length > 1;
+  const rows = standings().filter(([, n]) => n > 0).slice(0, tie ? 4 : 8);
   const max = rows[0]?.[1] ?? 0;
-  const note = state.tieBreak === 'runoff' ? 'Won the tie-break' : state.tieBreak === 'draw' ? 'Still level after the runoff, so a random draw settled it' : '';
+  const wonTieBreak = state.round > 1 && !tie;
   return h(
     'div',
-    { class: 'reveal' },
-    h('div', { class: 'winners' },
+    { class: `reveal${tie ? ' multi' : ''}` },
+    tie && h('div', { class: 'tie-head' }, 'It’s a tie!', h('span', {}, ` ${winners.length} guests share the top spot with ${max} ${max === 1 ? 'vote' : 'votes'} each.`)),
+    h('div', { class: 'winners' }, winners.map((p) =>
       h('div', { class: 'winner' },
-        h('div', { class: 'ribbon' }, '★ Best dressed ★'),
-        avatar(winner),
-        h('div', { class: 'wname' }, winner.name),
-        winner.character && h('div', { class: 'wchar' }, winner.character),
+        h('div', { class: 'ribbon' }, tie ? '★ Joint winner ★' : '★ Best dressed ★'),
+        avatar(p),
+        h('div', { class: 'wname' }, p.name),
+        p.character && h('div', { class: 'wchar' }, p.character),
         h('div', { class: 'wvotes' }, `${max} ${max === 1 ? 'vote' : 'votes'}`),
-        note && h('div', { class: 'wnote' }, note))),
-    h('div', { class: 'ranking' }, note && h('h3', { class: 'kicker' }, 'Tie-break votes'), rows.map(([p, n], i) => barRow(i + 1, p, n, max, p === winner))),
+        wonTieBreak && h('div', { class: 'wnote' }, 'Won the tie-break')))),
+    h('div', { class: 'ranking' }, rows.map(([p, n], i) => barRow(i + 1, p, n, max, winners.includes(p)))),
   );
 }
 
+function afterActions() {
+  const tie = (state.winners ?? []).length > 1;
+  return h('div', { class: 'after-actions' },
+    h('button', { class: 'btn ghost', type: 'button', onclick: () => act('/api/host/phase', { phase: 'revealed' }) }, 'Replay reveal ↻'),
+    tie && h('button', { class: 'btn', type: 'button', onclick: () => act('/api/host/tiebreak', { seconds: 60 }) }, 'Hold a 60-second tie-break'),
+    confirmButton('New award night', 'Tap again to clear all votes', () => act('/api/host/reset')));
+}
+
+function resultShell({ opened }) {
+  const stage = curtainStage({ opened });
+  const actions = afterActions();
+  actions.hidden = !opened;
+  return { stage, actions, el: h('div', { class: 'result-wrap' }, stage.el, actions) };
+}
+
 function resultView() {
-  const stage = curtainStage({ opened: true });
-  stage.behind.replaceChildren(resultContent());
-  return { key: viewKey(), el: stage.el, update() {} };
+  const shell = resultShell({ opened: true });
+  shell.stage.behind.replaceChildren(resultContent());
+  return { key: viewKey(), el: shell.el, update() {} };
 }
 
 async function playReveal() {
   const run = ++revealRun;
   const stop = () => run !== revealRun;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  bar.classList.add('idle');
   view = null;
 
-  const stage = curtainStage();
-  stage.caption.replaceChildren(h('div', { class: 'cap-line' }, 'And the best dressed is…'));
-  stage.behind.replaceChildren(resultContent()); // already in place behind the curtain
-  main.replaceChildren(stage.el);
+  const shell = resultShell({ opened: false });
+  shell.stage.caption.replaceChildren(h('div', { class: 'cap-line' }, 'And the best dressed is…'));
+  shell.stage.behind.replaceChildren(resultContent()); // already in place behind the curtain
+  main.replaceChildren(shell.el);
 
   sound.drumroll(3.6);
   await wait(3800);
   if (stop()) return;
-  stage.caption.classList.add('gone');
-  stage.open();
+  shell.stage.caption.classList.add('gone');
+  shell.stage.open();
   sound.fanfare();
   await wait(1100);
   if (stop()) return;
-  view = { key: viewKey(), el: stage.el, update() {} };
+  shell.actions.hidden = false;
+  view = { key: viewKey(), el: shell.el, update() {} };
   if (state.winners?.length) confetti();
 }
 
@@ -470,7 +552,6 @@ const sound = (() => {
 
 // ---------- confetti ----------
 
-let confettiRun = 0;
 function confetti() {
   const run = ++confettiRun;
   const ctx2d = canvas.getContext('2d');
@@ -508,81 +589,20 @@ function confetti() {
   })(performance.now());
 }
 
-// ---------- host controls ----------
-
-/** Sends a host command, then pulls fresh state so the screen reacts at once (polling hosts would otherwise lag a couple of seconds). */
-async function act(path, body = {}) {
-  sound.unlock();
-  try {
-    await api(path, { method: 'POST', body, hostKey });
-  } catch (e) {
-    console.error(`${path} failed:`, e.message);
-  }
-  refresh();
-}
-const startVote = () => act('/api/host/phase', { phase: 'open', seconds: voteMinutes() * 60 });
-
-let barSig = '';
-function renderBar() {
-  if (!state || !canControl) return void (bar.hidden = true);
-  const hasNames = state.roster.length > 0;
-  const sig = `${state.phase}|${state.showLive}|${hasNames}|${state.round}|${editing}`;
-  if (sig === barSig) return;
-  barSig = sig;
-  bar.hidden = false;
-  const btn = (label, onclick, cls = 'btn ghost') => h('button', { class: cls, type: 'button', onclick }, label);
-  const settings = btn('⚙ Settings', openDrawer);
-  const live = h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: state.showLive, onchange: (e) => act('/api/host/live', { showLive: e.target.checked }) }), 'Live standings');
-  const reopen = btn('Reopen +1 min', () => act('/api/host/phase', { phase: 'open', seconds: 60 }));
-  const items = {
-    waiting: hasNames && !editing ? [btn('✎ Edit names', () => { editing = true; mountOrUpdate(); renderBar(); }), settings] : [settings],
-    open: [btn('+1 min', () => act('/api/host/extend', { seconds: 60 })), state.round === 1 ? live : null, settings, btn('Close now ■', () => act('/api/host/phase', { phase: 'closed' }), 'btn primary')],
-    closed: [settings, reopen, btn('Reveal winner 🏆', () => act('/api/host/phase', { phase: 'revealed' }), 'btn primary')],
-    revealed: [settings, reopen, btn('Replay reveal ↻', () => act('/api/host/phase', { phase: 'revealed' }), 'btn primary')],
-  }[state.phase];
-  bar.replaceChildren(...items.filter(Boolean));
-}
-
-let idleTimer;
-function wake() {
-  if (drawer.classList.contains('open')) return;
-  bar.classList.remove('idle');
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => bar.classList.add('idle'), 4000);
-}
-for (const ev of ['mousemove', 'pointerdown', 'keydown', 'touchstart']) addEventListener(ev, wake, { passive: true });
-wake();
-
-// ---------- settings drawer ----------
+// ---------- options drawer ----------
 
 let guestsEl = null;
 
 function openDrawer() {
-  bar.classList.add('idle');
-  const urlInput = h('input', { id: 'vote-url', type: 'text', value: voteUrl(), 'aria-label': 'Voting link', spellcheck: 'false' });
-  const choices = voteUrls.length > 1 ? h('select', { 'aria-label': 'Detected addresses', onchange: (e) => { urlInput.value = e.target.value; } }, voteUrls.map((u) => h('option', { value: u }, u))) : null;
-  const saveUrl = h('button', { class: 'btn small', type: 'button', onclick: () => { store.set(URL_KEY, urlInput.value.trim()); remountVote(); } }, 'Update QR');
-
-  const minutes = h('select', { id: 'minutes', 'aria-label': 'Voting time', onchange: (e) => { store.set(MIN_KEY, e.target.value); if (view?.key.startsWith('ready')) mount(); } },
-    [2, 3, 5, 8, 10].map((m) => h('option', { value: m, selected: m === voteMinutes() }, `${m} minutes`)));
-
   guestsEl = h('div');
-  const reset = h('button', { class: 'btn small danger', type: 'button' }, 'Reset everything');
-  let armed = false; // the viewer never shows confirm(), so a second tap confirms
-  reset.addEventListener('click', async () => {
-    if (!armed) { armed = true; reset.textContent = 'Tap again to clear all votes and names'; return; }
-    await act('/api/host/reset');
-    armed = false;
-    reset.textContent = 'Reset everything';
-  });
-
   drawer.replaceChildren(
     h('button', { class: 'btn ghost small', style: 'float:right', type: 'button', onclick: closeDrawer }, 'Close ✕'),
-    h('h2', { class: 'display' }, 'Host settings'),
-    h('section', {}, h('h3', {}, 'Voting time'), minutes, h('p', { class: 'hint' }, 'The clock starts when you press Start voting. Tie-breaks always get 60 seconds.')),
-    h('section', {}, h('h3', {}, 'Voting link (in the QR)'), choices, urlInput, h('p', { class: 'hint' }, isLocal ? 'Phones must be on the same WiFi as this laptop, or use a public link.' : 'Guests need only an internet connection.'), saveUrl),
-    h('section', {}, h('h3', {}, `Guests (${state.roster.length})`), h('p', { class: 'hint' }, 'Name taken by mistake or a phone died? Release the name so they can pick again.'), guestsEl),
-    h('section', {}, h('h3', {}, 'Danger zone'), reset),
+    h('h2', { class: 'display' }, 'Options'),
+    h('section', {}, h('h3', {}, 'Guests on their phones'), h('p', { class: 'hint' }, 'Someone picked the wrong name, or changed phone? Release the name so they can pick again.'), guestsEl),
+    h('section', {}, h('h3', {}, 'Start over'),
+      h('p', { class: 'hint' }, 'Everything is saved in this browser: guest details, votes and the QR code. Closing the tab keeps it; clearing site data erases it.'),
+      confirmButton('New award night (keep guests)', 'Tap again to clear all votes', async () => { await act('/api/host/reset'); closeDrawer(); }, 'btn ghost small'),
+      confirmButton('Erase everything on this device', 'Tap again to erase and reload', () => { runtime.wipe(); location.reload(); }, 'btn small danger')),
   );
   updateGuests();
   drawer.classList.add('open');
@@ -591,8 +611,9 @@ function openDrawer() {
 function closeDrawer() {
   drawer.classList.remove('open');
   guestsEl = null;
-  wake();
 }
+document.getElementById('options').addEventListener('click', () => (drawer.classList.contains('open') ? closeDrawer() : openDrawer()));
+addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
 function updateGuests() {
   if (!guestsEl || !state) return;
@@ -605,9 +626,11 @@ function updateGuests() {
         { class: 'row' },
         avatar(p, 28),
         h('span', {}, p.name),
-        h('span', { class: `st${voted ? ' ok' : ''}` }, voted ? 'voted' : claimed ? 'joined' : '—'),
+        h('span', { class: `st${voted ? ' ok' : ''}` }, voted ? 'voted' : claimed ? 'on phone' : '—'),
         claimed && h('button', { type: 'button', onclick: () => act('/api/host/release', { voterId: p.id }) }, 'Release'),
       );
     }),
   );
 }
+
+if (!runtime.canSave()) note('This browser is blocking saved data (private window?). Guest details will be lost on refresh.', 15000);

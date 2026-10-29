@@ -83,16 +83,16 @@
 
 <div class="wrap">
   <header>
-    <p class="kicker">Interactive demo · dummy names</p>
-    <h1>Best Dressed, live voting</h1>
-    <p class="sub">Both screens below are the real app, running inside this page with 20 made-up guests. Nothing leaves this page, and a refresh starts over.</p>
+    <p class="kicker">Interactive demo · sample guests</p>
+    <h1>Best Dressed, from guest list to winner</h1>
+    <p class="sub">Both screens below are the real app. The host screen is on the left, a guest's phone on the right. Here they talk through this page; on the real site the phones connect straight to the host's browser. Nothing leaves this page, and a refresh starts over.</p>
   </header>
 
   <main class="bench">
-    <section class="col" aria-label="Projector screen">
+    <section class="col" aria-label="Host screen">
       <figure class="frame">
-        <div class="bezel"><div class="fit wide" id="fit-host"><iframe id="host" title="Projector screen"></iframe></div></div>
-        <figcaption>Projector screen. Move the mouse over it to show the host controls.</figcaption>
+        <div class="bezel"><div class="fit wide" id="fit-host"><iframe id="host" title="Host screen"></iframe></div></div>
+        <figcaption>Host screen, shared on the projector. Scroll inside it like a normal page.</figcaption>
       </figure>
     </section>
     <section class="col phone" aria-label="Guest phone">
@@ -107,12 +107,12 @@
     <div>
       <h2>Try it</h2>
       <ol>
-        <li>On the projector, click <b>Try it with 20 sample names</b>, then <b>Save guest list</b>. On the night you type your own.</li>
-        <li>Click <b>Start voting</b>. The QR code and a 5-minute clock appear.</li>
-        <li>On the phone, tap your name, then "I'm …", then vote. You can change your vote until the clock runs out.</li>
-        <li>Click <b>Dummy guests join</b>, then <b>Dummy guests vote</b> to fill the room. Voting closes by itself when time is up or everyone has voted.</li>
-        <li>On the projector, click <b>Reveal winner</b> and watch the curtain.</li>
-        <li>To see a tie-break, restart, then use <b>Make it a tie</b> in place of <b>Dummy guests vote</b>. Leave the phone unvoted, or vote for someone else.</li>
+        <li>On the host screen, click <b>Fill with 20 sample guests</b>, then <b>Save details</b>, then <b>Go to Best Dressed Award</b>.</li>
+        <li>Choose <b>2 minutes</b> or <b>5 minutes</b> and click <b>Start voting</b>. The countdown starts on every screen.</li>
+        <li>On the phone, tap your name, then "I'm …", then vote. Nobody sees a score: the host only sees names light up.</li>
+        <li>Click <b>Dummy guests join</b>, then <b>Dummy guests vote</b> to fill the room.</li>
+        <li>When the clock hits zero (or on <b>Close voting now</b>), voting closes. Click <b>Reveal Winner</b> and watch the curtain.</li>
+        <li>For a tie: <b>New award night</b>, start again, then use <b>Make it a tie</b> in place of Dummy guests vote, leave the phone unvoted, close and reveal. You get joint winners, and an optional tie-break.</li>
       </ol>
     </div>
     <div class="actions">
@@ -129,14 +129,9 @@
 /*__CORE__*/
 
 const DOCS = /*__DOCS__*/ {};
-const HOST_KEY = 'demo';
-const DEMO_URL = 'http://192.168.1.23:3000/';
+const DEMO_URL = 'https://your-site.vercel.app/vote#bn-demo1234'; // the real site shows its own address here
 
-const core = createCore({
-  roster: [], // the host types the names in on the projector, like on the night
-  hostKey: HOST_KEY,
-  randomId: () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(16).slice(2) + Date.now().toString(16)),
-});
+const core = createCore({ roster: [], randomId: () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(16).slice(2) + Date.now().toString(16)) });
 
 const $ = (id) => document.getElementById(id);
 const hostFrame = $('host');
@@ -144,66 +139,65 @@ const voterFrame = $('voter');
 hostFrame.srcdoc = DOCS.host;
 voterFrame.srcdoc = DOCS.voter;
 
-// ---------- in-page "server": the two frames talk to the same core through postMessage ----------
+// ---------- the host's browser, standing in for the phone <-> host link ----------
 
 const subscribers = new Set();
-const reply = (win, id, status, body) => win.postMessage({ bv: 1, type: 'resp', id, status, body }, '*');
+const linkInfo = () => ({ state: 'ready', id: 'bn-demo1234', guests: core.publicState().claimed.length, detail: '' });
+const reply = (win, id, status, body) => win.postMessage({ bn: 1, type: 'resp', id, status, body }, '*');
 
 addEventListener('message', (e) => {
   const d = e.data;
-  if (!d || d.bv !== 1) return;
-  if (e.source !== hostFrame.contentWindow && e.source !== voterFrame.contentWindow) return;
+  if (!d || d.bn !== 1) return;
+  const fromHost = e.source === hostFrame.contentWindow;
+  if (!fromHost && e.source !== voterFrame.contentWindow) return;
   if (d.type === 'sub') {
     subscribers.add(e.source);
-    return reply(e.source, d.id, 200, core.publicState());
+    e.source.postMessage({ bn: 1, type: 'state', state: core.publicState() }, '*');
+    if (fromHost) e.source.postMessage({ bn: 1, type: 'link', link: linkInfo() }, '*');
+    return reply(e.source, d.id, 200, {});
   }
   if (d.type === 'req') {
-    if (d.path === '/api/config') return reply(e.source, d.id, 200, { voteUrls: [DEMO_URL] });
-    const out = core.handle({ method: d.method, path: d.path, query: d.query, body: d.body, hostKey: d.hostKey });
+    // Only the host screen holds the host key; a phone can never use host-only routes.
+    const out = core.handle({ method: d.method, path: d.path, query: d.query, body: d.body, hostKey: fromHost ? core.hostKey() : undefined });
     reply(e.source, d.id, out.status, out.body);
   }
 });
 
 core.subscribe((state) => {
-  const data = JSON.stringify(state);
   for (const win of subscribers) {
-    try { win.postMessage({ bv: 1, type: 'state', data }, '*'); } catch { subscribers.delete(win); }
+    try {
+      win.postMessage({ bn: 1, type: 'state', state }, '*');
+      if (win === hostFrame.contentWindow) win.postMessage({ bn: 1, type: 'link', link: linkInfo() }, '*');
+    } catch { subscribers.delete(win); }
   }
 });
+setInterval(core.tick, 500); // closes the vote when time is up, like the real host does
 
 // ---------- scale the real-size screens to fit their frames ----------
 
 function fit(box, width) {
-  const iframe = box.firstElementChild;
-  const scale = box.clientWidth / width;
-  iframe.style.transform = `scale(${scale})`;
+  box.firstElementChild.style.transform = `scale(${box.clientWidth / width})`;
 }
-const fitHost = () => fit($('fit-host'), 1280);
-const fitVoter = () => fit($('fit-voter'), 390);
-new ResizeObserver(() => { fitHost(); fitVoter(); }).observe(document.body);
-fitHost();
-fitVoter();
+const fitAll = () => { fit($('fit-host'), 1280); fit($('fit-voter'), 390); };
+new ResizeObserver(fitAll).observe(document.body);
+fitAll();
 
 // ---------- dummy guests ----------
 
 const dummies = new Map(); // voterId -> device token
 const say = (msg) => { $('status').textContent = msg; };
-const call = (method, path, body, hostKey) => core.handle({ method, path, body, hostKey });
+const call = (method, path, body) => core.handle({ method, path, body });
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 let favourites = [];
 
-function pickFavourites() {
-  favourites = shuffle(core.state().roster).slice(0, 3).map((p) => p.id);
-}
-
 $('join').addEventListener('click', () => {
   const st = core.publicState();
-  if (!st.roster.length) return say('Add the guest list on the projector first.');
-  if (st.phase === 'closed' || st.phase === 'revealed') return say('Voting has closed. Restart the demo to let guests join.');
+  if (st.roster.length < 2) return say('Save the guest list on the host screen first.');
+  if (st.phase === 'closed' || st.phase === 'revealed') return say('Voting has closed. Start a new award night to let guests join.');
   const free = shuffle(st.roster.filter((p) => !st.claimed.includes(p.id)));
   const take = Math.min(12, free.length - 4); // always leave a few names for you
   if (take <= 0) return say('The room is full. Pick one of the free names on the phone, or restart the demo.');
-  if (!favourites.length) pickFavourites();
+  if (!favourites.length) favourites = shuffle(st.roster).slice(0, 3).map((p) => p.id);
   for (const p of free.slice(0, take)) {
     const r = call('POST', '/api/claim', { voterId: p.id });
     if (r.status === 200) dummies.set(p.id, r.body.token);
@@ -213,8 +207,9 @@ $('join').addEventListener('click', () => {
 
 function castDummyVotes(mode) {
   const st = core.publicState();
-  if (!st.roster.length) return say('Add the guest list on the projector first.');
-  if (st.phase !== 'open') return say(st.phase === 'waiting' ? 'Start voting on the projector first.' : 'Voting is not open. Use Reopen on the projector.');
+  if (st.roster.length < 2) return say('Save the guest list on the host screen first.');
+  if (st.phase !== 'open') return say(st.phase === 'waiting' ? 'Start voting on the host screen first.' : 'Voting is not open right now.');
+  if (!dummies.size) return say('Click Dummy guests join first.');
   const pool = st.contenders ?? st.roster.map((p) => p.id); // in a tie-break only the tied people can be voted for
   const favs = st.contenders ?? favourites;
   const pending = [...dummies].filter(([id]) => !st.voted.includes(id));
@@ -225,8 +220,7 @@ function castDummyVotes(mode) {
     let candidateId;
     if (mode === 'tie') {
       const duo = favs.slice(0, 2);
-      const left = pending.length - i;
-      const odd = pending.length % 2 === 1 && left === 1; // an odd one out votes elsewhere so the split stays level
+      const odd = pending.length % 2 === 1 && pending.length - i === 1; // an odd one out votes elsewhere so the split stays level
       candidateId = odd ? options.find((id) => !duo.includes(id)) : duo.filter((id) => id !== voterId).sort((a, b) => counts[a] - counts[b])[0];
     } else {
       const r = Math.random(); // most guests back one of three favourites, so the reveal has a clear shape
@@ -245,14 +239,12 @@ function castDummyVotes(mode) {
 $('vote').addEventListener('click', () => castDummyVotes('spread'));
 $('tie').addEventListener('click', () => castDummyVotes('tie'));
 
-setInterval(() => core.tick(), 1000); // closes the vote when time is up, like the real server does
-
 $('restart').addEventListener('click', () => {
-  call('POST', '/api/host/reset', {}, HOST_KEY);
+  core.handle({ method: 'POST', path: '/api/host/reset', body: {}, hostKey: core.hostKey() });
   dummies.clear();
   favourites = [];
-  say('Demo restarted.');
+  say('Demo restarted. The guest list is kept; start voting again.');
 });
 
-say('Start on the projector: add the guest list.');
+say('Start on the host screen: add the guest list.');
 </script>

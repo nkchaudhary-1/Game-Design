@@ -1,6 +1,7 @@
 // Guest (phone) flow: pick who you are -> vote for the best dressed -> wait for the big screen.
 
-import { h, api, avatar, connect, clock } from './common.js';
+import { h, api, avatar, connect, clock, setTransport } from './common.js';
+import { createGuestTransport } from './p2p.js';
 
 const KEY = 'bollywood-vote:v1';
 const app = document.getElementById('app');
@@ -9,6 +10,12 @@ const ctaInner = document.getElementById('cta-inner');
 const toastEl = document.getElementById('toast');
 const connEl = document.getElementById('conn');
 const countdown = document.getElementById('countdown');
+
+// The QR code carries the host's peer id after the #. Votes go straight to the host's browser (see p2p.js).
+const hostId = decodeURIComponent(location.hash.slice(1));
+const guestLink = globalThis.__BN_GUEST_TRANSPORT ?? (hostId ? createGuestTransport({ hostId }) : null); // the demo supplies its own
+let link = { status: 'connecting', detail: '' };
+if (guestLink) setTransport(guestLink);
 
 const load = () => {
   try { return JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { return {}; }
@@ -21,6 +28,7 @@ let state = null; // latest public state from the server
 let me = load(); // { epoch, voterId, token, candidateId }
 const ui = { pick: null, editing: false, busy: false };
 let lastSig = '';
+let seenRound = 1;
 let toastTimer;
 
 function toast(msg) {
@@ -45,9 +53,10 @@ function reconcile() {
     ui.pick = null;
     ui.editing = false;
   }
+  if (state.round !== seenRound) { ui.pick = null; ui.editing = false; seenRound = state.round; } // a tie-break starts from a clean ballot
   if (me.voterId) {
     const voted = state.voted.includes(me.voterId);
-    if (!voted) me.candidateId = null;
+    if (!voted) { me.candidateId = null; if (!ui.editing) ui.pick = null; }
     else if (!me.candidateId) recoverVote(); // vote landed but the reply was lost
   }
   store(me);
@@ -78,7 +87,7 @@ async function claim(voterId) {
     toast(
       e.code === 'taken' ? 'Someone already picked that name on another phone. Ask the host to release it.'
       : e.code === 'closed' ? 'Voting has closed.'
-      : 'Could not reach the server. Check your WiFi and try again.',
+      : 'Could not reach the host. Check your connection and try again.',
     );
   }
   ui.busy = false;
@@ -112,7 +121,7 @@ async function castVote() {
     toast(
       e.code === 'not_open' ? 'Voting just closed — sorry!'
       : e.code === 'bad_token' ? 'The host reset the session. Pick your name again.'
-      : 'Vote did not go through. Check your WiFi and try again.',
+      : 'Vote did not go through. Check your connection and try again.',
     );
   }
   ui.busy = false;
@@ -241,12 +250,14 @@ function viewRevealed() {
 
 function viewLoading() {
   setCta();
-  return message('🎬', 'Loading…');
+  if (!guestLink) return message('🔗', 'This link is incomplete', 'Scan the QR code on the big screen again to open the voting page.');
+  const stuck = link.status === 'host-offline' || link.status === 'offline';
+  return message(stuck ? '📡' : '🎬', stuck ? 'Can’t reach the host' : 'Connecting to the host…', stuck ? link.detail : 'Hang on a second.');
 }
 
 function currentView() {
   if (!state) return ['loading', viewLoading];
-  if (state.roster.length === 0) return ['empty', () => message('🎬', 'Nothing to vote on yet', 'The host is still setting up.', h('a', { class: 'link-btn', href: '/host' }, 'I’m the host →'))];
+  if (state.roster.length === 0) return ['empty', () => message('🎬', 'Nothing to vote on yet', 'The host is still setting up.', h('a', { class: 'link-btn', href: '/' }, 'I’m the host →'))];
   if (state.phase === 'revealed') return ['revealed', viewRevealed];
   if (state.phase === 'closed') return ['closed', viewClosed];
   if (!me.voterId) return ['who', viewWho];
@@ -261,7 +272,7 @@ function render(force = false) {
   const dep = state
     ? JSON.stringify([state.roster, name === 'who' ? state.claimed : null, state.phase === 'revealed' ? state.revealedAt : null])
     : '';
-  const sig = `${name}|${dep}|${me.voterId}|${me.candidateId}|${ui.editing}|${ui.busy}|${state?.epoch}|${state?.round}`;
+  const sig = `${name}|${dep}|${me.voterId}|${me.candidateId}|${ui.editing}|${ui.busy}|${state?.epoch}|${state?.round}|${state ? '' : link.status}`;
   if (!force && sig === lastSig) return;
   lastSig = sig;
   const out = view();
@@ -269,14 +280,20 @@ function render(force = false) {
   if (ui.busy) for (const b of cta.querySelectorAll('button')) b.disabled = true;
 }
 
-connect(
-  (s) => {
-    state = s;
-    reconcile();
-    render();
-  },
-  (ok) => { connEl.hidden = ok; },
-);
+if (guestLink) {
+  guestLink.onStatus?.((status, detail) => {
+    link = { status, detail };
+    if (!state) render(true); // before the first state, the loading screen says what is happening
+  });
+  connect(
+    (s) => {
+      state = s;
+      reconcile();
+      render();
+    },
+    (ok) => { connEl.hidden = ok; },
+  );
+}
 render(true);
 
 // Countdown strip: server time, so every phone and the projector agree.

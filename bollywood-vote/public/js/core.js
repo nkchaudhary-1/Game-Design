@@ -1,13 +1,13 @@
-// Voting rules, with no Node or browser APIs: the server runs it over HTTP, the interactive demo runs it in a page.
+// Voting rules. No browser or Node APIs: the host's browser runs this directly and answers the guests' phones.
 // All I/O is injected (persist, randomId, now), and handle() maps a request to {status, body}.
 
 export const PHASES = ['waiting', 'open', 'closed', 'revealed'];
-const MAX_ROSTER = 40;
+const MAX_ROSTER = 60;
 
 const clampSeconds = (v, fallback) => Math.min(1800, Math.max(15, Number(v) || fallback));
 const clean = (s, max) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-/** "Name | Character" lines -> roster entries. Accepts a string or an array of {name, character}. */
+/** "Name | Character" lines, or an array of {name, character}, -> roster entries. Blank names are dropped. */
 export function parseRoster(input) {
   const rows = Array.isArray(input)
     ? input.map((r) => [r?.name, r?.character])
@@ -21,18 +21,16 @@ export function parseRoster(input) {
   return roster.slice(0, MAX_ROSTER);
 }
 
-export function createCore({ roster, saved = {}, hostKey, randomId, persist = () => {}, now = Date.now, random = Math.random }) {
+export function createCore({ roster = [], saved = {}, hostKey, randomId, persist = () => {}, now = Date.now }) {
   let s = {
-    hostKey: hostKey || randomId().slice(0, 6),
+    hostKey: hostKey || randomId(),
     epoch: 1,
     phase: 'waiting',
-    showLive: true, // the projector shows who is winning while votes come in; the host can hide it for suspense
     revealedAt: 0,
     endsAt: 0, // ms timestamp when the open vote closes by itself; 0 when no vote is running
-    round: 1, // 1 = the main vote, 2 = the tie-break runoff
-    contenders: null, // runoff only: the tied people, the only ones who can be voted for
-    tie: null, // runoff only: { ids, votes } of the first-round tie, shown to everyone
-    drawn: null, // set when the runoff is level too and a random draw settles it
+    round: 1, // 1 = the main vote, 2+ = a tie-break the host chose to hold
+    contenders: null, // tie-break only: the tied people, the only ones who can be voted for
+    tie: null, // tie-break only: { ids, votes } of the tie that led to it
     roster,
     claims: {}, // voterId -> device token
     votes: {}, // voterId -> candidateId
@@ -50,19 +48,16 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
     return t;
   }
 
-  /** Highest tally and everyone on it. */
+  /** Highest tally and everyone on it (several people when it is a tie). */
   function leaders() {
     const t = tallies();
     const top = Math.max(0, ...Object.values(t));
     return { top, ids: top > 0 ? s.roster.filter((p) => t[p.id] === top).map((p) => p.id) : [] };
   }
 
-  /** Closes the vote when time is up or every guest has voted. Returns true if it changed anything. */
+  /** Closes the vote when time is up. Returns true if it changed anything. */
   function tick() {
-    if (s.phase !== 'open') return false;
-    const timeUp = s.endsAt > 0 && now() >= s.endsAt;
-    const allIn = s.roster.length > 0 && Object.keys(s.votes).length >= s.roster.length;
-    if (!timeUp && !allIn) return false;
+    if (s.phase !== 'open' || !(s.endsAt > 0) || now() < s.endsAt) return false;
     s.phase = 'closed';
     s.endsAt = 0;
     changed();
@@ -70,25 +65,22 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
   }
 
   function publicState() {
-    const t = tallies();
     const revealed = s.phase === 'revealed';
     return {
       epoch: s.epoch,
       phase: s.phase,
-      showLive: s.showLive,
       revealedAt: s.revealedAt,
       endsAt: s.endsAt,
-      serverNow: now(), // lets screens show a countdown that agrees with the server's clock
+      serverNow: now(), // lets screens show a countdown that agrees with the host's clock
       roster: s.roster,
       claimed: Object.keys(s.claims),
       voted: Object.keys(s.votes),
-      // Standings never leave the server until the host reveals them (or turns live standings on).
-      tallies: revealed || s.showLive ? t : null,
-      winners: revealed ? (s.drawn ? [s.drawn] : leaders().ids) : null,
+      // Nobody sees any score before the reveal: not the host, not the guests.
+      tallies: revealed ? tallies() : null,
+      winners: revealed ? leaders().ids : null,
       round: s.round,
       contenders: s.contenders,
       tie: s.tie,
-      tieBreak: s.round > 1 ? (s.drawn ? 'draw' : 'runoff') : null,
     };
   }
 
@@ -117,32 +109,13 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
 
     // ----- host -----
     if (path.startsWith('/api/host/')) {
-      if ((key || query.key) !== s.hostKey) return res(401, { error: 'bad_key' });
+      if (!key || key !== s.hostKey) return res(401, { error: 'bad_key' });
       if (route === 'GET /api/host/ping') return res(200, { ok: true });
 
       if (route === 'POST /api/host/phase') {
         const next = body.phase;
         if (!PHASES.includes(next)) return res(400, { error: 'bad_phase' });
         if (next === 'waiting') return res(400, { error: 'use_reset' });
-        if (next === 'revealed' && s.phase !== 'revealed') {
-          const { top, ids } = leaders();
-          if (ids.length > 1) {
-            if (s.round === 1) {
-              // A tie never reaches the curtain: the tied people go to a 60-second runoff on the same phones.
-              s.tie = { ids, votes: top };
-              s.contenders = ids;
-              s.round = 2;
-              s.votes = {};
-              s.drawn = null;
-              s.phase = 'open';
-              s.endsAt = now() + 60 * 1000;
-              changed();
-              return res(200, { ok: true, runoff: true });
-            }
-            s.drawn = ids[Math.floor(random() * ids.length)]; // level again after the runoff: a random draw settles it
-          }
-        }
-        if (next === 'open') s.drawn = null;
         if (next === 'revealed') s.revealedAt = now(); // re-sending 'revealed' replays the reveal
         // Opening starts the clock (default 5 minutes, or the number of seconds the host asks for); anything else stops it.
         s.endsAt = next === 'open' ? now() + clampSeconds(body.seconds, 300) * 1000 : 0;
@@ -151,15 +124,18 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
         return res(200, { ok: true });
       }
 
-      if (route === 'POST /api/host/extend') {
-        if (s.phase !== 'open') return res(409, { error: 'not_open' });
-        s.endsAt = Math.max(s.endsAt, now()) + clampSeconds(body.seconds, 60) * 1000;
-        changed();
-        return res(200, { ok: true });
-      }
-
-      if (route === 'POST /api/host/live') {
-        s.showLive = Boolean(body.showLive);
+      if (route === 'POST /api/host/tiebreak') {
+        // Optional, and the host's call: a tie shows joint winners, and this is the fair way to settle it.
+        if (s.phase !== 'revealed') return res(409, { error: 'not_revealed' });
+        const { top, ids } = leaders();
+        if (ids.length < 2) return res(409, { error: 'no_tie' });
+        s.tie = { ids, votes: top };
+        s.contenders = ids;
+        s.round += 1;
+        s.votes = {};
+        s.revealedAt = 0;
+        s.phase = 'open';
+        s.endsAt = now() + clampSeconds(body.seconds, 60) * 1000;
         changed();
         return res(200, { ok: true });
       }
@@ -171,7 +147,7 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
         s.roster = next;
         s.claims = {};
         s.votes = {};
-        Object.assign(s, { round: 1, contenders: null, tie: null, drawn: null });
+        Object.assign(s, { round: 1, contenders: null, tie: null });
         s.epoch += 1;
         changed();
         return res(200, { ok: true, count: next.length });
@@ -186,12 +162,13 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
       }
 
       if (route === 'POST /api/host/reset') {
+        // A fresh award night: votes and claims go, the guest list stays.
         s.phase = 'waiting';
         s.claims = {};
         s.votes = {};
         s.revealedAt = 0;
         s.endsAt = 0;
-        Object.assign(s, { round: 1, contenders: null, tie: null, drawn: null });
+        Object.assign(s, { round: 1, contenders: null, tie: null });
         s.epoch += 1;
         changed();
         return res(200, { ok: true });
@@ -225,7 +202,7 @@ export function createCore({ roster, saved = {}, hostKey, randomId, persist = ()
       if (body.candidateId === body.voterId) return res(400, { error: 'self_vote' });
       if (s.contenders && !s.contenders.includes(body.candidateId)) return res(400, { error: 'not_a_contender' });
       s.votes[body.voterId] = body.candidateId;
-      if (!tick()) changed(); // the last guest's vote closes the round right away
+      changed();
       return res(200, { ok: true, candidateId: body.candidateId });
     }
 

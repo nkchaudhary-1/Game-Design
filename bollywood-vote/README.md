@@ -1,65 +1,71 @@
-# Bollywood Night — live "Best Dressed" voting
+# Bollywood Night Awards: Best Dressed
 
-A website for a party vote. The host opens `/host` on a laptop and shares that screen on the projector. Guests scan the QR code
-on their own phones (any network, no WiFi pairing), tap their name and vote. The projector shows who's winning live, then a
-curtain reveals the winner. No accounts, no app.
+A static website for the Best Dressed award. The host opens the site on a laptop and shares that screen on the projector.
+Guests scan a QR code, tap their name and vote on their own phones. Scores stay hidden until the host reveals the winner
+behind a curtain.
 
-* **Guests:** `https://<your-site>/` (this is what the QR code points to)
-* **Host / projector:** `https://<your-site>/host`
+* **Host:** `https://<your-site>/` (guest details, then the Best Dressed Award page)
+* **Guests:** `https://<your-site>/vote#<code>` (this is what the QR code opens)
 
-## Put it online (Vercel, about 10 minutes, free plan)
+There is **no database, backend, login or external storage**. Guest details and votes live in the host's browser
+(`localStorage`), and the whole site is plain HTML, CSS and JavaScript.
 
-Vercel runs functions, not a long-lived server, so state lives in a small Redis database (Upstash, free). Each vote is its own
-Redis field, so 20 people voting at once can't overwrite each other, and phones are updated by polling every couple of seconds.
+## Deploy on Vercel (about 3 minutes, free plan)
 
-1. **Vercel → Add New → Project → import this GitHub repo.** Set **Root Directory** to `bollywood-vote`. Click **Deploy**.
-2. In the project, **Storage → Create Database → Upstash Redis** (free plan) and connect it to the project.
-   This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
-3. **Deployments → Redeploy** (new variables only apply to new deployments).
-4. Open `https://<your-project>.vercel.app/host`. Until step 2 and 3 are done it shows a "Finish setup" card.
+1. **Vercel → Add New → Project → import this GitHub repo.**
+2. Set **Root Directory** to `bollywood-vote`.
+3. Click **Deploy**. There is nothing to configure: no environment variables, no database, no build step.
 
-There is no password. Only share the main address with guests (the QR does this); keep `/host` to yourself. If you want a lock anyway,
-add an environment variable `HOST_KEY` in Vercel and open `/host?key=<that value>`.
+Any static host works the same way if you point it at the `public/` folder.
+
+## How votes get from phones to the host
+
+Browser storage is per device, so a QR code alone cannot carry votes back to the host. This site connects each phone
+**directly to the host's browser over WebRTC**:
+
+* The host page is the "server". It holds the guest list and votes in `localStorage`, runs the voting rules
+  (`public/js/core.js`) and answers the phones.
+* The QR code carries the host's short connection code after the `#`. A phone that opens it asks PeerJS's free public broker
+  to introduce it to the host, then talks to the host directly. The broker only passes connection details; votes and names never
+  go through it, and nothing is stored anywhere but the host's browser.
+* The host's connection code is saved too, so refreshing the host page keeps the same QR code, and phones reconnect by themselves.
+
+What this means on the night:
+
+* **Keep the host tab open** while voting runs (it can sit in the background while you share your screen). Refreshing it is fine.
+* Everyone needs an internet connection (phones on cellular are fine). A few locked-down networks block WebRTC; if a phone can't
+  connect, try another network or the phone's data.
+* The host screen shows `Ready · N phones connected` under the QR code so you can see it working before you start.
+* If the broker is ever unreachable, the host screen says so. Only introductions are affected: phones already connected keep voting.
 
 ## Running the night
 
-1. **Guest list.** The first host screen is **Who's coming?**: type one guest per line (`Name | Character`; the character is optional)
-   and save. **Edit names** reopens it until voting starts.
-2. **Ready.** The list is on screen while you run the awards. Guests see nothing yet.
-3. **Start voting.** The QR code appears with a **5:00 clock** (change it in Settings). Guests scan, tap their own name, vote.
-   The leaderboard updates live. Voting closes at zero or when everyone has voted. **+1 min** and **Close now** are in the control bar.
-4. **Reveal.** The curtain hangs closed over "Voting closed". Press **Reveal winner**: drumroll, curtain opens, confetti.
+1. **Guest details.** The first page. Add each guest's **name** and the **Bollywood character** they are portraying. Use *Add guest*,
+   or *Paste a list* (`Name | Character`, one per line). Click **Save details**. They are kept in this browser, so a refresh doesn't lose them.
+2. **Best Dressed Award.** After the other awards, open page 2. The QR code is already on screen so guests can scan and pick their name
+   while you set up. Choose **2 minutes** or **5 minutes**, then **Start voting**.
+3. **Voting.** A countdown runs on the host screen and on every phone. Each guest sees the guest list with names and characters and
+   votes for their favourite. Nobody sees any scores: the host only sees names light up as people vote.
+4. **Close.** At zero, voting closes by itself and late votes are refused. (**Close voting now** ends it early.)
+5. **Reveal Winner.** Click it for the drumroll and curtain. The winner's name and character appear with confetti.
 
-Move the mouse to show the control bar; it hides itself after a few seconds. Untick **Live standings** to hide the leaderboard
-until the reveal.
+### Ties
+A tie is never settled at random. The reveal shows **joint winners** ("It's a tie!"). The host can also choose **Hold a 60-second tie-break**,
+which puts only the tied guests on everyone's phone for one more vote.
 
-### There is never a tie
-If two or more people finish level at the top, **Reveal winner** doesn't reveal. It starts a **60-second tie-break** instead: phones
-switch to a ballot with only the tied people, and the projector shows them head to head with live counts. If the tie-break is level
-too, a random draw picks one. So there is always exactly one winner (or none, if nobody voted).
+### Preventing duplicate votes
+Guests first tap **their own name**. A name can be picked on one phone only, and each phone votes once (changing a vote replaces it).
+That also stops people voting for themselves. It is client-side, so it is honest-system protection: if someone picks the wrong
+name or switches phones, open **Options → Release** on the host screen.
 
-### Rules the app enforces
-* One vote per person. Guests pick **who they are** first, so nobody can vote for themselves or vote twice.
-  A name can be claimed by one phone only; if someone picked wrong or switched phones, **Settings → Guests → Release**.
-* Guests can change their vote until the clock runs out.
-* **Settings → Reset everything** wipes names and votes. Do a dry run with the sample names first, then reset.
-
-## Try it without deploying
-
-`npm run build:demo` builds `demo/dist/demo.html`: the real guest and host screens side by side in one page, wired to the same
-voting rules (`lib/core.js`) with dummy guests you can trigger. No server needed; open `demo/dist/standalone.html` in a browser.
-
-## Run it on one laptop instead (optional)
+## Develop
 
 ```bash
-node server.js     # Node 18+; prints the host link and a WiFi address for the QR code
+npm run dev         # static server on http://localhost:8080 (same clean URLs as Vercel: /vote)
+npm test            # the voting rules and the phone-to-host link (against a fake PeerJS network)
+npm run build:demo  # builds demo/dist/demo.html: both screens side by side with sample guests, no network needed
 ```
 
-This mode needs phones on the same WiFi as the laptop, and the laptop itself counts as the host. It keeps state in
-`data/state.json`. Set `PUBLIC_URL=https://…` when exposing it through a tunnel (the host link then carries a key).
-
-## Tests
-
-```bash
-npm test      # rules (timer, tie-break), the Redis store, the Vercel function, the Node server
-```
+Files: `public/index.html` + `js/host.js` (host app), `public/vote.html` + `js/voter.js` (guest page), `js/core.js` (rules),
+`js/p2p.js` (the phone-to-host link), `js/host-runtime.js` (localStorage + link), `vendor/` (QR code and PeerJS, both MIT).
+Stored in the host's browser: `bn:state` (guest list, votes, clock), `bn:hostId` (the QR code's connection code), `bn:minutes`.
