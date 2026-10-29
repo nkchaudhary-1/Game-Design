@@ -14,6 +14,9 @@ const banner = document.getElementById('banner');
 const runtime = globalThis.__BN_HOST_RUNTIME ?? startHostRuntime(); // the click-through demo supplies its own runtime
 setTransport(runtime.transport);
 
+// Shown quietly at the bottom of the Options panel.
+const CREDIT = { name: 'Neelesh Chaudhary', url: 'https://neelesh.one' };
+
 const MIN_KEY = 'bn:minutes';
 const store = {
   get: (k, d = '') => { try { return localStorage.getItem(k) || d; } catch { return d; } },
@@ -604,6 +607,7 @@ function openDrawer() {
       h('p', { class: 'hint' }, 'Everything is saved in this browser: guest details, votes and the QR code. Closing the tab keeps it; clearing site data erases it.'),
       confirmButton('New award night (keep guests)', 'Tap again to clear all votes', async () => { await act('/api/host/reset'); closeDrawer(); }, 'btn ghost small'),
       confirmButton('Erase everything on this device', 'Tap again to erase and reload', () => { runtime.wipe(); location.reload(); }, 'btn small danger')),
+    h('p', { class: 'credit' }, 'Designed & developed by ', h('a', { href: CREDIT.url, target: '_blank', rel: 'noopener' }, CREDIT.name)),
   );
   updateGuests();
   drawer.classList.add('open');

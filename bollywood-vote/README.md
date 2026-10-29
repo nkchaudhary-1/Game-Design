@@ -79,3 +79,5 @@ npm run build:demo  # builds demo/dist/demo.html: both screens side by side with
 Files: `public/index.html` + `js/host.js` (host app), `public/vote.html` + `js/voter.js` (guest page), `js/core.js` (rules),
 `js/p2p.js` (the phone-to-host link), `js/host-runtime.js` (localStorage + link), `vendor/` (QR code and PeerJS, both MIT).
 Stored in the host's browser: `bn:state` (guest list, votes, clock), `bn:hostId` (the QR code's connection code), `bn:minutes`.
+
+Designed and developed by [Neelesh Chaudhary](https://neelesh.one).
