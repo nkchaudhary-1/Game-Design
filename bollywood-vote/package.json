@@ -1,0 +1,12 @@
+{
+  "name": "bollywood-vote",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bollywood Night 'Best Dressed' award: a static site, no backend. Votes go phone to host over WebRTC.",
+  "scripts": {
+    "dev": "node tools/dev-server.mjs",
+    "test": "node --test test/*.test.js",
+    "build:demo": "node tools/build-demo.mjs"
+  }
+}

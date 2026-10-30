@@ -1,0 +1,261 @@
+<title>Best Dressed Voting Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Rozha+One&display=swap">
+<style>
+  /* Layout: a quiet workbench. The two real screens (projector + phone) are the content; the chrome around them stays out of the way. */
+  :root {
+    --bg: #f1eef5;
+    --surface: #ffffff;
+    --ink: #26142f;
+    --muted: #675573;
+    --line: #d9d0e3;
+    --gold: #f7be4a;
+    --gold-ink: #2a1100;
+    --bezel: #0b0511;
+    --font-display: 'Rozha One', Georgia, 'Times New Roman', serif;
+    --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #100816; --surface: #1b0f26; --ink: #f4ecf8; --muted: #b9a6c8; --line: #37214a; --bezel: #000000;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #100816; --surface: #1b0f26; --ink: #f4ecf8; --muted: #b9a6c8; --line: #37214a; --bezel: #000000;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 15px/1.55 var(--font-body);
+    padding-block: 28px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1240px; margin-inline: auto; display: grid; gap: 28px; }
+  button { font: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+  .kicker { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 6px 0 8px; font: 400 clamp(28px, 4.4vw, 44px)/1.1 var(--font-display); text-wrap: balance; }
+  .sub { margin: 0; max-width: 62ch; color: var(--muted); }
+
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 356px; gap: 28px; align-items: start; }
+  .col { min-width: 0; display: grid; gap: 10px; }
+  .col.phone { justify-items: center; }
+  figcaption { font-size: 13px; color: var(--muted); }
+
+  .frame { margin: 0; display: grid; gap: 10px; min-width: 0; width: 100%; }
+  .col.phone .frame { width: min(100%, 356px); }
+  .bezel { background: var(--bezel); padding: 10px; border-radius: 16px; box-shadow: 0 18px 40px rgba(20, 8, 28, 0.28); }
+  .bezel.round { padding: 12px; border-radius: 44px; }
+  .fit { position: relative; overflow: hidden; border-radius: 8px; }
+  .round .fit { border-radius: 32px; }
+  .fit.wide { aspect-ratio: 16 / 9; }
+  .fit.tall { aspect-ratio: 390 / 844; }
+  .fit iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: #14081c; }
+  .fit.wide iframe { width: 1280px; height: 720px; }
+  .fit.tall iframe { width: 390px; height: 844px; }
+
+  .try { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; }
+  .try h2 { margin: 0 0 10px; font: 400 24px/1.2 var(--font-display); }
+  .try ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
+  .try li::marker { font-weight: 700; color: var(--muted); }
+  .actions { display: grid; gap: 10px; align-content: start; }
+  .btn { min-height: 48px; padding: 0 18px; border-radius: 12px; border: 0; font-weight: 700; background: var(--gold); color: var(--gold-ink); }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+  #status { margin: 4px 0 0; min-height: 1.6em; font-size: 14px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .bench { grid-template-columns: minmax(0, 1fr); }
+    .col.phone { order: -1; }
+    .try { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="kicker">Interactive demo · sample guests</p>
+    <h1>Best Dressed, from guest list to winner</h1>
+    <p class="sub">Both screens below are the real app. The host screen is on the left, a guest's phone on the right. Here they talk through this page; on the real site the phones connect straight to the host's browser. Nothing leaves this page, and a refresh starts over.</p>
+  </header>
+
+  <main class="bench">
+    <section class="col" aria-label="Host screen">
+      <figure class="frame">
+        <div class="bezel"><div class="fit wide" id="fit-host"><iframe id="host" title="Host screen"></iframe></div></div>
+        <figcaption>Host screen, shared on the projector. Scroll inside it like a normal page.</figcaption>
+      </figure>
+    </section>
+    <section class="col phone" aria-label="Guest phone">
+      <figure class="frame">
+        <div class="bezel round"><div class="fit tall" id="fit-voter"><iframe id="voter" title="A guest's phone"></iframe></div></div>
+        <figcaption>A guest's phone, after scanning the QR code.</figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <section class="try" aria-label="Try it">
+    <div>
+      <h2>Try it</h2>
+      <ol>
+        <li>On the host screen, click <b>Fill with 20 sample guests</b>, then <b>Save details</b>, then <b>Go to Best Dressed Award</b>.</li>
+        <li>Choose <b>2 minutes</b> or <b>5 minutes</b> and click <b>Start voting</b>. The countdown starts on every screen.</li>
+        <li>On the phone, tap your name, then "I'm …", then vote. Nobody sees a score: the host only sees names light up.</li>
+        <li>Click <b>Dummy guests join</b>, then <b>Dummy guests vote</b> to fill the room.</li>
+        <li>When the clock hits zero (or on <b>Close voting now</b>), voting closes. Click <b>Reveal Winner</b> and watch the curtain.</li>
+        <li>For a tie: <b>New award night</b>, start again, then use <b>Make it a tie</b> in place of Dummy guests vote, leave the phone unvoted, close and reveal. You get joint winners, and an optional tie-break.</li>
+      </ol>
+    </div>
+    <div class="actions">
+      <button class="btn" id="join" type="button">Dummy guests join</button>
+      <button class="btn" id="vote" type="button">Dummy guests vote</button>
+      <button class="btn ghost" id="tie" type="button">Make it a tie</button>
+      <button class="btn ghost" id="restart" type="button">Restart demo</button>
+      <p id="status" role="status"></p>
+    </div>
+  </section>
+</div>
+
+<script>
+/*__CORE__*/
+
+const DOCS = /*__DOCS__*/ {};
+const DEMO_URL = 'https://your-site.vercel.app/vote#bn-demo1234'; // the real site shows its own address here
+
+const core = createCore({ roster: [], randomId: () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(16).slice(2) + Date.now().toString(16)) });
+
+const $ = (id) => document.getElementById(id);
+const hostFrame = $('host');
+const voterFrame = $('voter');
+hostFrame.srcdoc = DOCS.host;
+voterFrame.srcdoc = DOCS.voter;
+
+// ---------- the host's browser, standing in for the phone <-> host link ----------
+
+const subscribers = new Set();
+const linkInfo = () => ({ state: 'ready', id: 'bn-demo1234', guests: core.publicState().claimed.length, detail: '' });
+const reply = (win, id, status, body) => win.postMessage({ bn: 1, type: 'resp', id, status, body }, '*');
+
+addEventListener('message', (e) => {
+  const d = e.data;
+  if (!d || d.bn !== 1) return;
+  const fromHost = e.source === hostFrame.contentWindow;
+  if (!fromHost && e.source !== voterFrame.contentWindow) return;
+  if (d.type === 'sub') {
+    subscribers.add(e.source);
+    e.source.postMessage({ bn: 1, type: 'state', state: core.publicState() }, '*');
+    if (fromHost) e.source.postMessage({ bn: 1, type: 'link', link: linkInfo() }, '*');
+    return reply(e.source, d.id, 200, {});
+  }
+  if (d.type === 'req') {
+    // Only the host screen holds the host key; a phone can never use host-only routes.
+    const out = core.handle({ method: d.method, path: d.path, query: d.query, body: d.body, hostKey: fromHost ? core.hostKey() : undefined });
+    reply(e.source, d.id, out.status, out.body);
+  }
+});
+
+core.subscribe((state) => {
+  for (const win of subscribers) {
+    try {
+      win.postMessage({ bn: 1, type: 'state', state }, '*');
+      if (win === hostFrame.contentWindow) win.postMessage({ bn: 1, type: 'link', link: linkInfo() }, '*');
+    } catch { subscribers.delete(win); }
+  }
+});
+setInterval(core.tick, 500); // closes the vote when time is up, like the real host does
+
+// ---------- scale the real-size screens to fit their frames ----------
+
+function fit(box, width) {
+  box.firstElementChild.style.transform = `scale(${box.clientWidth / width})`;
+}
+const fitAll = () => { fit($('fit-host'), 1280); fit($('fit-voter'), 390); };
+new ResizeObserver(fitAll).observe(document.body);
+fitAll();
+
+// ---------- dummy guests ----------
+
+const dummies = new Map(); // voterId -> device token
+const say = (msg) => { $('status').textContent = msg; };
+const call = (method, path, body) => core.handle({ method, path, body });
+const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+let favourites = [];
+let seenEpoch = core.publicState().epoch;
+/** A new award night (or a changed guest list) makes every old dummy token invalid: forget them. */
+function syncRound(st) {
+  if (st.epoch === seenEpoch) return;
+  seenEpoch = st.epoch;
+  dummies.clear();
+  favourites = [];
+}
+
+$('join').addEventListener('click', () => {
+  const st = core.publicState();
+  syncRound(st);
+  if (st.roster.length < 2) return say('Save the guest list on the host screen first.');
+  if (st.phase === 'closed' || st.phase === 'revealed') return say('Voting has closed. Start a new award night to let guests join.');
+  const free = shuffle(st.roster.filter((p) => !st.claimed.includes(p.id)));
+  const take = Math.min(12, free.length - 4); // always leave a few names for you
+  if (take <= 0) return say('The room is full. Pick one of the free names on the phone, or restart the demo.');
+  if (!favourites.length) favourites = shuffle(st.roster).slice(0, 3).map((p) => p.id);
+  for (const p of free.slice(0, take)) {
+    const r = call('POST', '/api/claim', { voterId: p.id });
+    if (r.status === 200) dummies.set(p.id, r.body.token);
+  }
+  say(`${take} dummy guests joined.`);
+});
+
+function castDummyVotes(mode) {
+  const st = core.publicState();
+  syncRound(st);
+  if (st.roster.length < 2) return say('Save the guest list on the host screen first.');
+  if (st.phase !== 'open') return say(st.phase === 'waiting' ? 'Start voting on the host screen first.' : 'Voting is not open right now.');
+  if (!dummies.size) return say('Click Dummy guests join first.');
+  const pool = st.contenders ?? st.roster.map((p) => p.id); // in a tie-break only the tied people can be voted for
+  const favs = st.contenders ?? favourites;
+  const duo = favs.slice(0, 2);
+  // The two front-runners can only vote for each other, so their votes go first; the rest then even out the split.
+  const pending = [...dummies].filter(([id]) => st.claimed.includes(id) && !st.voted.includes(id)).sort((a, b) => Number(duo.includes(b[0])) - Number(duo.includes(a[0])));
+  const counts = Object.fromEntries(pool.map((id) => [id, 0]));
+  let cast = 0;
+  pending.forEach(([voterId, token], i) => {
+    const options = pool.filter((id) => id !== voterId);
+    let candidateId;
+    if (mode === 'tie') {
+      const odd = pending.length % 2 === 1 && pending.length - i === 1; // an odd one out votes elsewhere so the split stays level
+      candidateId = odd ? options.find((id) => !duo.includes(id)) : duo.filter((id) => id !== voterId).sort((a, b) => counts[a] - counts[b])[0];
+    } else {
+      const r = Math.random(); // most guests back one of three favourites, so the reveal has a clear shape
+      candidateId = st.contenders ? undefined : r < 0.4 ? favs[0] : r < 0.6 ? favs[1] : r < 0.7 ? favs[2] : undefined;
+    }
+    if (!options.includes(candidateId)) candidateId = options[Math.floor(Math.random() * options.length)];
+    if (call('POST', '/api/vote', { voterId, token, candidateId }).status === 200) {
+      cast += 1;
+      counts[candidateId] = (counts[candidateId] ?? 0) + 1;
+    }
+  });
+  if (!cast) return say('Every dummy guest has already voted. Click Dummy guests join to add more.');
+  const name = (id) => core.state().roster.find((p) => p.id === id)?.name;
+  say(mode === 'tie' ? `${cast} dummy votes cast, split between ${favs.slice(0, 2).map(name).join(' and ')}. Leave the phone unvoted to keep it tied.` : `${cast} dummy votes cast.`);
+}
+$('vote').addEventListener('click', () => castDummyVotes('spread'));
+$('tie').addEventListener('click', () => castDummyVotes('tie'));
+
+$('restart').addEventListener('click', () => {
+  core.handle({ method: 'POST', path: '/api/host/reset', body: {}, hostKey: core.hostKey() });
+  dummies.clear();
+  favourites = [];
+  say('Demo restarted. The guest list is kept; start voting again.');
+});
+
+say('Start on the host screen: add the guest list.');
+</script>
