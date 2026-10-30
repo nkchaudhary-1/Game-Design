@@ -19,6 +19,8 @@ export class Session {
   difficulty: AIDifficulty = 'NORMAL';
   arenaId = 'core-pit';
   muted = false;
+  /** Practice round: the CPU stands still, nothing is scored. */
+  practice = false;
   /** Where the workshop's back button goes. */
   returnTo: 'hangar' | 'lobby' = 'hangar';
   /** Two-tab mode switched on: every battle accepts a controller from another tab. */

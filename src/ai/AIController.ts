@@ -53,6 +53,8 @@ export class AIController {
   private chargeIndex = -1;
   private superReadySince = -1;
   private clock = 0;
+  /** Practice dummy: launches, then sits still and uses nothing. */
+  idle = false;
   /** Willing to detour for arena pickups (Crystal Arena); re-rolled with `aggressive`. */
   private collect = true;
 
@@ -79,6 +81,7 @@ export class AIController {
   update(match: Match, dt: number): void {
     const me = match.blades[this.slot];
     if (!me || !me.launched || !me.alive || match.phase !== 'live') { this.release(match, me); return; }
+    if (this.idle) { this.send({ t: 'steer', slot: this.slot, x: 0, z: 0 }); return; }
     this.clock += dt;
     this.thinkIn -= dt;
     this.tickCharge(dt);

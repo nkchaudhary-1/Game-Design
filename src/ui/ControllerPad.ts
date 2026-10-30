@@ -8,6 +8,7 @@
 import type { BuiltBlade } from '../blades/BladeFactory';
 import type { ControllerMsg, PadFeedback } from '../core/InputBus';
 import { clamp, CLASS_COLORS } from '../core/types';
+import { moveInfo, superInfo } from '../blades/powerText';
 import { abilityIcon, h, icon } from './dom';
 
 export interface PadOptions {
@@ -40,6 +41,7 @@ export class ControllerPad {
   private readonly sbtn: HTMLButtonElement;
   private readonly sRing: HTMLElement;
   private readonly sState: HTMLElement;
+  private readonly hint: HTMLElement;
 
   private drag: Drag | null = null;
   private launched = false;
@@ -99,6 +101,11 @@ export class ControllerPad {
         mv.charge ? h('span.ch', null, h('i')) : null,
       ) as HTMLButtonElement;
       this.bindMove(b, i as 0 | 1 | 2);
+      const info = moveInfo(mv, i + 1);
+      const show = (): void => this.showHint(info.name, [info.how + '.', ...info.lines].join(' '));
+      b.addEventListener('pointerenter', show);
+      b.addEventListener('pointerdown', show);
+      b.addEventListener('focus', show);
       this.mbtns.push(b);
       actions.append(b);
     });
@@ -118,11 +125,28 @@ export class ControllerPad {
     });
     actions.append(this.sbtn);
 
-    const foot = h('div.pad-foot', null, 'Keyboard: WASD steer · 1 2 3 moves · Space Super');
-    this.el = h('div.pad', { 'data-class': cls }, top, this.surface, actions, foot);
+    if (sup) {
+      const sinfo = superInfo(sup, built.levelBoost);
+      const showSuper = (): void => this.showHint(`Super · ${sinfo.name}`, `Lasts ${sinfo.duration} s, then recharges for ${sinfo.cooldown} s. ${sinfo.lines.join(' ')}`);
+      this.sbtn.addEventListener('pointerenter', showSuper);
+      this.sbtn.addEventListener('pointerdown', showSuper);
+      this.sbtn.addEventListener('focus', showSuper);
+    }
+    this.hint = h('div.pad-hint', { 'aria-live': 'polite' });
+    this.resetHint();
+    const foot = h('div.pad-foot', null, 'Keyboard: WASD steer · 1 2 3 moves · Space Super · H powers');
+    this.el = h('div.pad', { 'data-class': cls }, top, this.surface, actions, this.hint, foot);
 
     this.bindSurface();
     this.refreshLabels();
+  }
+
+  // ------------------------------------------------------------------------------------------ hint
+  private showHint(name: string, text: string): void {
+    this.hint.replaceChildren(h('b', null, `${name}: `), text);
+  }
+  private resetHint(): void {
+    this.hint.replaceChildren('Touch or hover a button to see what it does. Hold ', h('b', null, '1'), ' to charge, tap for a jab. ', h('b', null, '?'), ' lists every power.');
   }
 
   // ------------------------------------------------------------------------------------------ state

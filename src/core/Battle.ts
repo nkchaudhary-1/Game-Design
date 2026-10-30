@@ -26,6 +26,10 @@ export interface BattleOptions {
   onResult: (r: MatchResult) => void;
   /** The arena did something (a magnet flipped, a vent is about to erupt…): the screen may announce it. */
   onArena?: (e: Extract<SimEvent, { type: 'arena' }>) => void;
+  /** A blade used a move or Super (either side). */
+  onPower?: (e: Extract<SimEvent, { type: 'ability' | 'super' }>) => void;
+  /** Practice: the CPU stands still and uses nothing. */
+  practice?: boolean;
   seed?: number;
 }
 
@@ -61,6 +65,7 @@ export class Battle {
     this.match = new Match(getArena(o.arenaId), [{ built: o.player, control: 'human' }, { built: o.cpu, control: 'ai' }], rng);
     this.view = new BattleView(this.match, o.reduced);
     this.ai = new AIController(1, o.difficulty, (m) => this.bus.controller.send(m), makeRng(seed ^ 0x9e3779b9));
+    this.ai.idle = !!o.practice;
     this.unsub = this.bus.display.subscribe((m) => this.consume(m));
     this.view.resize(o.rr.aspect);
   }
@@ -166,13 +171,13 @@ export class Battle {
           a.play(e.cause === 'ring' ? 'ring_out' : 'spin_out', 0.5, undefined, this.panAt(this.match.blades[e.slot].x));
           break;
         case 'super':
-          if (e.state === 'activate') a.play('super_activate', 0.5, this.match.blades[e.slot].built.def.class);
+          if (e.state === 'activate') { a.play('super_activate', 0.5, this.match.blades[e.slot].built.def.class); this.o.onPower?.(e); }
           else if (e.state === 'end') a.play('super_end');
           else if (e.slot === 0) a.play('super_ready');
           break;
         case 'spinLow': if (e.slot === 0) a.play('spin_low'); break;
         case 'arena': a.arena(e.kind, this.panAt(e.x), e.power); this.o.onArena?.(e); break;
-        case 'ability': if (e.slot === 0) a.play('ability', e.charge); break;
+        case 'ability': if (e.slot === 0) a.play('ability', e.charge); this.o.onPower?.(e); break;
         case 'end': {
           this.result = e.result;
           this.phase = 'ending';

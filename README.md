@@ -30,9 +30,10 @@ Needs a browser with WebGL and WebAssembly. Fonts, art and the physics engine ar
 |---|---|---|
 | **Launch** | press on the pad, **pull back**, release (longer pull = harder launch) | A/D (or ←/→) aim, W/S (↑/↓) power, **Space** |
 | **Steer** | drag anywhere on the pad (floating joystick) | WASD / arrows |
-| **Move 1** | hold to **charge**, release to fire (charging drains spin) | hold **1** |
+| **Move 1** | hold to **charge**, release to fire (charging drains spin); a quick tap is a weak jab | hold **1** |
 | **Move 2 / 3** | tap | **2** / **3** |
 | **Super** | big button — shows READY / ACTIVE / RECHARGING | **Space** |
+| **What do my powers do?** | `?` button (top right of the arena); hover or press a move button to read it | **H** |
 | Pause | pause button | **Esc** |
 | Rematch (result screen) | Rematch button | **R** or **Enter** |
 
@@ -208,6 +209,25 @@ matchup to a coin flip, because everyone could then dodge everyone.)
   software rendering gets Low), High renders at up to 1.5× pixel ratio, the HUD no longer rewrites unchanged text every frame, and the
   game steps down a tier within about 1.2 s of sustained slow frames. Not measured on a real GPU yet.
 
+## Powers: knowing what each one does
+
+Every move and Super is data (effect lists and Super timelines), and the text you read is generated from that same data
+(`src/blades/powerText.ts`), so the words cannot drift from what runs: "You take 45% less damage and take 45% less knockback for
+1.1 s" is the real multiplier, scaled by your level. Where you see it:
+
+* **Pre-battle**: a "What my powers do" panel for your blade and the CPU's (the CPU's reads in the third person), with a Change Super button.
+* **Hangar**: each move and Super lists its effects, not just a one-line blurb.
+* **In battle**: hover or press a move button for its description; **H** or the `?` button pauses and opens both blades' full kits;
+  when anyone uses a move or Super its name and first effect line show on screen; coloured chips under each blade's HUD card name
+  what is on it (Armor, Frozen, Power up, Slowed, Draining…); a ring under a blade shows white = invulnerable, violet = debuffed,
+  blue = shielded, green = buffed.
+* **Practice dummy** (Pre-battle → Round → Practice dummy): the CPU stands still and uses nothing, nothing is scored. Use it to try every move.
+
+Bug found and fixed while auditing: **a quick tap on Move 1 (the chargeable attack) did nothing**, because releasing before the
+charge threshold cancelled it. A tap now fires a weak jab. `npx tsx tools/powers.ts [ids] [--dead]` fires every move and Super of
+every blade in a staged fight and reports what each visibly did (status given, zones, pulls, speed or spin change); the latest run
+found **0 of 175 powers with no visible effect**.
+
 ## Balance
 
 `npm run balance` plays the real simulation CPU-vs-CPU from both seats and checks design targets (triangle strength,
@@ -247,8 +267,12 @@ Latest run (`npm run balance`, CPU Normal, both seats; Level 1 and 7 at 60 battl
 
 ## Known limits / next
 
-* **18 blades are data only** (stats, moves, Supers listed as “coming soon”); **7 arenas** are data only.
-* **No hazards** yet: `arenas/hazards.ts` is the hook for arena mechanics.
+* **All 21 blades and all 8 arenas play** (own moves, Super pools, arena hazards). Not built yet: an Arena Selection screen, the
+  Progression/Upgrade and Settings screens, the Arena Circuit campaign screen, gamepad support, a collection level filter and rarity
+  VFX. The progression rules (ranks, unlocks, cores, upgrade costs, circuit stages) exist as tested logic in `core/Progression.ts`
+  and `core/Profile.ts` but are not wired into the UI, so everything is unlocked.
+* **Online multiplayer is out of scope** for this build (the controller/display bus is the seam for it).
+* **Balance**: three blades sit outside the 35–65% band in the roster round robin: Titan Breaker (71%), Bastion X (66%), Spectra (33%).
 * **Bundle is ~5 MB (1.9 MB gzip)**, mostly the inlined physics WASM. Fine on broadband; lazy-loading physics is the first fix.
 * **Visual direction** follows the supplied reference pack (cream paper + navy + red UI, spiral-fin armoured blades, concrete diorama arena). The realism pass made blades and the arena high-poly with physically based materials, but they are still generated in code: they match the references' palette, layering and glow, not their hand-sculpted surface detail. Hero-quality models need real meshes. Every one of the 21 blades has its own silhouette and palette (`blades/shapes.ts`: hooked blades, flame tongues, triple claw, saw ring, axe heads, castle octagon, boulders, orbiting discs, clock, petals, spiral arms…). Only four have reference art; the rest are my interpretation of the roster names and roles.
 * The reference art (`src/assets/art/`, cropped by `tools/prep-art.sh`) is used for the Hangar cards, Pre-battle cards and arena thumbnails. The Core Arena reference shows a bunny emblem on the floor; in-game the floor carries the V-chevron instead.

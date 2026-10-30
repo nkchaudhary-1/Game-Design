@@ -8,6 +8,7 @@ import type { MatchResult, SimEvent } from '../combat/events';
 import { CRYSTAL_INFO, CRYSTAL_KINDS } from '../arenas/hazards';
 import { TEAM_COLORS } from '../render/BattleView';
 import { TUNING } from '../core/Balance';
+import { chipFor, cpuVoice, moveInfo, superInfo, YOU, type PowerInfo, type StatusChip } from '../blades/powerText';
 import { CLASS_COLORS, clamp } from '../core/types';
 import { h } from './dom';
 
@@ -22,6 +23,8 @@ export interface HudOptions {
   anchor: (slot: number) => THREE.Vector3;
   size: () => { w: number; h: number };
   touch: boolean;
+  /** Practice round: the arena tag says so. */
+  practice?: boolean;
 }
 
 interface Card {
@@ -41,6 +44,11 @@ export class HUD {
   private readonly bannerEl: HTMLElement;
   private readonly calloutEl: HTMLElement;
   private lastCallout = -9;
+  private readonly chipEls: HTMLElement[] = [];
+  private readonly chipSig = ['', ''];
+  private readonly feeds: HTMLElement[] = [];
+  /** Per slot: the three moves, then the equipped Super, as text. */
+  private readonly infos: PowerInfo[][] = [];
   private readonly hintEl: HTMLElement;
   private liveStart = -1;
   private shownKo = -1;
@@ -72,13 +80,24 @@ export class HUD {
         spin,
       );
       el.style.setProperty('--accent', CLASS_COLORS[cls].main);
+      const chips = h('div.hud-chips', { 'aria-label': 'Active effects' });
+      el.append(chips);
+      this.chipEls.push(chips);
       this.cards.push({ el, bar, num, spin, sup });
       this.el.append(el);
+      const feed = h('div.hud-feed.p' + slot, { 'aria-live': 'polite' });
+      this.feeds.push(feed);
+      this.el.append(feed);
+      const voice = slot === 0 ? YOU : cpuVoice(b.built.def.name);
+      const infos: PowerInfo[] = b.built.moves.map((mv, k) => moveInfo(mv, k + 1, voice));
+      const sd = b.built.supers.find((x) => x.def.id === b.built.equippedSuper)?.def;
+      if (sd) infos.push(superInfo(sd, b.built.levelBoost, voice));
+      this.infos.push(infos);
     }
 
     this.scoreEl = h('div.score');
     this.status = h('div.status');
-    this.el.append(h('div.hud-round', null, this.scoreEl, this.status, h('div.arena-tag', null, match.arena.def.name)));
+    this.el.append(h('div.hud-round', null, this.scoreEl, this.status, h('div.arena-tag', null, match.arena.def.name + (o.practice ? ' · practice' : ''))));
     this.renderScore();
 
     for (let slot = 0; slot < 2; slot++) {
@@ -93,6 +112,18 @@ export class HUD {
     this.hintEl = h('div.hint.pulse');
     this.el.append(this.bannerEl, this.calloutEl, this.hintEl);
     this.setReadyHint();
+  }
+
+  /** A blade used a move or its Super: show what it is and what it does, for you and for the CPU. */
+  powerUsed(e: Extract<SimEvent, { type: 'ability' | 'super' }>): void {
+    if (e.type === 'super' && e.state !== 'activate') return;
+    const info = this.infos[e.slot]?.[e.type === 'ability' ? e.index : 3];
+    if (!info) return;
+    const feed = this.feeds[e.slot];
+    const item = h('div.feed-item', { class: info.kind === 'super' ? 'super' : null }, h('b', null, `${e.slot === 0 ? '' : 'CPU · '}${info.name}`), ' ', info.lines[0] ?? info.flavor);
+    feed.prepend(item);
+    while (feed.children.length > 2) feed.lastElementChild?.remove();
+    window.setTimeout(() => item.remove(), 4200);
   }
 
   /** The arena did something: say so in a line at the top, so a mechanic is never a surprise. */
@@ -173,6 +204,22 @@ export class HUD {
       if (!b.built.equippedSuper) { this.put(sb, 'No Super', 'sstate'); return; }
       const st = b.superState;
       this.put(sb, st === 'READY' ? 'Super ready' : st === 'ACTIVE' ? `Super ${b.superT.toFixed(1)}s` : `Super ${Math.ceil(b.superT)}s`, `sstate ${st}`);
+    });
+
+    // active effects under each card
+    match.blades.forEach((b, i) => {
+      const chips: StatusChip[] = [];
+      if (b.alive) {
+        for (const a of b.mods) { const c = chipFor(a, t, i === 0); if (c && c.remaining > 0.05) chips.push(c); }
+        if (b.shield && b.shield.hits > 0) chips.push({ label: `Shield ×${b.shield.hits}`, good: true, remaining: Math.max(0, b.shield.until - t) });
+      }
+      const merged = new Map<string, StatusChip>();
+      for (const c of chips) { const k = c.label; const prev = merged.get(k); if (!prev || prev.remaining < c.remaining) merged.set(k, c); }
+      const list = [...merged.values()].slice(0, 4);
+      const sig = list.map((c) => `${c.label}${c.good ? '+' : '-'}${c.remaining.toFixed(1)}`).join('|');
+      if (sig === this.chipSig[i]) return;
+      this.chipSig[i] = sig;
+      this.chipEls[i].replaceChildren(...list.map((c) => h('span.st-chip', { class: c.good ? null : 'bad' }, c.label, c.remaining < 30 ? h('i', null, `${c.remaining.toFixed(1)}s`) : null)));
     });
 
     // status line

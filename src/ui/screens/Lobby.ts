@@ -8,12 +8,16 @@ import { CLASS_COLORS } from '../../core/types';
 import { classChip, levelStepper, topBar } from '../common';
 import { BLADE_ART, ARENA_ART } from '../art';
 import { cap, h } from '../dom';
+import { cpuVoice } from '../../blades/powerText';
+import { powersPanel } from '../powers';
 import { matchupInfo } from '../text';
 import type { Ctx, Screen } from './types';
 
 const DIFFS: AIDifficulty[] = ['EASY', 'NORMAL', 'HARD'];
 
 export class LobbyScreen implements Screen {
+  /** Whether the Powers panel was left open (kept while you move between screens). */
+  private static powersOpen = true;
   readonly el: HTMLElement;
   private readonly body = h('div.lobby-body');
 
@@ -70,6 +74,21 @@ export class LobbyScreen implements Screen {
       ...MVP_BLADES.map((id) => this.mini(id, !s.cpuRandom && s.cpu === id, () => { s.cpu = id; s.cpuRandom = false; this.render(); })),
       h('button.mini', { type: 'button', style: '--accent:var(--stamina-light);padding:6px 14px', 'aria-pressed': String(s.cpuRandom), onclick: () => { s.cpuRandom = true; s.rollCpu(); this.render(); } }, 'Random'),
     );
+    const modeRow = h('div.pickrow', null, h('span.lbl', null, 'Round'),
+      h('div.seg', { role: 'group', 'aria-label': 'Round type' },
+        h('button', { type: 'button', 'aria-pressed': String(!s.practice), onclick: () => { s.practice = false; this.render(); } }, 'Fight'),
+        h('button', { type: 'button', 'aria-pressed': String(s.practice), title: 'The CPU launches, then stands still and uses nothing. Nothing is scored. Try every power on it.', onclick: () => { s.practice = true; this.render(); } }, 'Practice dummy'),
+      ),
+      s.practice ? h('span.chip.muted', null, 'CPU stands still · nothing scored') : null,
+    );
+    const powers = h('details.lobby-powers', { open: LobbyScreen.powersOpen },
+      h('summary', null, 'What my powers do'),
+      h('div.powers-cols', null,
+        powersPanel(you, { title: 'You', onChangeSuper: () => { s.returnTo = 'lobby'; this.ctx.go('workshop', s.you); } }),
+        powersPanel(cpu, { title: 'CPU', voice: cpuVoice(cpu.def.name) }),
+      ),
+    );
+    powers.addEventListener('toggle', () => { LobbyScreen.powersOpen = (powers as HTMLDetailsElement).open; });
     const diffRow = h('div.pickrow', null, h('span.lbl', null, 'CPU difficulty'),
       h('div.seg', { role: 'group', 'aria-label': 'CPU difficulty' },
         ...DIFFS.map((d) => h('button', { type: 'button', 'aria-pressed': String(s.difficulty === d), onclick: () => { s.difficulty = d; this.render(); } }, cap(d))),
@@ -92,7 +111,8 @@ export class LobbyScreen implements Screen {
         h('span.tag.' + mu.tag, null, mu.label),
         h('span', null, mu.text),
       ),
-      yourRow, cpuRow, diffRow, arenaRow,
+      powers,
+      yourRow, cpuRow, diffRow, modeRow, arenaRow,
       levelStepper(s.level, (l) => { s.setLevel(l); this.render(); }),
       h('div.cta', null,
         h('button.btn.primary.big', { type: 'button', onclick: () => this.ctx.go('battle') }, 'Battle'),

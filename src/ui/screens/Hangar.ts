@@ -4,6 +4,7 @@
 import { BLADE_ORDER, BLADES } from '../../blades/bladeData';
 import { recommendedBuild, defaultBuild, type BuiltBlade } from '../../blades/BladeFactory';
 import { getPart } from '../../blades/parts';
+import { moveInfo, superInfo } from '../../blades/powerText';
 import { CLASS_BEATS, CLASS_COLORS, PART_SLOTS, type BladeClass, type Rarity } from '../../core/types';
 import { levelStepper, modSpans, statsGrid, topBar } from '../common';
 import { BLADE_ART } from '../art';
@@ -192,7 +193,7 @@ export class HangarScreen implements Screen {
       h('div.moves', null, ...b.moves.map((m, i) =>
         h('div.move', null,
           h('span.k', null, String(i + 1)),
-          h('div', null, h('div.nm', null, m.name), h('div.ds', null, m.description)),
+          h('div', null, h('div.nm', null, m.name), h('div.ds', null, m.description), h('ul.pw-lines', null, ...moveInfo(m, i + 1).lines.map((l) => h('li', null, l)))),
           h('span.tg', null, m.charge ? 'Hold' : cap(m.type)),
         ))),
       h('div.eyebrow', null, 'Parts'),
@@ -235,6 +236,7 @@ export class HangarScreen implements Screen {
           h('span.nm', null, st.def.name, st.def.ultimate ? ' ★' : ''),
           h('span.chip.muted', null, st.unlocked ? `${st.def.duration.toFixed(1)}s · ${st.def.recharge}s` : `Lv ${st.def.unlockLevel}`),
           h('span.ds', null, st.def.description),
+          h('span.pw-lines', null, ...superInfo(st.def, b.levelBoost).lines.map((l) => h('span.li', null, l))),
           st.reason ? h('span.why', null, st.reason) : null,
         );
         return el;

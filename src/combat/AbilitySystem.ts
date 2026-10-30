@@ -1,7 +1,7 @@
 // AbilitySystem: turns controller input into basic moves. One system for every blade.
 //
 //  - tap  → instant move (cooldown applies)
-//  - hold → chargeable move charges, draining spin (PRD DL-6), release fires it scaled by charge
+//  - hold → chargeable move charges, draining spin (PRD DL-6), release fires it scaled by charge (a quick tap fires the weakest version)
 // Charging drains a little spin and the cooldown self-limits spam, so aggression has a real price.
 
 import { TUNING } from '../core/Balance';
@@ -53,8 +53,8 @@ export function updateAbilities(m: Match, b: BladeRuntime, dt: number): void {
       const ch = ab.charge!;
       const frac = b.charge.t / ch.maxTime;
       b.charge = { index: -1, t: 0, maxed: false };
-      if (frac >= ch.minCharge) fireAbility(m, b, i, frac);
-      else m.emit({ type: 'charge', slot: b.slot, index: i, state: 'cancel' });
+      // a tap is a quick jab, not nothing: it fires at the weakest charge (the effects scale from about a quarter of full power)
+      fireAbility(m, b, i, Math.max(frac, 0));
     }
   }
 

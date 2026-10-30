@@ -7,6 +7,7 @@ import { BladeView, visualSpecFor } from '../blades/BladeMesh';
 import { CLASS_COLORS, TAU, type BladeClass } from '../core/types';
 import type { Match } from '../combat/Match';
 import type { SimEvent } from '../combat/events';
+import { chipFor } from '../blades/powerText';
 import { ImpactFX } from './ImpactFX';
 
 /** Zone colours by kind (trap takes its owner's class colour). */
@@ -18,6 +19,8 @@ export class SuperFX {
   readonly root = new THREE.Group();
   private readonly zones = new Map<number, ZoneVisual>();
   private readonly auras: THREE.Mesh[] = [];
+  /** A ring on the floor under any blade with a status effect: white = untouchable, green = buffed, violet = debuffed, blue = shielded. */
+  private readonly status: THREE.Mesh[] = [];
   private readonly decoys = new Map<number, BladeView>();
   private readonly beams: THREE.Line[] = [];
   private time = 0;
@@ -32,6 +35,16 @@ export class SuperFX {
       a.renderOrder = 3;
       this.root.add(a);
       this.auras.push(a);
+    }
+    for (let i = 0; i < slots; i++) {
+      const r = new THREE.Mesh(
+        new THREE.RingGeometry(1.0, 1.1, 40).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+      );
+      r.visible = false;
+      r.renderOrder = 3;
+      this.root.add(r);
+      this.status.push(r);
     }
     for (let i = 0; i < 4; i++) {
       const l = new THREE.Line(
@@ -150,6 +163,24 @@ export class SuperFX {
       a.position.set(views[i].root.position.x, yAt(b.x, b.z) + 0.06, views[i].root.position.z);
       a.scale.setScalar(r);
       a.rotation.y = this.time * 1.4;
+    });
+
+    // status rings: what is on each blade right now
+    match.blades.forEach((b, i) => {
+      const r = this.status[i];
+      const chips = b.alive && !b.fallen ? b.mods.map((a) => chipFor(a, match.t, i === 0)).filter((c) => c && c.remaining > 0.05) : [];
+      const shield = !!b.shield && b.shield.hits > 0;
+      const on = chips.length > 0 || shield;
+      r.visible = on;
+      if (!on) return;
+      const bad = chips.some((c) => c && !c.good);
+      const color = b.hasFlag('invuln') ? '#ffffff' : bad && !shield ? '#b78cff' : shield ? CLASS_COLORS.DEFENSE.light : '#7dffb2';
+      const mat = r.material as THREE.MeshBasicMaterial;
+      mat.color.set(color).multiplyScalar(1.6);
+      mat.opacity = 0.55 + 0.3 * Math.sin(this.time * 9 + i * 2);
+      r.position.set(views[i].root.position.x, yAt(b.x, b.z) + 0.05, views[i].root.position.z);
+      r.scale.setScalar(b.radius * (1.3 + 0.06 * Math.sin(this.time * 7)));
+      r.rotation.y = -this.time * 1.2;
     });
 
     // pull / drain beams between owner and target

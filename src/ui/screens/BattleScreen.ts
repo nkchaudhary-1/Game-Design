@@ -13,6 +13,7 @@ import { controllerUrl } from '../ControllerPage';
 import { HUD } from '../HUD';
 import { h, icon } from '../dom';
 import { muteButton } from '../common';
+import { powersSheet } from '../powers';
 import { explainResult, matchupInfo, resultRows } from '../text';
 import type { Ctx, Screen } from './types';
 
@@ -28,6 +29,8 @@ export class BattleScreen implements Screen {
   private overlay: HTMLElement | null = null;
   private channel: { bus: ChannelBus; off: () => void } | null = null;
   private paused = false;
+  private helping = false;
+  private sheetData: { you: BuiltBlade; cpu: BuiltBlade } | null = null;
   private resultShown = false;
   private slow = 0;
   private frames = 0;
@@ -47,6 +50,8 @@ export class BattleScreen implements Screen {
       rr, player, cpu, difficulty: s.difficulty, arenaId: s.arenaId, reduced: ctx.reduced, audio: ctx.audio,
       onResult: (r) => this.onResult(r, player, cpu),
       onArena: (e) => this.hud.arenaEvent(e),
+      onPower: (e) => this.hud.powerUsed(e),
+      practice: s.practice,
     });
 
     this.hud = new HUD({
@@ -57,10 +62,13 @@ export class BattleScreen implements Screen {
       anchor: (slot) => this.battle.view.bladeWorld(slot),
       size: () => ({ w: this.wrap.clientWidth, h: this.wrap.clientHeight }),
       touch: ctx.touch,
+      practice: s.practice,
     });
+    const helpBtn = h('button.iconbtn', { type: 'button', 'aria-label': 'What do the powers do?', title: 'What do the powers do? (H)', onclick: () => this.toggleHelp() }, icon('help'));
     const pauseBtn = h('button.iconbtn', { type: 'button', 'aria-label': 'Pause', title: 'Pause (Esc)', onclick: () => this.togglePause() }, icon('pause'));
     const popBtn = h('button.iconbtn', { type: 'button', 'aria-label': 'Open controller in a new tab', title: 'Open the controller in a second tab (two-tab test)', onclick: () => this.openController(player) }, icon('phone'));
-    this.hud.add(h('div.arena-tools', null, popBtn, pauseBtn, muteButton(ctx)));
+    this.hud.add(h('div.arena-tools', null, helpBtn, popBtn, pauseBtn, muteButton(ctx)));
+    this.sheetData = { you: player, cpu };
     this.wrap.append(this.hud.el);
 
     this.battle.bus.latencyMs = ctx.latencyMs;
@@ -111,7 +119,8 @@ export class BattleScreen implements Screen {
   // ------------------------------------------------------------------------------------------ flow
   private onKey = (e: KeyboardEvent): void => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.code === 'Escape') { e.preventDefault(); if (!this.resultShown) this.togglePause(); return; }
+    if (e.code === 'KeyH' && !e.repeat && !this.resultShown) { e.preventDefault(); this.toggleHelp(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (this.helping) this.toggleHelp(); else if (!this.resultShown) this.togglePause(); return; }
     if (this.resultShown && !e.repeat && (e.code === 'KeyR' || e.code === 'Enter') && !(e.target instanceof HTMLButtonElement)) {
       e.preventDefault();
       this.ctx.go('battle');
@@ -120,8 +129,24 @@ export class BattleScreen implements Screen {
 
   private onVis = (): void => { if (document.hidden && !this.paused && !this.resultShown && this.battle.currentPhase === 'live') this.togglePause(); };
 
+  /** The powers sheet: pauses the fight, lists what every power of both blades does, resumes on close. */
+  private toggleHelp(): void {
+    if (this.resultShown || !this.sheetData) return;
+    if (this.helping) {
+      this.helping = false; this.paused = false;
+      this.overlay?.remove(); this.overlay = null;
+      this.pad.setEnabled(true); this.kb.setEnabled(true); this.ctx.audio.resume();
+      return;
+    }
+    if (this.paused) return;
+    this.helping = true; this.paused = true;
+    this.pad.cancelInput(); this.pad.setEnabled(false); this.kb.setEnabled(false); this.ctx.audio.suspend();
+    this.overlay = powersSheet(this.sheetData.you, this.sheetData.cpu, () => this.toggleHelp());
+    this.wrap.append(this.overlay);
+  }
+
   private togglePause(): void {
-    if (this.resultShown) return;
+    if (this.resultShown || this.helping) return;
     this.paused = !this.paused;
     if (this.paused) {
       this.pad.cancelInput();
@@ -159,7 +184,7 @@ export class BattleScreen implements Screen {
 
   private onResult(r: MatchResult, player: BuiltBlade, cpu: BuiltBlade): void {
     const s = this.ctx.session;
-    s.record(r.winner);
+    if (!s.practice) s.record(r.winner);
     this.resultShown = true;
     this.pad.cancelInput();
     this.pad.setEnabled(false);
@@ -179,7 +204,9 @@ export class BattleScreen implements Screen {
       ),
       h('div.line', null, t.line),
       ...t.why.map((w) => h('p.why', null, w)),
-      h('p.why', null, h('b', null, `Session ${s.score.you}–${s.score.cpu}`), s.score.draws ? ` (${s.score.draws} draw${s.score.draws > 1 ? 's' : ''})` : '', ` · matchup: ${mu.label.toLowerCase()}`),
+      s.practice
+        ? h('p.why', null, h('b', null, 'Practice round'), ' · nothing is scored. Press H to read what every power does, then try them on the dummy.')
+        : h('p.why', null, h('b', null, `Session ${s.score.you}–${s.score.cpu}`), s.score.draws ? ` (${s.score.draws} draw${s.score.draws > 1 ? 's' : ''})` : '', ` · matchup: ${mu.label.toLowerCase()}`),
       stats,
       h('div.btns', null,
         h('button.btn.primary', { type: 'button', onclick: () => this.ctx.go('battle') }, 'Rematch'),
