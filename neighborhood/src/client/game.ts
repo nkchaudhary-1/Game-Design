@@ -279,7 +279,7 @@ export class Game {
     if (code === 'Escape') {
       if (this.ui.liftOpen) return this.closeLift();
       if (this.ui.pauseOpen) return this.closePause();
-      if (!this.ui.chatOpen && !this.input.locked) return this.openPause();
+      if (!this.ui.chatOpen) { this.openPause(); this.input.unlock(); }   // browsers that deliver Esc while locked, and synthetic events
       return;
     }
     if (this.ui.liftOpen) {
