@@ -66,6 +66,12 @@ const ok = (cond, msg) => { console.log(`${cond ? '✔' : '✘'} ${msg}`); if (!
   await a.page.evaluate(() => window.__nb.interact());                 // main entrance
   await a.page.waitForTimeout(1200);
   await walkTo(a, 15, 13);
+  // call the lift (it may be parked on another floor with its landing doors shut)
+  await walkTo(a, 13.6, 19.4, { tol: 0.3 });
+  await a.page.evaluate(() => window.__nb.look(0, 0.2));
+  await a.page.waitForTimeout(1500);
+  await a.page.evaluate(() => window.__nb.interact());
+  await a.page.waitForFunction(() => { const s = window.__nb.state(); return s.lift.y < 0.25 && s.lift.door > 0.99; }, null, { timeout: 120000 });
   await walkTo(a, 13, 22.4, { tol: 0.25 });
   await a.page.evaluate(() => window.__nb.look(Math.PI / 2, 0.15));
   await a.page.waitForTimeout(1500);
@@ -76,6 +82,8 @@ const ok = (cond, msg) => { console.log(`${cond ? '✔' : '✘'} ${msg}`); if (!
   ok(Math.abs(s.y - 9.8) < 0.05 && /Floor 3/.test(s.zone), `rode the lift to ${s.zone} (y=${s.y.toFixed(2)})`);
   await a.page.screenshot({ path: `${SHOTS}/tour-lift-arrived.png` });
   await b.page.screenshot({ path: `${SHOTS}/tour-second-player.png` });
+  const calls = await a.page.evaluate(() => window.__nb.game.rig.renderer.info.render.calls);
+  console.log(`draw calls per frame: ${calls}`);
 
   ok(a.errors.length === 0 && b.errors.length === 0, `no page errors ${a.errors.concat(b.errors).join(' | ')}`);
   await browser.close();
