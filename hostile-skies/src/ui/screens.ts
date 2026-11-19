@@ -156,9 +156,9 @@ export class Ui {
         </div>
         <div class="best" data-best>${best ? `Best on ${TUNING[s.difficulty].label}: <b>${fmt(best)}</b>` : ''}</div>
       </div>
-      <div class="worldpick" title="${ALIEN ? 'A violet dusk under a ringed planet. Same fight, different sky.' : 'A late afternoon over a real-looking coast.'}">
+      <div class="worldpick" title="${ALIEN ? 'A violet dusk under a ringed planet.' : 'The same fight on a realistic golden-hour coast.'}">
         <span>World</span>
-        <div class="seg" data-seg="look" role="group" aria-label="World"><button data-v="earth">Golden hour</button><button data-v="alien">Alien dusk</button></div>
+        <div class="seg" data-seg="look" role="group" aria-label="World"><button data-v="alien">Alien dusk</button><button data-v="earth">Golden hour</button></div>
       </div>
       <div class="foot">Best with sound on and the window large. <span class="dim">Works with keyboard, mouse, gamepad or touch.</span></div>
     `, 'title');

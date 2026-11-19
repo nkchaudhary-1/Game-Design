@@ -11,10 +11,13 @@ import { ARENA_RADIUS, surfaceHeight } from '../sim/terrain';
 import { CANNON, MISSILE, WAVES, type SimEvent, type World } from '../sim/world';
 import { clamp, DEG } from '../sim/util';
 import type { GameView } from '../render/view';
+import { ALIEN } from '../render/look';
 
-const CY = '#9dffb8';
-const CY_DIM = 'rgba(157,255,184,0.66)';
-const CY_FAINT = 'rgba(157,255,184,0.26)';
+// Instruments: soft green over the realistic coast, icy cyan-white over the violet dusk (clear of the amber and red that mean danger).
+const RGB = ALIEN ? '180,240,255' : '157,255,184';
+const CY = ALIEN ? '#b4f0ff' : '#9dffb8';
+const CY_DIM = `rgba(${RGB},0.66)`;
+const CY_FAINT = `rgba(${RGB},0.26)`;
 const AMBER = '#ffc04d';
 const RED = '#ff5a4a';
 const LIME = '#b6ff3c';
@@ -238,7 +241,7 @@ export class Hud {
       if (p === 0 || Math.abs(p - pit / DEG) > 24) continue;
       const pr = p * DEG;
       const d = 0.075 / Math.max(Math.cos(pr), 0.35);
-      const col = p > 0 ? CY_DIM : 'rgba(157,255,184,0.5)';
+      const col = p > 0 ? CY_DIM : `rgba(${RGB},0.5)`;
       const neg = p < 0;
       seg(hdg - d, hdg - d * 0.38, pr, col, 1.3, neg);
       seg(hdg + d * 0.38, hdg + d, pr, col, 1.3, neg);
@@ -541,7 +544,7 @@ export class Hud {
     this.text('MSL', x - 118 * u, y, 11, CY_DIM, 'left');
     for (let i = 0; i < MISSILE.max; i++) {
       const px = x - 90 * u + i * 11 * u;
-      g.fillStyle = i < w.missiles ? (w.lock >= 1 && i === w.missiles - 1 ? RED : CY) : 'rgba(157,255,184,0.2)';
+      g.fillStyle = i < w.missiles ? (w.lock >= 1 && i === w.missiles - 1 ? RED : CY) : `rgba(${RGB},0.2)`;
       g.fillRect(px, y - 7 * u, 7 * u, 14 * u);
     }
     // cannon heat

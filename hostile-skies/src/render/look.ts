@@ -1,7 +1,8 @@
-// The two worlds. 'earth' is the realistic golden-hour coast (the default). 'alien' is a stylised dusk: a violet sky with
-// stars, moons and a ringed planet filling a quarter of it, ground in plum, rose and coral, rock spires on the skyline.
-// Picked with ?look=alien|earth or the World switch on the title screen (remembered in localStorage). It changes colour,
-// sky and a few props only: the simulation, the terrain shape and every number that matters to the fight stay identical.
+// The two worlds. 'alien' (the default) is the game's theme: a stylised violet dusk with stars, moons and a ringed planet
+// filling a quarter of the sky, ground in plum, rose and coral, rock spires on the skyline, and menus and instruments in
+// the same palette. 'earth' is the realistic golden-hour coast. Picked with ?look=alien|earth or the World switch on the
+// title screen (remembered in localStorage). It changes colour, sky and a few props only: the simulation, the terrain
+// shape and every number that matters to the fight stay identical.
 
 export type LookName = 'earth' | 'alien';
 
@@ -12,12 +13,18 @@ function pick(): LookName {
     const q = new URLSearchParams(location.search).get('look');
     if (q === 'alien' || q === 'earth') return q;
   } catch { /* no DOM (tests) */ }
-  try { if (localStorage.getItem(KEY) === 'alien') return 'alien'; } catch { /* private mode */ }
-  return 'earth';
+  try { if (localStorage.getItem(KEY) === 'earth') return 'earth'; } catch { /* private mode */ }
+  return 'alien';
 }
 
 export const LOOK: LookName = pick();
 export const ALIEN = LOOK === 'alien';
+
+// the menus pick their palette from this attribute (see ui.css), and the browser chrome follows
+try {
+  document.documentElement.dataset.look = LOOK;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', ALIEN ? '#150a2c' : '#0b1030');
+} catch { /* no DOM (tests) */ }
 
 /** Remember the choice and reload: the ground colours are baked into the terrain, so a reload is the honest way to switch. */
 export function chooseLook(v: LookName): void {

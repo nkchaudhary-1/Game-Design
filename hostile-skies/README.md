@@ -97,7 +97,7 @@ The jet is rate-commanded (like a fly-by-wire fighter) but everything else is re
 
 ## Look
 
-One late-afternoon scene, tuned to read as real rather than as a game backdrop (`render/`):
+The realistic golden-hour coast, tuned to read as real rather than as a game backdrop (`render/`). It is the alternative world; see *Alien dusk* below for the default:
 
 - **Sky and light.** A golden-hour dome with a hard sun, aureole and a faint moon. The sun direction drives the key light,
   the lens flare and the haze, and the fog colour is re-derived every frame from where the camera points, so land and sea
@@ -115,13 +115,19 @@ One late-afternoon scene, tuned to read as real rather than as a game backdrop (
   condensation around the airframe, and thin contrails above about 4 km.
 - **HUD.** Green on a soft shadow so it reads over sky, sea or land, with a short key hint panel for the first seconds.
 
-**Alien dusk (opt-in second world).** Pick it with the **World** switch on the title screen, or `?look=alien` (`?look=earth`
-goes back); the choice is remembered and switching reloads the page, because ground colours are baked into the terrain. It
-is a violet-to-coral dusk with stars, two moons and a banded, ringed planet filling a quarter of the sky, light shafts from a
-low oversized sun, plum, rose and coral ground (a luminance gradient map over the Earth colours, so forests, fields and
-snowline still read), violet conifers, a pink-shallow sea, and clusters of stepped rock spires out past the edge of the
-arena. It is built from `render/look.ts`, `render/monoliths.ts` and the alien branch in `render/sky.ts`. It changes colour,
-sky and props only: terrain shape, physics, AI and every test are identical in both worlds.
+**Alien dusk (the default theme).** The game's theme is a violet-to-coral dusk with stars, two moons and a banded, ringed
+planet filling a quarter of the sky, light shafts from a low oversized sun, plum, rose and coral ground (a luminance
+gradient map over the Earth colours, so forests, fields and snowline still read), violet conifers, a pink-shallow sea, and
+clusters of stepped rock spires out past the edge of the arena. The menus follow it (violet panels, coral and peach
+accents, a magenta tail on the title) and the HUD turns icy cyan-white, which stays clear of the amber and red that mean
+danger. The five paintings it was built from set the palette and the motifs: one saturated colour family per scene, a giant
+body in the sky, monoliths, layered haze.
+
+The realistic coast above is still there as the alternative: pick **Golden hour** with the World switch (top right of the
+title screen) or `?look=earth`; `?look=alien` forces the default. The choice is remembered, and switching reloads the page
+because ground colours are baked into the terrain. Both looks come from `render/look.ts` (palette, ground gradient map),
+`render/monoliths.ts`, the alien branch of the dome shader in `render/sky.ts`, and the `data-look` theme block in
+`ui/ui.css`. Only colour, sky and props change: terrain shape, physics, AI and every test are identical in both worlds.
 
 Not done: real shadows from dynamic objects, volumetric clouds, water simulation, per-vertex wind in the trees. The look is a
 tuned stylisation of realism, not a simulation of light.
@@ -157,7 +163,7 @@ hostile-skies/
     render/            three.js
       view.ts          scene, camera rig, entity sync, event reactions, haze, post chain
       sky.ts clouds.ts terrain.ts trees.ts cities.ts   the world
-      look.ts monoliths.ts                              the second (alien dusk) world
+      look.ts monoliths.ts                              the two worlds (alien dusk is the default)
       jet.ts models.ts                                  the Sparrow, its cockpit, alien ships
       post.ts flare.ts particles.ts effects.ts quality.ts   film pass, sun flare, smoke/fire/vapour, tiers
     hud/hud.ts         canvas HUD: conformal ladder / boresight / targets, tapes, radar, warnings
@@ -192,7 +198,7 @@ and phones start lower; the game steps down by itself if frames stay slow. Force
 ## QA URL switches
 
 `?demo` (play the reel) · `?record` (fixed-step recorder, see above) · `?autostart` (skip the title) · `?god` (take no damage) · `?wave=5` (start at a wave; 5 = the Leviathan) · `?seed=123` ·
-`?look=alien|earth` · `?quality=low` · `?shot` (keeps the WebGL buffer so headless screenshots are not blank). `window.__game` exposes the
+`?look=alien|earth` (default alien) · `?quality=low` · `?shot` (keeps the WebGL buffer so headless screenshots are not blank). `window.__game` exposes the
 world, view and sound for debugging.
 
 ## MVP vs later
