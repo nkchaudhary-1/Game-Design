@@ -67,7 +67,7 @@ export function car(mb: MB, x: number, z: number, along: 'x' | 'z', color: numbe
   mb.cbox(x, 0.28, z, sx, 0.72, sz, color, { solid: false, group });
   const cx = along === 'x' ? 2.2 : W - 0.1, cz = along === 'x' ? W - 0.1 : 2.2;
   mb.cbox(x - (along === 'x' ? 0.2 : 0), 1.0, z - (along === 'z' ? 0.2 : 0), cx, 0.55, cz, color, { solid: false, group });
-  mb.cbox(x - (along === 'x' ? 0.2 : 0), 1.05, z - (along === 'z' ? 0.2 : 0), cx + (along === 'x' ? 0.04 : 0.06), 0.4, cz + (along === 'z' ? 0.04 : 0.06), C.glass, { solid: false, alpha: 0.7, cast: false, group });
+  mb.cbox(x - (along === 'x' ? 0.2 : 0), 1.05, z - (along === 'z' ? 0.2 : 0), cx + (along === 'x' ? 0.04 : 0.06), 0.4, cz + (along === 'z' ? 0.04 : 0.06), 0x6f8aa3, { solid: false, alpha: 0.9, cast: false, group });
   mb.cbox(x, 0, z, sx, 1.45, sz, color, { noPiece: true, group });
   for (const a of [-1.35, 1.35])
     for (const b of [-0.85, 0.85]) {

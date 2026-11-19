@@ -1,4 +1,4 @@
-import { TAG_NOCAM } from '../collision';
+import { TAG_CAB, TAG_NOCAM } from '../collision';
 import { C, Frame, MB, PK, type LiftDef, type LiftPart } from './core';
 import { addFound, addLamp, addSwitch, bench, plant, rug, sofa, table, wallLabel } from './props';
 
@@ -243,7 +243,7 @@ function buildLift(mb: MB, f: Frame, G: number[]): LiftDef {
   const mk = (rel: LiftPart['rel'], color: number, leaf: -1 | 0 | 1, ox: number, oy: number, oz: number, group: number, noCam = false): LiftPart => {
     const s = mb.world.add({
       minX: ox + rel[0], minY: oy + rel[1], minZ: oz + rel[2], maxX: ox + rel[3], maxY: oy + rel[4], maxZ: oz + rel[5],
-      group, tag: noCam ? TAG_NOCAM : 0, dyn: true,
+      group, tag: (noCam ? TAG_NOCAM : 0) | (oy === F[0] && group === -1 ? TAG_CAB : 0), dyn: true,
     });
     return { rel, color, solid: s.id, leaf, noCam };
   };

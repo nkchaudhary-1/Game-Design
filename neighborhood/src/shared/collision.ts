@@ -7,6 +7,7 @@ import { approachAngle } from './math';
  */
 export const TAG_GLASS = 1; // blocks bodies, never blocks the camera
 export const TAG_NOCAM = 2; // blocks bodies, never blocks the camera (railings, cab ceiling…)
+export const TAG_CAB = 4;   // lift-cab parts: ignored by the camera while the player is inside the cab
 
 export interface Solid {
   id: number;
