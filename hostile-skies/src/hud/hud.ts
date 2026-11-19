@@ -9,16 +9,16 @@ import { bankAngle, forwardOf, headingAngle, pitchAngle } from '../sim/aircraft'
 import { isTargetable, ALIEN_SPEC } from '../sim/aliens';
 import { ARENA_RADIUS, surfaceHeight } from '../sim/terrain';
 import { CANNON, MISSILE, WAVES, type SimEvent, type World } from '../sim/world';
-import { clamp, DEG, smoothstep } from '../sim/util';
+import { clamp, DEG } from '../sim/util';
 import type { GameView } from '../render/view';
 
-const CY = '#6ff3ff';
-const CY_DIM = 'rgba(111,243,255,0.42)';
-const CY_FAINT = 'rgba(111,243,255,0.16)';
+const CY = '#9dffb8';
+const CY_DIM = 'rgba(157,255,184,0.66)';
+const CY_FAINT = 'rgba(157,255,184,0.26)';
 const AMBER = '#ffc04d';
 const RED = '#ff5a4a';
 const LIME = '#b6ff3c';
-const WHITE = '#f2fbff';
+const WHITE = '#f4fff6';
 
 export interface HudState {
   assist: boolean;
@@ -197,9 +197,15 @@ export class Hud {
     // damage: red once the hull is hit, cyan flicker when only the shield soaked it
     const df = w.damageFlash;
     if (df > 0) edge(w.hull < 100 && w.shield <= 0 ? '255,40,30' : '60,200,255', df * 0.55);
-    // G tunnel vision
-    const gT = smoothstep(7.5, 11.5, w.ac.g);
-    edge('4,6,14', gT * 0.6);
+    // G: vision tunnels in from the edges and greys out, then fades to black; negative G reddens it
+    if (w.blackout > 0.02) {
+      const b = w.blackout;
+      const gr = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * Math.max(0.05, 0.5 * (1 - b * 0.95)), W / 2, H / 2, Math.hypot(W, H) * (0.62 - 0.3 * b));
+      gr.addColorStop(0, 'rgba(2,3,6,0)'); gr.addColorStop(1, `rgba(2,3,6,${Math.min(1, 0.55 + b)})`);
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      if (b > 0.7) { g.fillStyle = `rgba(0,0,0,${(b - 0.7) / 0.3 * 0.85})`; g.fillRect(0, 0, W, H); }
+    }
+    if (w.redout > 0.02) edge('190,12,12', Math.min(0.85, w.redout * 0.9));
     // low hull heartbeat
     if (w.hull < 30 && w.playerAlive) edge('255,30,20', (0.12 + 0.1 * Math.sin(this.t * 6)) * (1 - w.hull / 30));
     if (!w.playerAlive) { g.fillStyle = 'rgba(20,0,0,0.25)'; g.fillRect(0, 0, W, H); }
@@ -232,7 +238,7 @@ export class Hud {
       if (p === 0 || Math.abs(p - pit / DEG) > 24) continue;
       const pr = p * DEG;
       const d = 0.075 / Math.max(Math.cos(pr), 0.35);
-      const col = p > 0 ? CY_DIM : 'rgba(111,243,255,0.3)';
+      const col = p > 0 ? CY_DIM : 'rgba(157,255,184,0.5)';
       const neg = p < 0;
       seg(hdg - d, hdg - d * 0.38, pr, col, 1.3, neg);
       seg(hdg + d * 0.38, hdg + d, pr, col, 1.3, neg);
@@ -466,7 +472,7 @@ export class Hud {
     const ry = cy + half + 16 * u;
     this.num(`R ${Math.max(0, Math.round(gnd))}`, xr + 4 * u, ry, 15, w.tti < 4 ? RED : gnd < 500 ? AMBER : CY_DIM, 'left');
     this.num(`${ac.vel.y >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(ac.vel.y))}`, xr + 4 * u, ry + 18 * u, 14, CY_DIM, 'left');
-    this.num(`M ${(ac.speed / 330).toFixed(2)}`, xl - 4 * u, ry, 15, CY_DIM, 'right');
+    this.num(`M ${ac.mach.toFixed(2)}`, xl - 4 * u, ry, 15, ac.mach > 0.95 && ac.mach < 1.08 ? AMBER : CY_DIM, 'right');
     this.num(`G ${ac.g.toFixed(1)}`, xl - 4 * u, ry + 18 * u, 15, ac.g > 9 ? RED : ac.g > 6.5 ? AMBER : CY_DIM, 'right');
     // throttle tick beside the speed tape
     const tx = xl - 66 * u, th = 150 * u;
@@ -535,7 +541,7 @@ export class Hud {
     this.text('MSL', x - 118 * u, y, 11, CY_DIM, 'left');
     for (let i = 0; i < MISSILE.max; i++) {
       const px = x - 90 * u + i * 11 * u;
-      g.fillStyle = i < w.missiles ? (w.lock >= 1 && i === w.missiles - 1 ? RED : CY) : 'rgba(111,243,255,0.14)';
+      g.fillStyle = i < w.missiles ? (w.lock >= 1 && i === w.missiles - 1 ? RED : CY) : 'rgba(157,255,184,0.2)';
       g.fillRect(px, y - 7 * u, 7 * u, 14 * u);
     }
     // cannon heat
@@ -668,6 +674,7 @@ export class Hud {
     if (w.overheated) list.push({ t: 'CANNON OVERHEAT', c: AMBER });
     if (w.hull < 30) list.push({ t: 'HULL CRITICAL', c: RED });
     if (ac.g > 9.5) list.push({ t: 'OVER-G', c: AMBER });
+    if (w.blackout > 0.45) list.push({ t: 'G-LOC — EASE THE TURN', c: RED });
     let y = this.h / 2 - (this.compact ? 70 : 96) * u;
     for (const l of list.slice(0, 3)) {
       if (!blink && l.big) { y += 40 * u; continue; }
@@ -732,7 +739,11 @@ export class Hud {
       : ['W S pitch   A D roll   Q E yaw   R F throttle   Shift afterburner',
          'Space cannon   Enter missile   T target   C camera   H assist   Esc pause'];
     let y = (this.compact ? 70 : 128) * u;
-    for (const l of lines) { this.text(l, this.w / 2, y, 13, CY_DIM, 'center'); y += 20 * u; }
+    this.ctx.font = `600 ${Math.round(13 * u)}px "Chakra Petch", system-ui, sans-serif`;
+    const w = Math.max(...lines.map((l) => this.ctx.measureText(l).width)) + 36 * u;
+    this.ctx.fillStyle = 'rgba(6,16,12,0.55)';
+    this.ctx.fillRect(this.w / 2 - w / 2, y - 14 * u, w, lines.length * 20 * u + 8 * u);
+    for (const l of lines) { this.text(l, this.w / 2, y, 13, CY, 'center'); y += 20 * u; }
     this.ctx.globalAlpha = 1;
   }
 

@@ -13,7 +13,7 @@ export const JET = {
   mass: 9000,
   wingArea: 56,
   thrustMil: 75_000,
-  thrustAb: 135_000,
+  thrustAb: 175_000,
   cd0: 0.032,
   inducedK: 0.075,
   clAlpha: 5.2,
@@ -53,6 +53,10 @@ export interface Aircraft {
   braking: boolean;
   /** Smoothed engine output 0..1.3 (1.3 = full afterburner). */
   thrust: number;
+  /** Mach number: speed over the local speed of sound. */
+  mach: number;
+  /** Pre-stall airframe buffet 0..1 (shake). */
+  buffet: number;
 }
 
 export function newAircraft(x: number, y: number, z: number, speed = 190): Aircraft {
@@ -62,22 +66,46 @@ export function newAircraft(x: number, y: number, z: number, speed = 190): Aircr
     q: new Quaternion(),
     pitchRate: 0, rollRate: 0, yawRate: 0,
     throttle: 0.55, boostFuel: 100, boosting: false, boostLock: false, boostIdle: 0,
-    speed, aoa: 0, beta: 0, g: 1, stalled: false, braking: false, thrust: 0.55,
+    speed, aoa: 0, beta: 0, g: 1, stalled: false, braking: false, thrust: 0.55, mach: speed / 340, buffet: 0,
   };
 }
 
 const _f = new Vector3(), _u = new Vector3(), _r = new Vector3(), _vh = new Vector3();
 const _lift = new Vector3(), _acc = new Vector3(), _dq = new Quaternion(), _w = new Vector3();
 
-export const airDensity = (alt: number): number => 1.225 * Math.exp(-Math.max(alt, 0) / 8500);
+/** International Standard Atmosphere: air density, speed of sound and temperature at an altitude in metres. */
+export function atmosphere(alt: number): { rho: number; a: number; T: number } {
+  const h = Math.max(alt, 0);
+  const T = h < 11000 ? 288.15 - 0.0065 * h : 216.65;
+  const rho = h < 11000 ? 1.225 * Math.pow(T / 288.15, 4.256) : 0.3639 * Math.exp(-(h - 11000) / 6341.6);
+  return { rho, a: Math.sqrt(1.4 * 287.05 * T), T };
+}
+export const airDensity = (alt: number): number => atmosphere(alt).rho;
+export const speedOfSound = (alt: number): number => atmosphere(alt).a;
+
+/** Lift-curve slope multiplier: Prandtl-Glauert rise towards the transonic, a collapse through Mach 1, a lower supersonic slope. */
+export function liftSlopeMul(M: number): number {
+  if (M < 0.88) return Math.min(1.45, 1 / Math.sqrt(1 - M * M));
+  if (M < 1.15) return lerp(1.45, 0.78, smoothstep(0.88, 1.15, M));
+  return 0.78 * Math.sqrt(1.15 / M);
+}
+
+/** Extra zero-lift drag as a multiple of the subsonic value: the transonic drag rise, easing off supersonic. */
+export function waveDrag(M: number): number {
+  return 1.0 * smoothstep(0.8, 1.04, M) * (1 - 0.5 * smoothstep(1.1, 1.6, M));
+}
 
 /** Lift coefficient vs angle of attack: linear up to the stall, then a sharp drop to a draggy plateau. */
-export function liftCoef(aoa: number): number {
+export function liftCoef(aoa: number, mach = 0): number {
   const a = Math.abs(aoa), s = aoa < 0 ? -1 : 1;
-  if (a <= JET.aoaStall) return s * JET.clAlpha * a;
-  const over = smoothstep(0, 1, (a - JET.aoaStall) / (12 * DEG));
+  const slope = JET.clAlpha * liftSlopeMul(mach);
+  const clMax = JET.clMax * (1 - 0.16 * smoothstep(0.75, 1.0, mach));
+  const stall = clMax / slope; // the stall angle moves with the slope, as shock-induced separation arrives early
+  if (a <= Math.min(JET.aoaStall, stall)) return s * slope * a;
+  const aS = Math.min(JET.aoaStall, stall);
+  const over = smoothstep(0, 1, (a - aS) / (12 * DEG));
   const fade = 1 - smoothstep(50 * DEG, 100 * DEG, a);
-  return s * lerp(JET.clMax, 0.5, over) * fade;
+  return s * lerp(clMax, 0.5, over) * fade;
 }
 
 export function bankAngle(a: Aircraft): number {
@@ -106,7 +134,10 @@ export function stepAircraft(a: Aircraft, c: Controls, dt: number, assist: boole
   const vf = a.vel.dot(_f), vu = a.vel.dot(_u), vr = a.vel.dot(_r);
   a.aoa = V > 6 ? Math.atan2(-vu, vf) : 0;
   a.beta = V > 6 ? Math.atan2(vr, Math.max(Math.abs(vf), 1)) : 0;
-  const rho = airDensity(a.pos.y);
+  const atm = atmosphere(a.pos.y);
+  const rho = atm.rho;
+  const mach = V / atm.a;
+  a.mach = mach;
   const qbar = 0.5 * rho * V * V;
   const qS = qbar * JET.wingArea;
   const pitch = Math.asin(clamp(_f.y, -1, 1));
@@ -130,13 +161,14 @@ export function stepAircraft(a: Aircraft, c: Controls, dt: number, assist: boole
   a.thrust += (target - a.thrust) * damp(a.boosting ? 4 : 1.6, dt);
 
   // ---- aerodynamic forces ---------------------------------------------------------------------------------------
-  const cl = liftCoef(a.aoa);
+  const cl = liftCoef(a.aoa, mach);
   const absA = Math.abs(a.aoa);
-  let cd = JET.cd0 + JET.inducedK * cl * cl + 1.0 * Math.sin(Math.min(absA, Math.PI / 2)) ** 2 * smoothstep(12 * DEG, 45 * DEG, absA);
+  let cd = JET.cd0 * (1 + waveDrag(mach)) + JET.inducedK * cl * cl + 1.0 * Math.sin(Math.min(absA, Math.PI / 2)) ** 2 * smoothstep(12 * DEG, 45 * DEG, absA);
   cd += 0.5 * Math.sin(Math.min(Math.abs(a.beta), Math.PI / 2)) ** 2;
   if (c.brake) cd += 0.13;
 
   a.stalled = absA > JET.aoaStall * 1.02 || V < 48;
+  a.buffet = smoothstep(0.72 * JET.aoaStall, 1.02 * JET.aoaStall, absA) * smoothstep(40, 90, V) + 0.35 * smoothstep(0.92, 1.02, mach) * (1 - smoothstep(1.02, 1.12, mach));
 
   _acc.set(0, -G, 0);
   if (V > 0.5) {
@@ -156,7 +188,7 @@ export function stepAircraft(a: Aircraft, c: Controls, dt: number, assist: boole
   }
   const dens = lerp(1, rho / 1.225, 0.6);
   const thrust = a.thrust <= 1 ? JET.thrustMil * a.thrust : JET.thrustMil + (JET.thrustAb - JET.thrustMil) * ((a.thrust - 1) / 0.3);
-  _acc.addScaledVector(_f, (thrust * dens) / JET.mass);
+  _acc.addScaledVector(_f, (thrust * dens * (1 + 0.2 * Math.min(mach, 1.6))) / JET.mass);
 
   a.vel.addScaledVector(_acc, dt);
   if (a.vel.length() > 650) a.vel.setLength(650);
@@ -173,7 +205,7 @@ export function stepAircraft(a: Aircraft, c: Controls, dt: number, assist: boole
 
   // static stability: the nose tends to follow the flight path towards the AoA that carries 1 g (or n g in a bank)
   const cosBank = Math.max(Math.abs(Math.cos(bank)), 0.3) * (Math.cos(bank) < 0 ? 0.3 : 1);
-  const aoaTrim = clamp((assist ? 1.04 : 1) * (JET.mass * G * Math.cos(pitch)) / (Math.max(qS, 1) * JET.clAlpha) / Math.max(cosBank, 0.3), 0, JET.aoaStall * 0.85);
+  const aoaTrim = clamp((assist ? 1.04 : 1) * (JET.mass * G * Math.cos(pitch)) / (Math.max(qS, 1) * JET.clAlpha * liftSlopeMul(mach)) / Math.max(cosBank, 0.3), 0, JET.aoaStall * 0.85);
   // assist also eases the flight path back towards level when the stick is released
   const gamma = V > 20 ? Math.asin(clamp(a.vel.y / V, -1, 1)) : 0;
   const aoaGoal = assist

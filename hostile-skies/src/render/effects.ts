@@ -7,6 +7,8 @@ import { Particles } from './particles';
 interface RingFx { mesh: Mesh; mat: MeshBasicMaterial; age: number; life: number; size: number; on: boolean }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
+/** The wind that carries smoke and clouds: a few metres a second from the west-south-west. */
+const WIND_X = 6, WIND_Z = 2.5;
 const _d = new Vector3();
 
 /** Random unit vector, optionally squashed vertically. */
@@ -59,7 +61,7 @@ export class Effects {
     }
     for (let i = 0; i < 5; i++) {
       sphereDir(_d).multiplyScalar(size * rnd(0.1, 0.6));
-      P.smoke.emit(pos.x, pos.y, pos.z, _d.x, _d.y + size * 0.3, _d.z, size * 0.5, size * 0.5, rnd(1.2, 2.2), 0.06, 0.06, 0.07, 0.6, 0.9, -2);
+      P.smoke.emit(pos.x, pos.y, pos.z, _d.x + WIND_X, _d.y + size * 0.3, _d.z + WIND_Z, size * 0.5, size * 0.5, rnd(1.2, 2.2), 0.06, 0.06, 0.07, 0.6, 0.9, -2);
     }
     this.ring(pos, size * 1.3, 0.4, 0.8, 2, 0.5);
   }
@@ -76,7 +78,7 @@ export class Effects {
     }
     for (let i = 0; i < Math.min(26, 8 + Math.round(size / 8)); i++) {
       sphereDir(_d).multiplyScalar(rnd(0.3, 1.2) * size);
-      P.smoke.emit(pos.x + _d.x * 0.3, pos.y + _d.y * 0.3, pos.z + _d.z * 0.3, _d.x * 0.4, _d.y * 0.4 + size * 0.35, _d.z * 0.4,
+      P.smoke.emit(pos.x + _d.x * 0.3, pos.y + _d.y * 0.3, pos.z + _d.z * 0.3, _d.x * 0.4 + WIND_X, _d.y * 0.4 + size * 0.35, _d.z * 0.4 + WIND_Z,
         size * rnd(0.5, 0.9), size * 0.55, rnd(2.2, 4.2), 0.05, 0.045, 0.05, 0.75, 0.7, -1.4);
     }
     for (let i = 0; i < Math.min(40, 10 + Math.round(size / 5)); i++) {
@@ -118,7 +120,7 @@ export class Effects {
 
   /** Dust and debris where rounds hit the ground. */
   dust(pos: Vector3, size: number): void {
-    this.particles.smoke.emit(pos.x, pos.y + 2, pos.z, rnd(-3, 3), rnd(4, 10), rnd(-3, 3), size * 0.4, size * 0.6, rnd(0.8, 1.6), 0.28, 0.24, 0.2, 0.5, 1, -1);
+    this.particles.smoke.emit(pos.x, pos.y + 2, pos.z, rnd(-3, 3) + WIND_X, rnd(4, 10), rnd(-3, 3) + WIND_Z, size * 0.4, size * 0.6, rnd(0.8, 1.6), 0.28, 0.24, 0.2, 0.5, 1, -1);
   }
 
   /** A ship warping in. */
@@ -134,7 +136,7 @@ export class Effects {
 
   smokeTrail(pos: Vector3, size: number, dark = true): void {
     const c = dark ? 0.09 : 0.7;
-    this.particles.smoke.emit(pos.x, pos.y, pos.z, rnd(-2, 2), rnd(-1, 3), rnd(-2, 2), size, size * 1.2, rnd(1.2, 2), c, c, c * 1.05, dark ? 0.7 : 0.35, 0.6, 0);
+    this.particles.smoke.emit(pos.x, pos.y, pos.z, rnd(-2, 2) + WIND_X * 0.5, rnd(-1, 3), rnd(-2, 2) + WIND_Z * 0.5, size, size * 1.2, rnd(1.2, 2), c, c, c * 1.05, dark ? 0.7 : 0.35, 0.6, 0);
   }
 
   fireTrail(pos: Vector3, size: number): void {
@@ -145,8 +147,41 @@ export class Effects {
     this.particles.add.emit(pos.x, pos.y, pos.z, 0, 0, 0, size, 0, life, r, g, b, 0.7, 0, 0);
   }
 
+  // ---- burning wrecks, vapour and contrails -------------------------------------------------------------------
+
+  private fires: { x: number; y: number; z: number; t: number; size: number }[] = [];
+
+  /** A wreck or crater that keeps burning and smoking for about half a minute. */
+  addFire(pos: Vector3, size: number): void {
+    if (this.fires.length >= 6) this.fires.shift();
+    this.fires.push({ x: pos.x, y: pos.y, z: pos.z, t: 0, size: Math.min(size, 240) });
+  }
+
+  /** Condensation around the airframe at transonic speed: a short-lived white haze. */
+  vapor(pos: Vector3, size: number): void {
+    this.particles.smoke.emit(pos.x, pos.y, pos.z, rnd(-1, 1), rnd(-0.5, 1.5), rnd(-1, 1), size, size * 1.8, rnd(0.5, 0.9), 0.96, 0.98, 1, 0.6, 1.2, 0);
+  }
+
+  /** A thin, long-lived engine contrail (only forms where the air is cold, high up). */
+  contrail(pos: Vector3): void {
+    this.particles.smoke.emit(pos.x, pos.y, pos.z, rnd(-0.4, 0.4) + WIND_X * 0.2, 0, rnd(-0.4, 0.4) + WIND_Z * 0.2, 1.6, 1.1, rnd(7, 10), 0.97, 0.98, 1, 0.5, 0.08, 0);
+  }
+
   update(dt: number, camera: Camera): void {
     this.shake = Math.max(0, this.shake - dt * 2.2);
+    for (let i = this.fires.length - 1; i >= 0; i--) {
+      const f = this.fires[i]!;
+      f.t += dt;
+      if (f.t > 28) { this.fires.splice(i, 1); continue; }
+      const k = 1 - f.t / 28;
+      if (Math.random() < dt * 22 * (0.4 + 0.6 * k)) {
+        const r = f.size * 0.18;
+        this.particles.add.emit(f.x + rnd(-r, r), f.y + rnd(0, r), f.z + rnd(-r, r), rnd(-2, 2), rnd(4, 12), rnd(-2, 2), f.size * rnd(0.16, 0.3) * (0.5 + k), -f.size * 0.05, rnd(0.3, 0.6), 3, rnd(1.1, 1.8), 0.3, 1, 0.8, 0);
+      }
+      if (Math.random() < dt * 26 * (0.5 + 0.5 * k)) {
+        this.particles.smoke.emit(f.x + rnd(-1, 1) * f.size * 0.15, f.y + f.size * 0.1, f.z + rnd(-1, 1) * f.size * 0.15, WIND_X + rnd(-1, 1), rnd(10, 18), WIND_Z + rnd(-1, 1), f.size * rnd(0.25, 0.4), f.size * 0.45, rnd(5, 8), 0.06, 0.055, 0.05, 0.8 * (0.4 + 0.6 * k), 0.25, -1);
+      }
+    }
     this.particles.update(dt);
     for (const fx of this.rings) {
       if (!fx.on) continue;
@@ -166,5 +201,6 @@ export class Effects {
     this.particles.clear();
     for (const fx of this.rings) { fx.on = false; fx.mesh.visible = false; }
     this.shake = 0;
+    this.fires.length = 0;
   }
 }

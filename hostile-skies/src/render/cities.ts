@@ -3,7 +3,7 @@
 // and finally flattens the skyline.
 
 import {
-  AdditiveBlending, BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DoubleSide, Float32BufferAttribute,
+  BufferGeometry, CanvasTexture, CircleGeometry, Color, Float32BufferAttribute,
   Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, Vector3,
 } from 'three';
 import { CITY_SITES, terrainHeight, type CitySite } from '../sim/terrain';
@@ -20,21 +20,28 @@ function facadeTextures(): { map: CanvasTexture; glow: CanvasTexture } {
   const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
   const a = mk(), e = mk();
   const ga = a.getContext('2d')!, ge = e.getContext('2d')!;
-  ga.fillStyle = '#272b3c'; ga.fillRect(0, 0, S, S);
+  ga.fillStyle = '#c4bdb0'; ga.fillRect(0, 0, S, S);
   ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S);
   const rng = makeRng(21);
   const cw = S / cols, ch = S / rows;
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const x = c * cw + cw * 0.2, y = r * ch + ch * 0.22, w = cw * 0.6, h = ch * 0.5;
-    ga.fillStyle = '#12151f'; ga.fillRect(x, y, w, h);
-    if (rng() < 0.52) {
-      const k = rng();
-      const col = k < 0.62 ? '#ffd58a' : k < 0.85 ? '#ffe9c2' : '#9fd8ff';
-      ge.fillStyle = col; ge.fillRect(x, y, w, h);
+  for (let r = 0; r < rows; r++) {
+    // floor slab line
+    ga.fillStyle = 'rgba(70,66,62,0.55)'; ga.fillRect(0, r * ch + ch * 0.9, S, ch * 0.1);
+    for (let c = 0; c < cols; c++) {
+      const x = c * cw + cw * 0.24, y = r * ch + ch * 0.24, w = cw * 0.52, h = ch * 0.5;
+      const gr = ga.createLinearGradient(0, y, 0, y + h);
+      gr.addColorStop(0, '#5d7690'); gr.addColorStop(1, '#2a384a');
+      ga.fillStyle = gr; ga.fillRect(x, y, w, h);
+      ga.fillStyle = 'rgba(255,255,255,0.10)'; ga.fillRect(x, y, w, h * 0.12);
+      if (rng() < 0.5) {
+        const k = rng();
+        const col = k < 0.62 ? '#ffd58a' : k < 0.85 ? '#ffe9c2' : '#9fd8ff';
+        ge.fillStyle = col; ge.fillRect(x, y, w, h);
+      }
     }
   }
   // a dark patch in the corner for roofs to sample
-  ga.fillStyle = '#10131c'; ga.fillRect(0, 0, 6, 6);
+  ga.fillStyle = '#6f6d69'; ga.fillRect(0, 0, 6, 6);
   ge.fillStyle = '#000'; ge.fillRect(0, 0, 6, 6);
   const map = new CanvasTexture(a), glow = new CanvasTexture(e);
   for (const t of [map, glow]) { t.wrapS = t.wrapT = RepeatWrapping; t.colorSpace = SRGBColorSpace; t.anisotropy = 4; }
@@ -47,9 +54,9 @@ function padTexture(): CanvasTexture {
   c.width = c.height = 128;
   const g = c.getContext('2d')!;
   const gr = g.createRadialGradient(64, 64, 8, 64, 64, 64);
-  gr.addColorStop(0, 'rgba(20,20,30,0.92)');
-  gr.addColorStop(0.7, 'rgba(22,22,32,0.8)');
-  gr.addColorStop(1, 'rgba(22,22,32,0)');
+  gr.addColorStop(0, 'rgba(74,72,68,0.95)');
+  gr.addColorStop(0.78, 'rgba(78,76,70,0.8)');
+  gr.addColorStop(1, 'rgba(78,76,70,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
@@ -65,36 +72,114 @@ function buildCity(site: CitySite): { geo: BufferGeometry; count: number } {
     idx.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
     vi += 4;
   };
+  const o = (x: number, y: number, z: number): number[] => [x, y - site.level, z];
+  const R0 = 0.012; // uv inside the dark corner of the facade texture: no windows, no emission
+  const flat = (x0: number, z0: number, x1: number, z1: number, y: number, c: number[]) =>
+    quad([o(x0, y, z1), o(x1, y, z1), o(x1, y, z0), o(x0, y, z0)], [0, 1, 0], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], c);
+
+  /** A windowed block with a flat roof (optionally with a rooftop box). */
+  const block = (cx: number, cz: number, w: number, dp: number, y0: number, H: number, c: number[], roof: number[], plant = false) => {
+    const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - dp / 2, z1 = cz + dp / 2, yt = y0 + H;
+    const uw = w / TILE_W, ud = dp / TILE_W, vh = H / TILE_H;
+    quad([o(x0, y0, z1), o(x1, y0, z1), o(x1, yt, z1), o(x0, yt, z1)], [0, 0, 1], [[0, 0], [uw, 0], [uw, vh], [0, vh]], c);
+    quad([o(x1, y0, z0), o(x0, y0, z0), o(x0, yt, z0), o(x1, yt, z0)], [0, 0, -1], [[0, 0], [uw, 0], [uw, vh], [0, vh]], c);
+    quad([o(x1, y0, z1), o(x1, y0, z0), o(x1, yt, z0), o(x1, yt, z1)], [1, 0, 0], [[0, 0], [ud, 0], [ud, vh], [0, vh]], c);
+    quad([o(x0, y0, z0), o(x0, y0, z1), o(x0, yt, z1), o(x0, yt, z0)], [-1, 0, 0], [[0, 0], [ud, 0], [ud, vh], [0, vh]], c);
+    flat(x0, z0, x1, z1, yt, roof);
+    if (plant) { // rooftop plant room
+      const pw = w * 0.32, pd = dp * 0.3, ph = 4.5;
+      const qx0 = cx - pw / 2 + w * 0.1, qx1 = cx + pw / 2 + w * 0.1, qz0 = cz - pd / 2, qz1 = cz + pd / 2;
+      quad([o(qx0, yt, qz1), o(qx1, yt, qz1), o(qx1, yt + ph, qz1), o(qx0, yt + ph, qz1)], [0, 0, 1], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], [0.5, 0.5, 0.5]);
+      quad([o(qx1, yt, qz0), o(qx0, yt, qz0), o(qx0, yt + ph, qz0), o(qx1, yt + ph, qz0)], [0, 0, -1], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], [0.5, 0.5, 0.5]);
+      quad([o(qx1, yt, qz1), o(qx1, yt, qz0), o(qx1, yt + ph, qz0), o(qx1, yt + ph, qz1)], [1, 0, 0], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], [0.45, 0.45, 0.45]);
+      quad([o(qx0, yt, qz0), o(qx0, yt, qz1), o(qx0, yt + ph, qz1), o(qx0, yt + ph, qz0)], [-1, 0, 0], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], [0.45, 0.45, 0.45]);
+      flat(qx0, qz0, qx1, qz1, yt + ph, [0.55, 0.55, 0.55]);
+    }
+  };
+
+  /** A small house with a pitched roof (ridge along x). */
+  const house = (cx: number, cz: number, w: number, dp: number, y0: number, c: number[], roof: number[]) => {
+    const H = 6 + rng() * 2.5, rh = 3.2 + rng() * 1.2;
+    const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - dp / 2, z1 = cz + dp / 2, yt = y0 + H, zm = cz, yr = yt + rh;
+    const uw = w / TILE_W, ud = dp / TILE_W, vh = H / TILE_H;
+    quad([o(x0, y0, z1), o(x1, y0, z1), o(x1, yt, z1), o(x0, yt, z1)], [0, 0, 1], [[0, 0], [uw, 0], [uw, vh], [0, vh]], c);
+    quad([o(x1, y0, z0), o(x0, y0, z0), o(x0, yt, z0), o(x1, yt, z0)], [0, 0, -1], [[0, 0], [uw, 0], [uw, vh], [0, vh]], c);
+    quad([o(x1, y0, z1), o(x1, y0, z0), o(x1, yt, z0), o(x1, yt, z1)], [1, 0, 0], [[0, 0], [ud, 0], [ud, vh], [0, vh]], c);
+    quad([o(x0, y0, z0), o(x0, y0, z1), o(x0, yt, z1), o(x0, yt, z0)], [-1, 0, 0], [[0, 0], [ud, 0], [ud, vh], [0, vh]], c);
+    const sl = Math.hypot(rh, dp / 2), nz = rh / sl, ny = (dp / 2) / sl;
+    quad([o(x0, yt, z1), o(x1, yt, z1), o(x1, yr, zm), o(x0, yr, zm)], [0, ny, nz], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], roof);
+    quad([o(x1, yt, z0), o(x0, yt, z0), o(x0, yr, zm), o(x1, yr, zm)], [0, ny, -nz], [[R0, R0], [R0, R0], [R0, R0], [R0, R0]], roof);
+    // gable ends (triangles as degenerate quads)
+    quad([o(x1, yt, z1), o(x1, yt, z0), o(x1, yr, zm), o(x1, yr, zm)], [1, 0, 0], [[0, 0], [ud, 0], [ud / 2, 0.2], [ud / 2, 0.2]], c);
+    quad([o(x0, yt, z0), o(x0, yt, z1), o(x0, yr, zm), o(x0, yr, zm)], [-1, 0, 0], [[0, 0], [ud, 0], [ud / 2, 0.2], [ud / 2, 0.2]], c);
+  };
+
   const cell = 54, R = site.radius;
+  const lines = Math.ceil(R / cell);
+  const asphalt = [0.075, 0.075, 0.08], lane = [0.5, 0.48, 0.38];
+  // streets every fourth grid line, drawn as dark strips with a centre line
+  for (let g = -lines; g <= lines; g += 4) {
+    const along = g * cell, half = Math.sqrt(Math.max(0, R * R - along * along)) * 1.02;
+    if (half < 20) continue;
+    for (const axis of [0, 1]) {
+      const a0 = axis === 0 ? along - 7 : -half, a1 = axis === 0 ? along + 7 : half;
+      const b0 = axis === 0 ? -half : along - 7, b1 = axis === 0 ? half : along + 7;
+      const gy = site.level + 0.45;
+      flat(Math.min(a0, a1), Math.min(b0, b1), Math.max(a0, a1), Math.max(b0, b1), gy, asphalt);
+      if (axis === 0) flat(along - 0.35, -half, along + 0.35, half, gy + 0.06, lane);
+      else flat(-half, along - 0.35, half, along + 0.35, gy + 0.06, lane);
+    }
+  }
+
   let count = 0;
-  for (let gx = -Math.ceil(R / cell); gx <= Math.ceil(R / cell); gx++) {
-    for (let gz = -Math.ceil(R / cell); gz <= Math.ceil(R / cell); gz++) {
-      // streets every fourth line
+  for (let gx = -lines; gx <= lines; gx++) {
+    for (let gz = -lines; gz <= lines; gz++) {
       if (gx % 4 === 0 || gz % 4 === 0) continue;
-      const cx = gx * cell + (rng() - 0.5) * 8, cz = gz * cell + (rng() - 0.5) * 8;
+      const cx = gx * cell, cz = gz * cell;
       const d = Math.hypot(cx, cz) / R;
-      if (d > 1.0 || rng() < 0.12 + d * 0.3) continue;
-      const w = cell * (0.5 + rng() * 0.28), dp = cell * (0.5 + rng() * 0.28);
-      const core = 1 - d;
-      const h = (10 + Math.pow(rng(), 1.6) * 60 + core * core * 85 * (0.4 + rng() * 0.8)) * (d > 0.85 ? 0.5 : 1);
-      const floors = Math.max(2, Math.round(h / FLOOR_H));
-      const H = floors * FLOOR_H;
+      if (d > 1.0) continue;
       const wx = site.x + cx, wz = site.z + cz;
-      const y0 = terrainHeight(wx, wz) - 1;
-      const tint = 0.75 + rng() * 0.5;
-      const c = [tint, tint, tint * 1.05];
-      const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - dp / 2, z1 = cz + dp / 2, yt = y0 + H;
-      const uw = w / TILE_W, ud = dp / TILE_W, vh = H / TILE_H;
-      const o = (x: number, y: number, z: number) => [x, y - site.level, z];
-      // four walls (wrapped around), wound outwards
-      quad([o(x0, y0, z1), o(x1, y0, z1), o(x1, yt, z1), o(x0, yt, z1)], [0, 0, 1], [[0, 0], [uw, 0], [uw, vh], [0, vh]], c);
-      quad([o(x1, y0, z0), o(x0, y0, z0), o(x0, yt, z0), o(x1, yt, z0)], [0, 0, -1], [[0, 0], [uw, 0], [uw, vh], [0, vh]], c);
-      quad([o(x1, y0, z1), o(x1, y0, z0), o(x1, yt, z0), o(x1, yt, z1)], [1, 0, 0], [[0, 0], [ud, 0], [ud, vh], [0, vh]], c);
-      quad([o(x0, y0, z0), o(x0, y0, z1), o(x0, yt, z1), o(x0, yt, z0)], [-1, 0, 0], [[0, 0], [ud, 0], [ud, vh], [0, vh]], c);
-      // roof samples the dark corner of the facade texture
-      const r = 0.012;
-      quad([o(x0, yt, z1), o(x1, yt, z1), o(x1, yt, z0), o(x0, yt, z0)], [0, 1, 0], [[r, r], [r, r], [r, r], [r, r]], [0.6, 0.6, 0.66]);
-      count++;
+      const y0 = terrainHeight(wx, wz) - 0.6;
+      const r = rng();
+      // parks and empty lots
+      if (r < 0.07 + d * 0.1) { flat(cx - 22, cz - 22, cx + 22, cz + 22, site.level + 0.5, [0.09, 0.17, 0.045]); continue; }
+      const kind = rng();
+      const tint = 0.78 + rng() * 0.3;
+      const c = kind < 0.28 ? [tint * 1.04, tint * 0.8, tint * 0.66]         // brick
+        : kind < 0.55 ? [tint * 0.98, tint * 0.98, tint]                       // concrete
+        : kind < 0.75 ? [tint * 0.74, tint * 0.9, tint * 1.12]                 // glass
+        : [tint * 1.08, tint * 1.0, tint * 0.78];                              // sand
+      const core = 1 - d;
+      if (d > 0.68) {
+        // outskirts: a block of houses in each cell
+        const roof = rng() < 0.6 ? [0.46, 0.18, 0.1] : [0.28, 0.27, 0.27];
+        for (const [ox, oz] of [[-13, -13], [13, -13], [-13, 13], [13, 13]] as const) {
+          if (rng() < 0.18) continue;
+          house(cx + ox + (rng() - 0.5) * 3, cz + oz + (rng() - 0.5) * 3, 15 + rng() * 4, 10 + rng() * 3, y0, [c[0]! * 1.05, c[1]! * 1.05, c[2]! * 1.05], roof);
+          count++;
+        }
+        continue;
+      }
+      const roofC = [0.26 + rng() * 0.08, 0.26 + rng() * 0.08, 0.27 + rng() * 0.08];
+      if (core > 0.5 && rng() < 0.55) {
+        // downtown tower, usually with a setback
+        const H1 = FLOOR_H * Math.round((34 + rng() * 40) / FLOOR_H), H2 = FLOOR_H * Math.round((20 + rng() * 70) / FLOOR_H);
+        const w = cell * (0.62 + rng() * 0.2), dp = cell * (0.62 + rng() * 0.2);
+        block(cx, cz, w, dp, y0, H1, c, roofC);
+        block(cx, cz, w * 0.62, dp * 0.62, y0 + H1, H2, [c[0]! * 0.92, c[1]! * 0.95, c[2]! * 1.02], roofC, true);
+        count += 2;
+      } else if (rng() < 0.22) {
+        // L-shaped block
+        const H = FLOOR_H * Math.round((14 + rng() * 34) / FLOOR_H);
+        block(cx - 8, cz, cell * 0.5, cell * 0.78, y0, H, c, roofC);
+        block(cx + 14, cz + 12, cell * 0.36, cell * 0.4, y0, H * 0.7, c, roofC, true);
+        count += 2;
+      } else {
+        const w = cell * (0.55 + rng() * 0.3), dp = cell * (0.55 + rng() * 0.3);
+        const H = FLOOR_H * Math.max(2, Math.round((10 + Math.pow(rng(), 1.5) * 44 + core * core * 40) / FLOOR_H));
+        block(cx, cz, w, dp, y0, H, c, roofC, rng() < 0.5);
+        count++;
+      }
     }
   }
   const g = new BufferGeometry();
@@ -111,8 +196,6 @@ interface CityMesh {
   group: Group;
   buildings: Mesh;
   mat: MeshStandardMaterial;
-  beam: Mesh;
-  beamMat: MeshBasicMaterial;
   fireT: number;
 }
 
@@ -128,19 +211,15 @@ export class CityView {
       g.position.set(site.x, site.level, site.z);
       const { geo } = buildCity(site);
       const mat = new MeshStandardMaterial({
-        map: tex.map, emissiveMap: tex.glow, emissive: new Color(1, 0.86, 0.6), emissiveIntensity: 1.5, vertexColors: true,
-        roughness: 0.75, metalness: 0.15,
+        map: tex.map, emissiveMap: tex.glow, emissive: new Color(1, 0.86, 0.6), emissiveIntensity: 0.16, vertexColors: true,
+        roughness: 0.8, metalness: 0.04,
       });
       const buildings = new Mesh(geo, mat);
       const pad = new Mesh(new CircleGeometry(site.radius * 1.12, 40).rotateX(-Math.PI / 2), footprint);
       pad.position.y = 0.6;
-      // a long soft column of light: the objective marker
-      const beamMat = new MeshBasicMaterial({ color: new Color(0.2, 0.9, 1.3), transparent: true, opacity: 0.2, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, fog: false });
-      const beam = new Mesh(new CylinderGeometry(26, 40, 2600, 16, 1, true).translate(0, 1300, 0), beamMat);
-      beam.renderOrder = 4;
-      g.add(pad, buildings, beam);
+      g.add(pad, buildings);
       this.group.add(g);
-      this.views.push({ group: g, buildings, mat, beam, beamMat, fireT: 0 });
+      this.views.push({ group: g, buildings, mat, fireT: 0 });
     }
   }
 
@@ -150,18 +229,13 @@ export class CityView {
       const frac = c.hp / c.maxHp;
       const hurt = c.hurtT < 1.2;
       if (c.alive) {
-        v.mat.emissiveIntensity = 0.25 + 1.25 * frac * (hurt ? 0.65 + 0.35 * Math.sin(time * 40) : 1);
+        v.mat.emissiveIntensity = 0.03 + 0.13 * frac * (hurt ? 0.65 + 0.35 * Math.sin(time * 40) : 1);
         v.mat.color.setScalar(1);
         v.buildings.scale.y = 1;
-        // beacon: calm cyan, urgent red while under attack
-        const alarm = c.hurtT < 4;
-        v.beamMat.color.setRGB(alarm ? 2.2 : 0.2, alarm ? 0.35 : 0.9, alarm ? 0.25 : 1.3);
-        v.beamMat.opacity = alarm ? 0.22 + 0.14 * Math.sin(time * 9) : 0.16;
       } else {
-        v.mat.emissiveIntensity = 0.04;
-        v.mat.color.setScalar(0.35);
+        v.mat.emissiveIntensity = 0.0;
+        v.mat.color.setScalar(0.3);
         v.buildings.scale.y += (0.28 - v.buildings.scale.y) * Math.min(1, dt * 1.5);
-        v.beamMat.opacity = 0;
       }
       // fires: more of them the worse the damage
       const burn = c.alive ? (frac < 0.7 ? (0.7 - frac) / 0.7 : 0) : 1;

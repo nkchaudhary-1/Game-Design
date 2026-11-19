@@ -17,14 +17,19 @@ import { surfaceHeight } from '../sim/terrain';
 import type { SimEvent, World } from '../sim/world';
 import { CityView } from './cities';
 import { Effects } from './effects';
-import { beamTime, buildAlien, buildJet, buildMissile, disposeModel, type AlienModel, type JetModel } from './models';
+import { SunFlare } from './flare';
+import { buildCockpit, buildJet, type JetModel } from './jet';
+import { FilmPass } from './post';
+import { beamTime, buildAlien, buildMissile, disposeModel, type AlienModel } from './models';
 import { GFX } from './quality';
-import { PALETTE, Sky, SUN_DIR } from './sky';
+import { Clouds } from './clouds';
+import { PALETTE, Sky, SUN_DIR, updateHaze } from './sky';
 import { Sea, TerrainView } from './terrain';
+import { Trees } from './trees';
 
 export type CamMode = 'chase' | 'cockpit';
 
-const FOG_DENSITY = 0.00026;
+const FOG_DENSITY = 0.00013;
 const Y = new Vector3(0, 1, 0);
 const Z = new Vector3(0, 0, 1);
 const ZERO = new Vector3();
@@ -95,12 +100,17 @@ export class GameView {
   readonly fx: Effects;
   private composer: EffectComposer | null = null;
   private bloom: UnrealBloomPass | null = null;
+  private film: FilmPass | null = null;
+  readonly flare: SunFlare;
   private sky = new Sky();
+  private clouds = new Clouds();
+  private trees: Trees;
   private terrain: TerrainView;
   private sea: Sea;
   private cities = new CityView();
   private proj: ProjectileView;
   private jet: JetModel = buildJet();
+  private cockpit = buildCockpit();
   private aliens = new Map<number, AlienView>();
   private missiles = new Map<number, Group>();
   private camQ = new Quaternion();
@@ -120,12 +130,12 @@ export class GameView {
       preserveDrawingBuffer: new URLSearchParams(location.search).has('shot'),
     });
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.0;
     this.scene.background = PALETTE.fog.clone();
     this.scene.fog = new FogExp2(PALETTE.fog.clone(), FOG_DENSITY);
 
-    const hemi = new HemisphereLight(new Color('#7f78b8'), new Color('#2c2a3a'), 0.9);
-    const sun = new DirectionalLight(new Color('#ffbd8a'), 1.9);
+    const hemi = new HemisphereLight(new Color('#a5c0e4'), new Color('#5b5142'), 1.5);
+    const sun = new DirectionalLight(new Color('#fff0dc'), 6.0);
     sun.position.copy(SUN_DIR).multiplyScalar(1000);
     this.scene.add(hemi, sun, this.sky.group);
 
@@ -139,12 +149,16 @@ export class GameView {
 
     this.terrain = new TerrainView(this.scene);
     this.sea = new Sea(FOG_DENSITY);
-    this.scene.add(this.sea.mesh, this.cities.group);
+    this.scene.add(this.sea.mesh, this.cities.group, this.clouds.mesh);
+    this.trees = new Trees(this.scene);
     this.fx = new Effects(this.scene, GFX.particles);
     this.proj = new ProjectileView(this.scene);
     this.scene.add(this.jet.root);
     this.camera.rotation.order = 'YXZ';
+    this.cockpit.visible = false;
+    this.camera.add(this.cockpit);
     this.scene.add(this.camera);
+    this.flare = new SunFlare(canvas);
     this.applyTier();
   }
 
@@ -156,13 +170,16 @@ export class GameView {
     this.composer?.dispose();
     this.composer = null;
     this.bloom = null;
+    this.film = null;
     if (GFX.bloom) {
       this.rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: GFX.msaa });
       this.composer = new EffectComposer(this.renderer, this.rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.bloom = new UnrealBloomPass(new Vector2(1, 1), 0.34, 0.5, 1.08);
+      this.bloom = new UnrealBloomPass(new Vector2(1, 1), 0.2, 0.5, 1.8);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
+      this.film = new FilmPass();
+      this.composer.addPass(this.film);
     }
     this.terrain.reset();
     this.resize(this.w, this.h);
@@ -176,6 +193,7 @@ export class GameView {
     this.composer?.setSize(this.w, this.h);
     this.camera.aspect = this.w / this.h;
     this.camera.updateProjectionMatrix();
+    this.flare?.resize(this.w, this.h);
   }
 
   /** Build the terrain around a point immediately, so the first frame has no pop-in. */
@@ -192,6 +210,7 @@ export class GameView {
     for (const g of this.missiles.values()) { this.scene.remove(g); disposeModel(g); }
     this.missiles.clear();
     this.fx.clear();
+    this.trees.reset();
     this.camInit = false;
   }
 
@@ -215,6 +234,7 @@ export class GameView {
           const d = e.pos.distanceTo(camPos);
           const kick = Math.min(1.1, (e.size / 160) * (900 / (d + 250)));
           if (kick > 0.04) this.fx.addShake(kick * (this.reducedMotion ? 0.25 : 1));
+          if (e.kind === 'ground' && e.size >= 90) this.fx.addFire(e.pos, e.size);
           if (e.kind === 'alien') this.fx.alienBurst(e.pos, e.size);
           else if (e.kind === 'missile') this.fx.missileBlast(e.pos, e.size);
           else if (e.kind === 'boss' || e.kind === 'city') this.fx.bigBlast(e.pos, e.size);
@@ -251,11 +271,18 @@ export class GameView {
 
     this.updateCamera(w, dt, state);
     this.terrain.update(this.camera.position.x, this.camera.position.z, 2);
+    this.trees.update(this.camera.position.x, this.camera.position.y, this.camera.position.z);
     this.sea.update(this.t, this.camera.position.x, this.camera.position.z);
-    this.sky.update(this.camera, this.dpr);
+    updateHaze(this.camera);
+    (this.scene.fog as FogExp2).color.copy(PALETTE.fog);
+    (this.scene.background as Color).copy(PALETTE.fog);
+    this.sky.update(this.camera);
+    this.clouds.update(dt, this.camera);
     this.fx.particles.setScale(this.h * this.dpr, (this.camera.fov * Math.PI) / 180);
     this.fx.update(dt, this.camera);
 
+    this.film?.setFrame(this.t, this.camera.aspect);
+    this.flare.update(this.camera, dt);
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
   }
@@ -270,9 +297,21 @@ export class GameView {
     const th = ac.thrust;
     const flick = 0.9 + Math.random() * 0.2;
     j.flame.visible = th > 0.18;
-    j.flame.scale.set(0.5 + th * 0.45, 0.5 + th * 0.45, (0.6 + th * 3.6) * flick);
-    j.glow.scale.setScalar((4 + th * 5) * flick);
+    for (const f of j.flame.children) f.scale.set(0.5 + th * 0.45, 0.5 + th * 0.45, (0.6 + th * 3.6) * flick);
+    j.glow.scale.setScalar((3 + th * 3.5) * flick);
     j.strobe.visible = this.t % 1.3 < 0.09;
+    // transonic condensation: a white collar around the canopy and wing roots on the way through Mach 1
+    if (ac.mach > 0.93 && ac.mach < 1.1 && ac.pos.y < 4000 && Math.random() < 0.9) {
+      const sweep = 1 - Math.abs(ac.mach - 1.01) / 0.09;
+      for (const [x, y, z] of [[0, 0.7, -2.2], [1.9, 0.3, 0.6], [-1.9, 0.3, 0.6]] as const) {
+        _v.set(x, y, z).applyQuaternion(ac.q).add(ac.pos);
+        this.fx.vapor(_v, 2.8 + sweep * 2.5);
+      }
+    }
+    // thin contrails from both engines high up
+    if (ac.pos.y > 4300 && ac.speed > 90) {
+      for (const x of [-0.74, 0.74]) { _v.set(x, 0, 9.3).applyQuaternion(ac.q).add(ac.pos); this.fx.contrail(_v); }
+    }
     // contrail / engine heat shimmer and wingtip vapour in hard turns
     this.trailT -= 0.016;
     if (this.trailT <= 0 && ac.speed > 40) {
@@ -408,12 +447,13 @@ export class GameView {
 
   private updateCamera(w: World, dt: number, state: ViewState): void {
     const ac = w.ac, cam = this.camera;
+    let showCockpit = false;
     if (!this.camInit) { this.camQ.copy(ac.q); this.camInit = true; }
     const speedK = Math.min(1, ac.speed / 360);
     let fov = 62 + speedK * 7 + (ac.thrust > 1.05 ? 5 : 0);
 
     // baseline shake: afterburner rumble, heavy G, stalls
-    const base = (ac.thrust > 1.05 ? 0.06 : 0) + (ac.g > 8 ? 0.12 : 0) + (ac.stalled && w.playerAlive ? 0.08 : 0);
+    const base = (ac.thrust > 1.05 ? 0.06 : 0) + (ac.g > 8 ? 0.12 : 0) + (w.playerAlive ? ac.buffet * 0.22 : 0);
     const shake = Math.min(1.6, this.fx.shake + base) * (this.reducedMotion ? 0.3 : 1);
 
     if (state.mode === 'orbit' || !w.playerAlive) {
@@ -429,6 +469,7 @@ export class GameView {
       cam.lookAt(_v2.copy(ac.pos).addScaledVector(_v3.set(0, 0, -1).applyQuaternion(ac.q), w.playerAlive ? 12 : 0));
       fov = 52;
     } else if (state.mode === 'cockpit') {
+      showCockpit = true;
       this.camQ.copy(ac.q);
       cam.position.copy(ac.pos).add(_v.set(0, 0.95, -3.6).applyQuaternion(ac.q));
       cam.quaternion.copy(ac.q);
@@ -446,6 +487,10 @@ export class GameView {
       cam.position.add(_v.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).multiplyScalar(shake * 0.9));
       cam.quaternion.multiply(_q2.setFromAxisAngle(Z, (Math.random() - 0.5) * shake * 0.03));
     }
+    // the cockpit interior needs a close near plane; the chase camera does not
+    const near = showCockpit ? 0.35 : 1.5;
+    this.cockpit.visible = showCockpit;
+    if (cam.near !== near) { cam.near = near; cam.updateProjectionMatrix(); }
     if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * (1 - Math.exp(-4 * dt)); cam.updateProjectionMatrix(); }
     // keep the camera out of the ground
     const floor = surfaceHeight(cam.position.x, cam.position.z) + 4;

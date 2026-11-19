@@ -14,7 +14,7 @@ import { GameView, type ViewState } from './render/view';
 import { autopilot } from './sim/autopilot';
 import { newControls } from './sim/controls';
 import { createScene, DEMO_SCENES, type DemoScene } from './sim/demo';
-import { SPAWN } from './sim/terrain';
+import { SPAWN, terrainHeight } from './sim/terrain';
 import { World, WAVES, type SimEvent } from './sim/world';
 import { lerp } from './sim/util';
 import { loadSettings, Ui, type Settings } from './ui/screens';
@@ -386,7 +386,7 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
 // QA hooks (inert unless you open the console)
 (window as unknown as Record<string, unknown>).__game = {
   get world() { return world; }, view, hud, sound, input, ui, waves: WAVES.length,
-  get mode() { return mode; }, pause, resume, startMission, toTitle, startDemo, autopilot,
+  get mode() { return mode; }, pause, resume, startMission, toTitle, startDemo, autopilot, terrainHeight,
 };
 
 // ---- recorder (?record) -------------------------------------------------------------------------------------------
@@ -441,6 +441,9 @@ function installRecorder(): void {
       c.width = glCanvas.width; c.height = glCanvas.height;
       const g = c.getContext('2d')!;
       g.drawImage(glCanvas, 0, 0, c.width, c.height);
+      g.globalCompositeOperation = 'screen';
+      g.drawImage(view.flare.canvas, 0, 0, c.width, c.height);
+      g.globalCompositeOperation = 'source-over';
       g.drawImage(hudCanvas, 0, 0, c.width, c.height);
       const f = Number(fadeEl.style.opacity || 0);
       if (f > 0) { g.fillStyle = `rgba(0,0,0,${f})`; g.fillRect(0, 0, c.width, c.height); }

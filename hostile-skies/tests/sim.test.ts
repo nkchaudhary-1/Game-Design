@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { bankAngle, forwardOf, newAircraft, stepAircraft } from '../src/sim/aircraft';
+import { atmosphere, bankAngle, forwardOf, liftSlopeMul, newAircraft, speedOfSound, stepAircraft, waveDrag } from '../src/sim/aircraft';
 import { autopilot as pilot } from '../src/sim/autopilot';
 import { makeAlien } from '../src/sim/aliens';
 import { newControls, type Controls } from '../src/sim/controls';
@@ -124,6 +124,80 @@ describe('flight model', () => {
     fly(false, 30, (_t, c) => {
       c.pitch = rng() * 2 - 1; c.roll = rng() * 2 - 1; c.throttleSet = rng();
     });
+  });
+});
+
+describe('atmosphere and compressibility', () => {
+  it('follows the standard atmosphere: sea level, the tropopause and a steady fall in density', () => {
+    const sl = atmosphere(0);
+    expect(sl.rho).toBeCloseTo(1.225, 2);
+    expect(sl.a).toBeGreaterThan(339);
+    expect(sl.a).toBeLessThan(341.5);
+    const top = atmosphere(11000);
+    expect(top.a).toBeGreaterThan(294);
+    expect(top.a).toBeLessThan(297);
+    expect(top.rho).toBeGreaterThan(0.35);
+    expect(top.rho).toBeLessThan(0.38);
+    let last = Infinity;
+    for (let h = 0; h <= 15000; h += 500) { const r = atmosphere(h).rho; expect(r).toBeLessThan(last); last = r; }
+  });
+  it('has a transonic drag rise and a lift collapse that ease off again supersonic', () => {
+    expect(waveDrag(0.5)).toBe(0);
+    expect(waveDrag(1.04)).toBeGreaterThan(waveDrag(0.9));
+    expect(waveDrag(1.04)).toBeGreaterThan(waveDrag(1.6));
+    expect(liftSlopeMul(0.85)).toBeGreaterThan(liftSlopeMul(0.3));
+    expect(liftSlopeMul(1.3)).toBeLessThan(liftSlopeMul(0.85));
+  });
+  it('reports a Mach number from true speed over the local speed of sound', () => {
+    const a = newAircraft(0, 6000, 0, 250);
+    stepAircraft(a, newControls(), DT, true);
+    expect(a.mach).toBeCloseTo(a.speed / speedOfSound(a.pos.y), 1);
+  });
+  it('cannot go supersonic at low level in level flight, but can high up in a dive on the afterburner', () => {
+    const low = newAircraft(0, 800, 0, 250);
+    const c = newControls();
+    for (let i = 0; i < 90 * 60; i++) { Object.assign(c, newControls()); c.throttleSet = 1; c.boost = true; stepAircraft(low, c, DT, true); }
+    expect(low.mach).toBeLessThan(1.0);
+    const high = newAircraft(0, 9000, 0, 260);
+    let top = 0;
+    for (let i = 0; i < 40 * 60 && high.pos.y > 2500; i++) { Object.assign(c, newControls()); c.throttleSet = 1; c.boost = true; c.pitch = -0.25; stepAircraft(high, c, DT, true); top = Math.max(top, high.mach); }
+    expect(top).toBeGreaterThan(1.0);
+  });
+  it('shakes the airframe near the stall and through Mach 1, and not in cruise', () => {
+    const cruise = newAircraft(0, 1500, 0, 200);
+    stepAircraft(cruise, newControls(), DT, true);
+    expect(cruise.buffet).toBeLessThan(0.05);
+    const stall = newAircraft(0, 1500, 0, 100);
+    const c = newControls();
+    let peak = 0;
+    for (let i = 0; i < 6 * 60; i++) { Object.assign(c, newControls()); c.pitch = 1; c.throttleSet = 0; stepAircraft(stall, c, DT, false); peak = Math.max(peak, stall.buffet); }
+    expect(peak).toBeGreaterThan(0.3);
+  });
+});
+
+describe('G-force effects', () => {
+  const pull = (difficulty: 'cadet' | 'pilot' | 'ace', secs: number) => {
+    const w = new World({ seed: 1, difficulty, god: true }); w.waveT = 1e9;
+    w.ac.pos.set(0, 3000, 0);
+    let peak = 0;
+    run(w, secs, () => ({ ...newControls(), pitch: 1, roll: 0.9, throttleSet: 1 }));
+    peak = w.blackout;
+    return { w, peak };
+  };
+  it('a long hard turn greys the pilot out, more slowly on Cadet, and eases off when the stick is released', () => {
+    const pilot = pull('pilot', 12);
+    const cadet = pull('cadet', 12);
+    expect(pilot.peak).toBeGreaterThan(0.1);
+    expect(cadet.peak).toBeLessThan(pilot.peak);
+    const before = pilot.w.blackout;
+    run(pilot.w, 8);
+    expect(pilot.w.blackout).toBeLessThan(before * 0.6);
+  });
+  it('gentle flying never blacks out', () => {
+    const w = new World({ seed: 1, god: true }); w.waveT = 1e9;
+    run(w, 20, (_w, t) => ({ ...newControls(), roll: Math.sin(t) * 0.5, pitch: 0.1 }));
+    expect(w.blackout).toBe(0);
+    expect(w.redout).toBe(0);
   });
 });
 

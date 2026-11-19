@@ -123,6 +123,9 @@ export class World implements AiHost {
   tti = Infinity;
   /** Seconds spent outside the combat area. */
   oobT = 0;
+  /** Vision loss from sustained high G (0 = clear, 1 = blacked out) and from negative G (red-out). Visual only. */
+  blackout = 0;
+  redout = 0;
   damageFlash = 0;
   deathCause = '';
   /** Which gun fired last and how long ago (renderer muzzle flashes). */
@@ -706,6 +709,12 @@ export class World implements AiHost {
     if (this.playerAlive) {
       stepAircraft(ac, c, dt, this.assist);
       this.pilotHook?.(this, dt);
+      // the pilot's body: blood drains from the head above about 5 g and vision tunnels, then fades; negative g reddens it
+      const gt = this.tuning.gTolerance;
+      if (ac.g > 5.2) this.blackout = Math.min(1, this.blackout + ((ac.g - 5.2) * 0.045 * dt) / gt);
+      else this.blackout = Math.max(0, this.blackout - (ac.g < 3.5 ? 0.3 : 0.08) * dt);
+      if (ac.g < -1.2) this.redout = Math.min(1, this.redout + ((-ac.g - 1.2) * 0.12 * dt) / gt);
+      else this.redout = Math.max(0, this.redout - 0.4 * dt);
       this.tti = timeToImpact(ac.pos.x, ac.pos.y, ac.pos.z, ac.vel.x, ac.vel.y, ac.vel.z, 20, 5);
 
       const cycle = c.cycleTarget && !this.prevCycle;

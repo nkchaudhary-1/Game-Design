@@ -13,13 +13,12 @@ export interface Gfx {
   /** Particle pool sizes. */
   particles: number;
   msaa: number;
-  stars: number;
 }
 
 const TIERS: Record<Tier, Omit<Gfx, 'tier'>> = {
-  high: { bloom: true, chunkRadius: 6, chunkSegs: 40, maxDpr: 1.75, particles: 4200, msaa: 4, stars: 1600 },
-  medium: { bloom: true, chunkRadius: 5, chunkSegs: 32, maxDpr: 1.5, particles: 2600, msaa: 0, stars: 1000 },
-  low: { bloom: false, chunkRadius: 4, chunkSegs: 24, maxDpr: 1, particles: 1400, msaa: 0, stars: 500 },
+  high: { bloom: true, chunkRadius: 6, chunkSegs: 40, maxDpr: 1.75, particles: 4200, msaa: 4 },
+  medium: { bloom: true, chunkRadius: 5, chunkSegs: 32, maxDpr: 1.5, particles: 2600, msaa: 0 },
+  low: { bloom: false, chunkRadius: 4, chunkSegs: 24, maxDpr: 1, particles: 1400, msaa: 0 },
 };
 
 export const GFX: Gfx = { tier: 'high', ...TIERS.high };

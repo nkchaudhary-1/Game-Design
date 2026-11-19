@@ -40,7 +40,7 @@ export function glowSprite(color: Color, size: number, opacity = 1): Sprite {
 }
 
 const M = {
-  hull: new MeshStandardMaterial({ color: 0x9fb2c9, metalness: 0.35, roughness: 0.42 }),
+  hull: new MeshStandardMaterial({ color: 0x78879a, metalness: 0.3, roughness: 0.5 }),
   hullDark: new MeshStandardMaterial({ color: 0x2a3140, metalness: 0.5, roughness: 0.48 }),
   glass: new MeshStandardMaterial({ color: 0x0a1722, metalness: 0.95, roughness: 0.06, emissive: new Color(0x0a4d6e), emissiveIntensity: 0.9 }),
   cyan: new MeshBasicMaterial({ color: hdr(new Color(0x5ff1ff), 2.2) }),
@@ -116,106 +116,7 @@ function bubbleMaterial(color: Color, power = 2.4): ShaderMaterial {
   });
 }
 
-// ---- the Sparrow --------------------------------------------------------------------------------------------------
-
-function flatShape(pts: [number, number][], thick: number): ExtrudeGeometry {
-  const s = new Shape();
-  s.moveTo(pts[0]![0], pts[0]![1]);
-  for (let i = 1; i < pts.length; i++) s.lineTo(pts[i]![0], pts[i]![1]);
-  s.closePath();
-  const g = new ExtrudeGeometry(s, { depth: thick, bevelEnabled: false });
-  g.rotateX(Math.PI / 2); // shape y -> world z, thickness downwards
-  g.translate(0, thick / 2, 0);
-  return g;
-}
-
-export interface JetModel {
-  root: Group;
-  flame: Group;
-  glow: Sprite;
-  strobe: Mesh;
-  parts: Object3D[];
-}
-
-export function buildJet(): JetModel {
-  const root = new Group();
-  const parts: Object3D[] = [];
-  const add = (m: Object3D) => { root.add(m); parts.push(m); return m; };
-
-  const prof = [
-    [0.001, -8.6], [0.7, -8.4], [1.05, -7.0], [1.22, -4.0], [1.2, -1.0], [1.1, 2.0], [0.82, 4.6], [0.5, 6.6], [0.16, 7.8], [0.001, 8.3],
-  ].map(([r, y]) => new Vector2(r, y));
-  const fus = new Mesh(new LatheGeometry(prof, 22).rotateX(-Math.PI / 2).scale(0.95, 0.72, 1), M.hull);
-  add(fus);
-  // dark radome tip
-  const nose = new Mesh(new ConeGeometry(0.42, 1.8, 14).rotateX(-Math.PI / 2).translate(0, 0, -8.3), M.hullDark);
-  add(nose);
-
-  const wingR = flatShape([[0.8, -2.4], [6.1, 3.7], [6.1, 5.1], [0.9, 5.4]], 0.2);
-  const wr = new Mesh(wingR, M.hull);
-  const wl = new Mesh(wingR, M.hull); wl.scale.x = -1;
-  add(wr); add(wl);
-  // wing trim
-  const trimGeo = new BoxGeometry(0.1, 0.06, 7.6);
-  for (const s of [1, -1]) {
-    const t = new Mesh(trimGeo, M.cyan);
-    t.position.set(3.35 * s, 0.14, 0.75); t.rotation.y = 0.72 * s;
-    add(t);
-  }
-
-  // fins are cut in (forward, up) and stood on edge
-  const fin = (() => {
-    const s = new Shape();
-    s.moveTo(0.6, 0); s.lineTo(-1.4, 3.1); s.lineTo(-3.2, 3.1); s.lineTo(-2.6, 0); s.closePath();
-    const g = new ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: false });
-    g.translate(0, 0, -0.09).rotateY(Math.PI / 2);
-    return g;
-  })();
-  for (const s of [1, -1]) {
-    const f = new Mesh(fin, M.hull);
-    f.position.set(1.15 * s, 0.35, 8.0); f.rotation.z = -0.24 * s;
-    add(f);
-  }
-  const stab = flatShape([[0.6, 0], [3.4, 1.7], [3.4, 2.7], [0.7, 2.9]], 0.14);
-  const sr = new Mesh(stab, M.hullDark), sl = new Mesh(stab, M.hullDark); sl.scale.x = -1;
-  sr.position.set(0, 0.0, 5.6); sl.position.set(0, 0.0, 5.6);
-  add(sr); add(sl);
-
-  const intake = new BoxGeometry(0.9, 0.9, 3.0);
-  for (const s of [1, -1]) {
-    const i = new Mesh(intake, M.hullDark);
-    i.position.set(1.15 * s, -0.25, -2.9);
-    add(i);
-  }
-
-  const canopy = new Mesh(new SphereGeometry(1, 18, 12), M.glass);
-  canopy.scale.set(0.62, 0.55, 2.4); canopy.position.set(0, 0.55, -3.7);
-  add(canopy);
-
-  const nozzle = new Mesh(new CylinderGeometry(0.95, 0.78, 1.5, 20, 1, true).rotateX(Math.PI / 2), M.hullDark);
-  nozzle.position.z = 8.2;
-  add(nozzle);
-
-  const flame = new Group();
-  const cone = (r: number, mat: Material) => new Mesh(new ConeGeometry(r, 1, 14, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2), mat);
-  flame.add(cone(0.7, M.flameOuter), cone(0.4, M.flameInner));
-  flame.position.z = 8.8;
-  root.add(flame);
-  const glow = glowSprite(new Color(2.2, 1.1, 0.5), 7, 0.8);
-  glow.position.z = 9.2;
-  root.add(glow);
-
-  for (const [x, mat] of [[-6.05, M.red], [6.05, M.green]] as const) {
-    const l = new Mesh(new SphereGeometry(0.16, 8, 6), mat);
-    l.position.set(x, 0.12, 4.5);
-    add(l);
-  }
-  const strobe = new Mesh(new SphereGeometry(0.2, 8, 6), M.white);
-  strobe.position.set(0, 3.5, 9.4);
-  add(strobe);
-
-  return { root, flame, glow, strobe, parts };
-}
+// ---- missiles ---------------------------------------------------------------------------------------------------------
 
 export function buildMissile(): Group {
   const g = new Group();

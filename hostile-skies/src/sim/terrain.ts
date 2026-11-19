@@ -1,7 +1,7 @@
 // The world's ground: one deterministic height function used by the renderer (to build chunks), the flight model
 // (crash checks), and the alien AI (terrain avoidance). x is east, z is south (so north is -z), y is up, metres.
 
-import { clamp, lerp, smoothstep } from './util';
+import { lerp, smoothstep } from './util';
 
 export const SEA_LEVEL = 0;
 /** Combat area. Past this the pilot is told to turn back. */
@@ -118,24 +118,44 @@ export function timeToImpact(
   return Infinity;
 }
 
-/** Colour of the ground at a point, from height and steepness. Returns linear-ish RGB 0..1 (dusk-tinted). */
-export function groundColor(h: number, slope: number, n: number, out: [number, number, number]): void {
-  // palette (already toned for a dusk sky): sand, grass, forest, rock, snow
-  const sand: [number, number, number] = [0.42, 0.36, 0.27];
-  const grass: [number, number, number] = [0.16, 0.32, 0.14];
-  const forest: [number, number, number] = [0.07, 0.19, 0.1];
-  const rock: [number, number, number] = [0.31, 0.29, 0.3];
-  const snow: [number, number, number] = [0.78, 0.8, 0.9];
+/** Two smooth noise fields used for ground colour and tree placement: fine variation, and big patches such as fields. */
+export const groundNoise = (wx: number, wz: number): number => (Math.sin(wx * 0.013 + Math.sin(wz * 0.009) * 2) + Math.sin(wz * 0.017 - wx * 0.006) + 2) * 0.25;
+export const groundPatches = (wx: number, wz: number): number => (Math.sin(wx * 0.0017 + 1.3) + Math.sin(wz * 0.0023 - 0.7) + Math.sin((wx + wz) * 0.0011) + 3) / 6;
+/** How wooded the ground is (0..1) from height and the two noise fields. */
+export const forestAmount = (h: number, n: number, n2: number): number =>
+  smoothstep(30, 120, h) * (1 - smoothstep(820, 1000, h)) * smoothstep(0.38, 0.52, n * 0.6 + n2 * 0.5);
+
+/**
+ * Colour of the ground at a point, from height, steepness and two noise values (n: fine variation, n2: big patches
+ * such as fields). Returns linear RGB 0..1 for a late-afternoon sun: sand, meadow, dry fields, conifer forest, rock, snow.
+ */
+export function groundColor(h: number, slope: number, n: number, n2: number, out: [number, number, number]): void {
+  const sand: [number, number, number] = [0.5, 0.42, 0.25];
+  const wet: [number, number, number] = [0.26, 0.22, 0.14];
+  const meadow: [number, number, number] = [0.15, 0.2, 0.05];
+  const dry: [number, number, number] = [0.3, 0.26, 0.09];
+  const forest: [number, number, number] = [0.028, 0.06, 0.02];
+  const alpine: [number, number, number] = [0.15, 0.17, 0.08];
+  const rock: [number, number, number] = [0.19, 0.16, 0.13];
+  const snow: [number, number, number] = [0.74, 0.76, 0.82];
   const mix = (a: [number, number, number], b: [number, number, number], t: number) => {
     out[0] = lerp(a[0], b[0], t); out[1] = lerp(a[1], b[1], t); out[2] = lerp(a[2], b[2], t);
   };
-  out[0] = grass[0]; out[1] = grass[1]; out[2] = grass[2];
-  if (h < 9) mix(sand, grass, smoothstep(2, 9, h));
-  else if (h < 260) mix(grass, forest, clamp(0.35 + n * 0.8, 0, 1) * smoothstep(40, 130, h));
-  else mix(forest, rock, smoothstep(260, 520, h));
-  const rocky = smoothstep(0.42, 0.78, slope + (n - 0.5) * 0.25);
-  mix([out[0], out[1], out[2]], rock, rocky);
-  if (h > 780) mix([out[0], out[1], out[2]], snow, smoothstep(780, 1050, h + (n - 0.5) * 140) * (1 - rocky * 0.5));
-  const shade = 0.88 + n * 0.24;
+  const cur = (): [number, number, number] => [out[0], out[1], out[2]];
+
+  // lowland: fields of meadow and dry crop in patches, wet sand at the waterline, dry sand above it
+  const field = smoothstep(0.42, 0.58, n2);
+  mix(meadow, dry, field * 0.85);
+  if (h < 3) mix(wet, sand, smoothstep(-2, 3, h));
+  if (h >= 3 && h < 14) { mix(sand, field > 0.5 ? dry : meadow, smoothstep(3, 14, h)); }
+  // forest on the hills, thinning out below 40 m and above the treeline
+  const forestAmt = forestAmount(h, n, n2);
+  if (h >= 14) mix(cur(), forest, forestAmt);
+  // alpine meadow above the trees
+  if (h > 760) mix(cur(), alpine, smoothstep(760, 950, h));
+  const rocky = smoothstep(0.4, 0.75, slope + (n - 0.5) * 0.25 + smoothstep(700, 1150, h) * 0.25);
+  mix(cur(), rock, rocky);
+  if (h > 880) mix(cur(), snow, smoothstep(880, 1120, h + (n - 0.5) * 150) * (1 - rocky * 0.55));
+  const shade = 0.86 + n * 0.28;
   out[0] *= shade; out[1] *= shade; out[2] *= shade;
 }
