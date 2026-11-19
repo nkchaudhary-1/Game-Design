@@ -51,9 +51,10 @@ export function buildStreetscape(mb: MB) {
   car(mb, -26, -2.95, 'x', C.sage); car(mb, 6, -2.95, 'x', C.offWhite); car(mb, 34, -2.95, 'x', C.plum);
   streetSign(mb, -9.2, -7.4, 'MAPLE LANE →', 0);
   streetSign(mb, -6.4, 7.4, 'MAPLE ST', 0);
-  mb.cbox(-50.5, 0, -5.6, 0.12, 1.5, 1.8, C.woodDark); mb.cbox(-50.5, 1.5, -5.6, 0.2, 0.9, 2.4, C.charcoal);
-  mb.label('YOU ARE HERE', -50.37, 2.15, -5.6, 2.2, 0.5, -Math.PI / 2, C.charcoal, C.white);
-  mb.interact('info', -50.3, 1.5, -5.6, 0, 'Read the map board', -1, 'MAPLE STREET · Block 01. Houses along the street, Residential Lane to the north-west, the park and its hidden corners to the north-east, Maple Court Apartments south-east, the car park beyond. Three secrets are hidden around the block.');
+  for (const x of [-54.6, -52.4]) mb.cbox(x, 0, -6.7, 0.12, 1.5, 0.12, C.woodDark);
+  mb.cbox(-53.5, 1.5, -6.7, 2.8, 1.0, 0.12, C.charcoal);
+  mb.label('YOU ARE HERE', -53.5, 2.2, -6.62, 2.4, 0.5, 0, C.charcoal, C.white);
+  mb.interact('info', -53.5, 1.6, -6.0, 0, 'Read the map board', -1, 'MAPLE STREET · Block 01. Houses along the street, Residential Lane to the north-west, the park and its hidden corners to the north-east, Maple Court Apartments south-east, the car park beyond. Three secrets are hidden around the block.');
   // lawns & trees outside the lots
   lawn(mb, -7, -23, 11.5, -7.1, C.grassLight);
   for (const [x, z, s, t] of [[-3, -12, 1.1, 0], [4, -18, 1.2, 1], [8, -10, 1, 2], [-4, -20, 0.9, 1]] as const) tree(mb, x, z, s, t);
