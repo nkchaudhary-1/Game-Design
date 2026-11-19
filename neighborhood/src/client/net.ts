@@ -1,6 +1,16 @@
 import type { C2S, S2C } from '../shared/protocol';
 
-export class Net {
+/** What the game needs from a transport: a WebSocket to the real server, or the in-page host used by the demo artifact. */
+export interface NetLike {
+  rtt: number;
+  onMessage: (m: S2C) => void;
+  onClose: () => void;
+  connect(): Promise<void>;
+  send(m: C2S): void;
+  close(): void;
+}
+
+export class Net implements NetLike {
   private ws: WebSocket | null = null;
   rtt = 0;
   private pingTimer = 0;
@@ -8,7 +18,7 @@ export class Net {
   onClose: () => void = () => {};
 
   static url() {
-    const env = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_WS_URL;
+    const env = import.meta.env?.VITE_WS_URL as string | undefined;
     return env || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   }
 

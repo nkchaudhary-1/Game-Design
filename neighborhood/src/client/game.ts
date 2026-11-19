@@ -9,7 +9,7 @@ import { Avatar } from './avatar';
 import { Sound } from './audio';
 import { CameraRig } from './camera';
 import { DEFAULT_SETTINGS, Input, type Settings } from './input';
-import { Net } from './net';
+import { Net, type NetLike } from './net';
 import { Rig } from './rig';
 import { UI } from './ui';
 import { World3D } from './world3d';
@@ -21,7 +21,7 @@ interface Pending { seq: number; mx: number; mz: number; jump: boolean; sprint: 
 
 export class Game {
   readonly map: MapDef = buildMaple();
-  rig: Rig; world3d: World3D; cam: CameraRig; input: Input; net = new Net(); sound = new Sound(); ui: UI;
+  rig: Rig; world3d: World3D; cam: CameraRig; input: Input; net: NetLike; sound = new Sound(); ui: UI;
   settings: Settings;
   state: 'menu' | 'connecting' | 'play' = 'menu';
   profile: Profile;
@@ -61,7 +61,8 @@ export class Game {
   private fpsFrames = 0; private fpsTime = 0; private lowFps = 0;
   private tmpV = new THREE.Vector3();
 
-  constructor(canvas: HTMLCanvasElement, profile: Profile, settings: Settings, private saveSettings: (s: Settings) => void, private saveProfile: (p: Profile) => void) {
+  constructor(canvas: HTMLCanvasElement, profile: Profile, settings: Settings, private saveSettings: (s: Settings) => void, private saveProfile: (p: Profile) => void, opts: { net?: NetLike; note?: string } = {}) {
+    this.net = opts.net ?? new Net();
     this.profile = profile; this.settings = { ...DEFAULT_SETTINGS, ...settings };
     this.rig = new Rig(canvas);
     this.world3d = new World3D(this.map);
@@ -95,6 +96,7 @@ export class Game {
     this.net.onMessage = (m) => this.onMessage(m);
     this.net.onClose = () => { if (this.state === 'play') this.returnToMenu('Connection to the neighborhood was lost.'); };
     this.ui.showMenu(profile.name, profile.look);
+    if (opts.note) this.ui.setStatus(opts.note);
     this.rig.setViewShift(window.innerWidth > 720 ? 0.17 : 0);
     window.addEventListener('resize', () => this.rig.setViewShift(this.state !== 'play' && window.innerWidth > 720 ? 0.17 : 0));
     requestAnimationFrame(() => this.frame());

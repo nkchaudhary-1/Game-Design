@@ -40,7 +40,7 @@ export class UI {
   private onlineBox = el('div', 'online glass');
   private onlineList = el('ul');
   private hints = el('div', 'hints glass');
-  private clickHint = el('div', 'click-hint glass', 'Click to look around');
+  private clickHint = el('div', 'click-hint glass', 'Click or drag to look around');
   private mm = el('canvas');
   private mmLvl = el('div', 'lvl glass');
   private fps = el('div', 'fps');

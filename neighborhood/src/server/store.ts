@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Look } from '../shared/protocol';
+import type { PlayerRec, StoreApi } from './types';
 
-export interface PlayerRec { name: string; look: Look; x: number; y: number; z: number; yaw: number; found: number[]; seen: number }
+export type { PlayerRec };
 interface Data { v: 1; players: Record<string, PlayerRec>; doors: number[]; sw: number[] }
 
 /** Public id derived from the login token. Only this hash is stored — never the token. */
@@ -13,7 +13,7 @@ export const idFromToken = (token: string) => createHash('sha256').update(token)
  * Tiny JSON-file persistence (atomic write, debounced). The interface is deliberately the shape of a
  * Postgres/Supabase repository so it can be swapped without touching the game code.
  */
-export class Store {
+export class Store implements StoreApi {
   private data: Data = { v: 1, players: {}, doors: [], sw: [] };
   private timer: NodeJS.Timeout | null = null;
   constructor(private path: string | null) {

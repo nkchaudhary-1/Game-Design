@@ -5,7 +5,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { SIM_DT } from '../shared/consts';
 import type { C2S } from '../shared/protocol';
 import { GameWorld, type SPlayer } from './game';
-import { Store } from './store';
+import { idFromToken, Store } from './store';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
@@ -17,7 +17,7 @@ export interface RunningServer { port: number; world: GameWorld; close(): Promis
 
 export async function startServer(o: ServerOpts): Promise<RunningServer> {
   const store = new Store(o.dataFile);
-  const world = new GameWorld(store);
+  const world = new GameWorld(store, idFromToken);
   const dist = resolve(o.root, 'dist');
   let vite: import('vite').ViteDevServer | null = null;
 

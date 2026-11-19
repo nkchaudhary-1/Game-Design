@@ -6,7 +6,7 @@ import { round3 } from '../shared/math';
 import {
   cleanLook, cleanName, FL, type BodyWire, type C2S, type InputCmd, type Look, type LiftWire, type PlayerInfo, type PlayerWire, type S2C,
 } from '../shared/protocol';
-import { idFromToken, type Store } from './store';
+import type { StoreApi } from './types';
 
 export interface Conn { send(msg: S2C): void; close(): void }
 
@@ -31,7 +31,7 @@ export class GameWorld {
   private clock = 0;                 // seconds of simulated time
   private cabFloorSolid: number;
 
-  constructor(readonly store: Store) {
+  constructor(readonly store: StoreApi, private idOf: (token: string) => string) {
     this.map = buildMaple();
     this.lift = newLiftState(this.map.lift);
     syncLiftSolids(this.map.lift, this.map.world, this.lift);
@@ -46,7 +46,7 @@ export class GameWorld {
   // ───────────────────────── join / leave ─────────────────────────
   join(conn: Conn, token: string, name: string, look: Look): SPlayer | null {
     if (typeof token !== 'string' || token.length < 12 || token.length > 128) { conn.send({ t: 'error', text: 'Bad token' }); return null; }
-    const id = idFromToken(token);
+    const id = this.idOf(token);
     const existing = this.players.get(id);
     if (existing) { this.leave(existing); existing.conn.close(); }
     if (this.players.size >= MAX_PLAYERS) { conn.send({ t: 'error', text: 'Neighborhood is full' }); return null; }

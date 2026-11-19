@@ -7,11 +7,20 @@ ownership yet** — on purpose. The bet of this prototype is *"is this place enj
 ```
 npm install
 npm run dev          # http://localhost:5173  (client + game server, one process, one port)
-npm test             # 26 tests: controller, the real map, lift, and a real-WebSocket server suite
+npm test             # 27 tests: controller, the real map, lift, and a real-WebSocket server suite
 npm run build && npm start   # production: static client + game server on $PORT
 ```
 
 Open it in **two tabs** (or two browsers) to see each other. State lives in `data/world.json` (gitignored).
+
+**Single-file playable demo** (no server, no network — used for the Artifact page):
+
+```
+npm run build:artifact    # → dist-artifact/neighborhood-playable.html (~720 kB, fully self-contained)
+```
+
+The whole authoritative game server runs inside the page (`src/client/local.ts`), plus three simulated neighbours
+(`src/server/bots.ts`) who sit on benches, wave, chat, open doors and ride the lift using the same rules as any player.
 
 ## First playable — checklist (blueprint §18)
 
@@ -103,9 +112,10 @@ camera, and costs nothing per frame. In the lift the camera rises and looks down
   None are needed for one block; all become relevant at Block 03+.
 
 ### Testing
-`npm test` — 26 tests, ~25 s:
+`npm test` — 27 tests, ~25 s:
 - **controller**: walls, no tunnelling at sprint speed, stair up/down with a max 0.2 m step per frame, step/headroom rules, jump height, moving platforms.
 - **map**: all spawns valid, the street is walkable end-to-end, world edge holds, door blocks/opens, **walk from the lobby up the stairs through every floor to the roof**, closed lift doors keep you out of the shaft, **lift carries riders between all four floors**.
+- **neighbours**: a 7-minute simulated run in which all three complete their routes with no stuck steps, sit, chat, and ride the lift to floor 2 and back.
 - **server (real WebSockets)**: two players see each other, authoritative movement, speed-hack clamp, door/seat rules, multi-rider lift trip, restart persistence.
 
 ## Deliberately not here (MVP vs later)
