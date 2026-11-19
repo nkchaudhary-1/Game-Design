@@ -5,11 +5,12 @@
 // correctly, fade out as the aircraft gets close (so you can fly through them) and drift slowly with the wind.
 
 import {
-  DataTexture, InstancedBufferAttribute, InstancedBufferGeometry, LinearFilter, Mesh, PerspectiveCamera,
+  Color, DataTexture, InstancedBufferAttribute, InstancedBufferGeometry, LinearFilter, Mesh, PerspectiveCamera,
   PlaneGeometry, RGBAFormat, ShaderMaterial, UnsignedByteType, Vector3,
 } from 'three';
 import { makeRng, smoothstep } from '../sim/util';
 import { PALETTE, SUN_DIR } from './sky';
+import { ALIEN } from './look';
 
 // ---- noise for the textures and the coverage map ------------------------------------------------------------------
 
@@ -128,7 +129,7 @@ export class Clouds {
     // cumulus: clusters where a coverage noise map says the sky is broken
     const R = 16000;
     let placed = 0;
-    for (let tries = 0; tries < 900 && placed < 70; tries++) {
+    for (let tries = 0; tries < 900 && placed < (ALIEN ? 26 : 70); tries++) {
       const cx = (rng() * 2 - 1) * R, cz = (rng() * 2 - 1) * R;
       if (Math.hypot(cx, cz) > R) continue;
       if (fbm(cx * 0.00016 + 5, cz * 0.00016 - 3, 3, 3) < 0.5) continue;
@@ -176,8 +177,8 @@ export class Clouds {
       uniforms: {
         atlas: { value: puffAtlas() }, sunDirW: { value: SUN_DIR },
         fogCol: { value: PALETTE.fog },
-        shadeCol: { value: PALETTE.mid.clone().multiplyScalar(0.55).lerp(PALETTE.horizonCool, 0.3) },
-        sunLit: { value: PALETTE.sun.clone().multiplyScalar(1.12) },
+        shadeCol: { value: ALIEN ? new Color('#43237a') : PALETTE.mid.clone().multiplyScalar(0.55).lerp(PALETTE.horizonCool, 0.3) },
+        sunLit: { value: ALIEN ? new Color('#ffb4a8') : PALETTE.sun.clone().multiplyScalar(1.12) },
         rimCol: { value: PALETTE.glow.clone() },
       },
     });

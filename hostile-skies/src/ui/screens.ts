@@ -3,6 +3,7 @@
 
 import { TUNING, type Difficulty } from '../sim/difficulty';
 import { WAVES, type Stats } from '../sim/world';
+import { ALIEN, LOOK, chooseLook } from '../render/look';
 
 export interface Settings {
   difficulty: Difficulty;
@@ -155,6 +156,10 @@ export class Ui {
         </div>
         <div class="best" data-best>${best ? `Best on ${TUNING[s.difficulty].label}: <b>${fmt(best)}</b>` : ''}</div>
       </div>
+      <div class="worldpick" title="${ALIEN ? 'A violet dusk under a ringed planet. Same fight, different sky.' : 'A late afternoon over a real-looking coast.'}">
+        <span>World</span>
+        <div class="seg" data-seg="look" role="group" aria-label="World"><button data-v="earth">Golden hour</button><button data-v="alien">Alien dusk</button></div>
+      </div>
       <div class="foot">Best with sound on and the window large. <span class="dim">Works with keyboard, mouse, gamepad or touch.</span></div>
     `, 'title');
 
@@ -172,6 +177,7 @@ export class Ui {
     this.seg(el, 'difficulty', s.difficulty, (v) => { this.change({ difficulty: v }); hints(); });
     this.seg(el, 'assist', s.assist ? 'on' : 'off', (v) => { this.change({ assist: v === 'on' }); hints(); });
     this.seg(el, 'pitch', s.flightStick ? 'stick' : 'arcade', (v) => { this.change({ flightStick: v === 'stick' }); hints(); });
+    this.seg(el, 'look', LOOK, (v) => { if (v !== LOOK) chooseLook(v); });
     hints();
     el.querySelector('[data-act="launch"]')!.addEventListener('click', () => this.onLaunch(this.settings));
     el.querySelector('[data-act="demo"]')!.addEventListener('click', () => this.onDemo());

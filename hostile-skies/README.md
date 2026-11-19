@@ -13,7 +13,7 @@ npm install
 npm run skies            # dev server: http://localhost:5174
 npm run skies:build      # production build into dist-skies/
 npm run skies:single     # ONE self-contained file: dist-skies-single/hostile-skies.html (open from disk, or host anywhere)
-npm run skies:test       # 41 simulation tests (Vitest)
+npm run skies:test       # 42 simulation tests (Vitest)
 ```
 
 Needs a browser with WebGL. Fonts and everything else are bundled; nothing is fetched at runtime.
@@ -115,6 +115,14 @@ One late-afternoon scene, tuned to read as real rather than as a game backdrop (
   condensation around the airframe, and thin contrails above about 4 km.
 - **HUD.** Green on a soft shadow so it reads over sky, sea or land, with a short key hint panel for the first seconds.
 
+**Alien dusk (opt-in second world).** Pick it with the **World** switch on the title screen, or `?look=alien` (`?look=earth`
+goes back); the choice is remembered and switching reloads the page, because ground colours are baked into the terrain. It
+is a violet-to-coral dusk with stars, two moons and a banded, ringed planet filling a quarter of the sky, light shafts from a
+low oversized sun, plum, rose and coral ground (a luminance gradient map over the Earth colours, so forests, fields and
+snowline still read), violet conifers, a pink-shallow sea, and clusters of stepped rock spires out past the edge of the
+arena. It is built from `render/look.ts`, `render/monoliths.ts` and the alien branch in `render/sky.ts`. It changes colour,
+sky and props only: terrain shape, physics, AI and every test are identical in both worlds.
+
 Not done: real shadows from dynamic objects, volumetric clouds, water simulation, per-vertex wind in the trees. The look is a
 tuned stylisation of realism, not a simulation of light.
 
@@ -149,13 +157,14 @@ hostile-skies/
     render/            three.js
       view.ts          scene, camera rig, entity sync, event reactions, haze, post chain
       sky.ts clouds.ts terrain.ts trees.ts cities.ts   the world
+      look.ts monoliths.ts                              the second (alien dusk) world
       jet.ts models.ts                                  the Sparrow, its cockpit, alien ships
       post.ts flare.ts particles.ts effects.ts quality.ts   film pass, sun flare, smoke/fire/vapour, tiers
     hud/hud.ts         canvas HUD: conformal ladder / boresight / targets, tapes, radar, warnings
     audio/audio.ts     Web Audio synthesis: engine, wind, alarms, combat pulse, one-shots
     input/input.ts     keyboard, mouse, gamepad, touch -> Controls
     ui/                title / pause / help / result screens + CSS
-  tests/sim.test.ts    41 tests: terrain, flight model, atmosphere, G effects, combat, missions, aim assist, demo reel
+  tests/sim.test.ts    42 tests: terrain, flight model, atmosphere, G effects, combat, missions, aim assist, demo reel
 ```
 
 The sim talks to everything else through a single `events` array (explosions, hits, kills, warps, messages). The renderer,
@@ -183,14 +192,14 @@ and phones start lower; the game steps down by itself if frames stay slow. Force
 ## QA URL switches
 
 `?demo` (play the reel) · `?record` (fixed-step recorder, see above) · `?autostart` (skip the title) · `?god` (take no damage) · `?wave=5` (start at a wave; 5 = the Leviathan) · `?seed=123` ·
-`?quality=low` · `?shot` (keeps the WebGL buffer so headless screenshots are not blank). `window.__game` exposes the
+`?look=alien|earth` · `?quality=low` · `?shot` (keeps the WebGL buffer so headless screenshots are not blank). `window.__game` exposes the
 world, view and sound for debugging.
 
 ## MVP vs later
 
 **In the MVP:** the full loop (title, five waves, boss, result with stats and best score), three alien classes plus the
 boss, assisted and manual flight, chase and cockpit cameras, three input schemes, procedural audio, three graphics tiers,
-41 simulation tests.
+42 simulation tests.
 
 **Later, in the order I would do it:**
 1. *Checkpoint / continue from wave N.* One life over a ~10 minute run is the sharpest edge in the current design.

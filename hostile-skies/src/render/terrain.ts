@@ -13,6 +13,7 @@ import {
 import { groundColor, groundNoise, groundPatches, terrainHeight } from '../sim/terrain';
 import { GFX } from './quality';
 import { PALETTE, SUN_DIR } from './sky';
+import { ALIEN, alienGround } from './look';
 
 export const CHUNK = 1024;
 /** The distant ring: big coarse chunks out to the horizon, with holes cut where the detailed chunks already cover. */
@@ -156,6 +157,7 @@ export class TerrainView {
       const wx = ox + x * step, wz = oz + z * step;
       const slope = Math.hypot(dx, dz);
       groundColor(h, slope, groundNoise(wx, wz), groundPatches(wx, wz), rgb);
+      if (ALIEN) alienGround(rgb);
       col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
       if (h < lo) lo = h;
       if (h > hi) hi = h;
@@ -212,6 +214,7 @@ export class TerrainView {
       nor[i * 3] = -dx * il; nor[i * 3 + 1] = il; nor[i * 3 + 2] = -dz * il;
       const wx = ox + x * step, wz = oz + z * step;
       groundColor(h, Math.hypot(dx, dz), groundNoise(wx, wz), groundPatches(wx, wz), rgb);
+      if (ALIEN) alienGround(rgb);
       col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
       if (h < lo) lo = h;
       if (h > hi) hi = h;
@@ -385,7 +388,7 @@ export class Sea {
       uniforms: {
         time: { value: 0 }, sunDir: { value: SUN_DIR }, horizon: { value: PALETTE.horizon }, horizonCool: { value: PALETTE.horizonCool },
         mid: { value: PALETTE.mid }, zenith: { value: PALETTE.zenith }, fogCol: { value: PALETTE.fog }, fogDensity: { value: fogDensity },
-        deep: { value: new Color('#0a3552') }, shallow: { value: new Color('#2c9a98') }, sunCol: { value: PALETTE.sun },
+        deep: { value: new Color(ALIEN ? '#2b1166' : '#0a3552') }, shallow: { value: new Color(ALIEN ? '#f0607e' : '#2c9a98') }, sunCol: { value: PALETTE.sun },
         bathy: { value: FIELDS.bathy }, mapR: { value: MAP_R },
       },
     });

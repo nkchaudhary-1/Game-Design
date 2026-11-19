@@ -710,11 +710,16 @@ export class World implements AiHost {
       stepAircraft(ac, c, dt, this.assist);
       this.pilotHook?.(this, dt);
       // the pilot's body: blood drains from the head above about 5 g and vision tunnels, then fades; negative g reddens it
+      // (the demo reel's scripted pilot is held to 8 g on purpose, so it never greys out: the reel must stay watchable)
       const gt = this.tuning.gTolerance;
-      if (ac.g > 5.2) this.blackout = Math.min(1, this.blackout + ((ac.g - 5.2) * 0.045 * dt) / gt);
-      else this.blackout = Math.max(0, this.blackout - (ac.g < 3.5 ? 0.3 : 0.08) * dt);
-      if (ac.g < -1.2) this.redout = Math.min(1, this.redout + ((-ac.g - 1.2) * 0.12 * dt) / gt);
-      else this.redout = Math.max(0, this.redout - 0.4 * dt);
+      if (this.demo) {
+        this.blackout = 0; this.redout = 0;
+      } else {
+        if (ac.g > 5.2) this.blackout = Math.min(1, this.blackout + ((ac.g - 5.2) * 0.045 * dt) / gt);
+        else this.blackout = Math.max(0, this.blackout - (ac.g < 3.5 ? 0.3 : 0.08) * dt);
+        if (ac.g < -1.2) this.redout = Math.min(1, this.redout + ((-ac.g - 1.2) * 0.12 * dt) / gt);
+        else this.redout = Math.max(0, this.redout - 0.4 * dt);
+      }
       this.tti = timeToImpact(ac.pos.x, ac.pos.y, ac.pos.z, ac.vel.x, ac.vel.y, ac.vel.z, 20, 5);
 
       const cycle = c.cycleTarget && !this.prevCycle;

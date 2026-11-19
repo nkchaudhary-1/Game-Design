@@ -11,6 +11,7 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CITY_SITES, forestAmount, groundNoise, groundPatches, terrainHeight } from '../sim/terrain';
 import { GFX } from './quality';
+import { ALIEN } from './look';
 
 const MAX = 7000;
 const CELL = 38;
@@ -46,7 +47,9 @@ export class Trees {
   private tint = new Color();
 
   constructor(scene: Scene) {
-    this.mesh = new InstancedMesh(conifer(), new MeshLambertMaterial({ vertexColors: true }), MAX);
+    const mat = new MeshLambertMaterial({ vertexColors: true });
+    if (ALIEN) mat.color.setRGB(3.4, 0.5, 5.8); // dark green becomes deep violet
+    this.mesh = new InstancedMesh(conifer(), mat, MAX);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(35048);

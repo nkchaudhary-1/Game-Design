@@ -416,15 +416,16 @@ describe('demo reel', () => {
   const play = (i: number) => {
     const sc = createScene(i);
     const w = sc.world;
-    let maxG = 0, minAgl = Infinity, steps = 0;
+    let maxG = 0, minAgl = Infinity, steps = 0, grey = 0;
     for (; !sc.done() && steps < 60 * 70; steps++) {
       w.step(DT, sc.flight.controls());
       w.events.length = 0;
       maxG = Math.max(maxG, w.ac.g);
+      grey = Math.max(grey, w.blackout, w.redout);
       minAgl = Math.min(minAgl, w.ac.pos.y - surfaceHeight(w.ac.pos.x, w.ac.pos.z));
       expect(Number.isFinite(w.ac.pos.x + w.ac.pos.y + w.ac.pos.z)).toBe(true);
     }
-    return { sc, w, maxG, minAgl, secs: steps * DT };
+    return { sc, w, maxG, minAgl, grey, secs: steps * DT };
   };
   it('has three scenes that each play out and end on their own', () => {
     expect(DEMO_SCENES).toBe(3);
@@ -453,5 +454,8 @@ describe('demo reel', () => {
       expect(maxG).toBeLessThan(12.5);
       expect(minAgl).toBeGreaterThan(30);
     }
+  });
+  it('the reel never greys the screen out, even though its pilot pulls 8 g', () => {
+    for (let i = 0; i < DEMO_SCENES; i++) expect(play(i).grey).toBe(0);
   });
 });

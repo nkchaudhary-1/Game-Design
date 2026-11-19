@@ -24,12 +24,14 @@ import { beamTime, buildAlien, buildMissile, disposeModel, type AlienModel } fro
 import { GFX } from './quality';
 import { Clouds } from './clouds';
 import { PALETTE, Sky, SUN_DIR, updateHaze } from './sky';
+import { ALIEN } from './look';
+import { Monoliths } from './monoliths';
 import { Sea, TerrainView } from './terrain';
 import { Trees } from './trees';
 
 export type CamMode = 'chase' | 'cockpit';
 
-const FOG_DENSITY = 0.00013;
+const FOG_DENSITY = ALIEN ? 0.00018 : 0.00013;
 const Y = new Vector3(0, 1, 0);
 const Z = new Vector3(0, 0, 1);
 const ZERO = new Vector3();
@@ -130,12 +132,12 @@ export class GameView {
       preserveDrawingBuffer: new URLSearchParams(location.search).has('shot'),
     });
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = ALIEN ? 0.92 : 1.0;
     this.scene.background = PALETTE.fog.clone();
     this.scene.fog = new FogExp2(PALETTE.fog.clone(), FOG_DENSITY);
 
-    const hemi = new HemisphereLight(new Color('#a5c0e4'), new Color('#5b5142'), 1.5);
-    const sun = new DirectionalLight(new Color('#fff0dc'), 6.0);
+    const hemi = ALIEN ? new HemisphereLight(new Color('#9373dd'), new Color('#35183f'), 1.3) : new HemisphereLight(new Color('#a5c0e4'), new Color('#5b5142'), 1.5);
+    const sun = new DirectionalLight(new Color(ALIEN ? '#ffc7a2' : '#fff0dc'), ALIEN ? 5.2 : 6.0);
     sun.position.copy(SUN_DIR).multiplyScalar(1000);
     this.scene.add(hemi, sun, this.sky.group);
 
@@ -144,13 +146,14 @@ export class GameView {
     const envScene = new Scene();
     envScene.add(new Mesh(this.sky.env.geometry, this.sky.env.material));
     this.scene.environment = pm.fromScene(envScene, 0, 0.1, 100).texture;
-    this.scene.environmentIntensity = 0.7;
+    this.scene.environmentIntensity = ALIEN ? 0.85 : 0.7;
     pm.dispose();
 
     this.terrain = new TerrainView(this.scene);
     this.sea = new Sea(FOG_DENSITY);
     this.scene.add(this.sea.mesh, this.cities.group, this.clouds.mesh);
     this.trees = new Trees(this.scene);
+    if (ALIEN) new Monoliths(this.scene);
     this.fx = new Effects(this.scene, GFX.particles);
     this.proj = new ProjectileView(this.scene);
     this.scene.add(this.jet.root);

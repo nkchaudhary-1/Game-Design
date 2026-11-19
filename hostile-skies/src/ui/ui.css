@@ -55,6 +55,10 @@ button.ghost:hover, .stack button:not(.primary):hover { background: var(--cy-sof
 button:focus-visible, .seg button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .best { font-size: 13px; color: var(--dim); min-height: 1.2em; }
 .best b { color: var(--cy); font-family: var(--num); font-size: 1.15em; }
+.worldpick { position: absolute; top: 16px; right: 18px; z-index: 2; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 5px 6px 5px 12px; backdrop-filter: blur(8px); }
+.worldpick span { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+.worldpick .seg button { padding: 5px 12px; font-size: 13px; }
+@media (max-width: 700px) { .worldpick { top: auto; bottom: 10px; right: 10px; } .title-col { padding-bottom: 64px; } }
 .foot { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 12px; color: var(--faint); z-index: 1; }
 .dim { color: var(--faint); }
 
