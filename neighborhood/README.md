@@ -27,7 +27,7 @@ Open it in **two tabs** (or two browsers) to see each other. State lives in `dat
 | One park | ✅ fountain, playground, community board, benches, hidden garden with a secret |
 | **Two+ multiplayer characters, real-time sync** | ✅ client prediction + server reconciliation for you, interpolation for others |
 | Doors and basic interactions | ✅ doors, light switches, doorbell/knock, benches & sofas (sit), info objects, 3 hidden collectibles |
-| Flat-colour 3D, browser | ✅ palette from §15; ~25 draw calls for the whole street |
+| Flat-colour 3D, browser | ✅ palette from §15; no textures; the static street is merged into a few dozen meshes (~105 draw calls/frame measured, including doors, labels and avatars) |
 | State persists | ✅ position, collectibles found, light switches, open doors — across disconnects *and* server restarts |
 
 Extras that earn their keep: chat with bubbles, wave/dance emotes, minimap, zone names, synthesized audio (lift hum + ding, doors, birds), auto graphics downgrade.
@@ -95,7 +95,7 @@ visibility group; the camera ignores hidden geometry. It reads like a doll's hou
 camera, and costs nothing per frame. In the lift the camera rises and looks down into the cab, since a 2 m box has no room behind you.
 
 ### Performance
-- Whole static world merged into **~25 draw calls** (vertex colours, one material per visibility group); no textures.
+- Static world merged by visibility group with vertex colours (one material per group); no textures. Measured **~105 draw calls/frame** in the two-player tour (doors, labels, lamps and avatars are separate objects) — comfortable, with headroom to instance trees and lamps later.
 - Shadow camera follows the player (±36 m, 2048²); point lights are a fixed pool of 6 (changing light count recompiles shaders).
 - Spatial-hash colliders; per-frame allocations avoided in the controller. Snapshots are ~40 bytes/player at 20 Hz.
 - Auto-downgrades to "Low" (no shadows, DPR 1) if FPS stays under 28 for 4 s. Pause menu has the manual switch.
