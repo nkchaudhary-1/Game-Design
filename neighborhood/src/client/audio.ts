@@ -1,5 +1,9 @@
+export type Surface = 'pave' | 'road' | 'grass' | 'wood' | 'tile' | 'carpet' | 'stone' | 'metal';
+
 /** Tiny WebAudio synth: no asset files. Positional sounds fade with distance from the listener. */
 export class Sound {
+  private room: BiquadFilterNode | null = null;
+  private indoor = false;
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private liftGain: GainNode | null = null;
@@ -16,7 +20,8 @@ export class Sound {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
-    this.master.connect(this.ctx.destination);
+    this.room = this.ctx.createBiquadFilter(); this.room.type = 'lowpass'; this.room.frequency.value = 20000; this.room.Q.value = 0.4;
+    this.master.connect(this.room); this.room.connect(this.ctx.destination);
     this.apply();
     // soft room-tone wind
     const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
@@ -62,10 +67,28 @@ export class Sound {
   toast() { this.tone(520, 0.08, 0.1, 'sine'); }
   jump() { this.noise(0.08, 0.12, 700, 0.8); }
   land() { this.noise(0.09, 0.2, 300, 0.8, 0, 'lowpass'); }
-  step(dt: number, speed: number, grounded: boolean) {
+  /** Walls take the top off outdoor sound: wind, birds and street noise soften when you step inside. */
+  setIndoor(inside: boolean) {
+    if (!this.ctx || !this.room || inside === this.indoor) return;
+    this.indoor = inside;
+    this.room.frequency.setTargetAtTime(inside ? 1400 : 20000, this.ctx.currentTime, 0.12);
+  }
+  step(dt: number, speed: number, grounded: boolean, surface: () => Surface) {
     if (!this.ctx || !grounded || speed < 0.5) { this.stepClock = 0; return; }
     this.stepClock -= dt * speed;
-    if (this.stepClock <= 0) { this.stepClock = 1.15; this.noise(0.06, 0.1 + Math.min(0.1, speed * 0.015), 260 + Math.random() * 60, 0.7, 0, 'lowpass'); }
+    if (this.stepClock > 0) return;
+    this.stepClock = 1.15;
+    const v = 0.1 + Math.min(0.08, speed * 0.012), r = Math.random();
+    switch (surface()) {
+      case 'pave': this.noise(0.05, v * 1.1, 1900 + r * 400, 1.6); this.tone(180, 0.04, v * 0.5, 'triangle', 0, -60); break;
+      case 'road': this.noise(0.06, v, 1100 + r * 200, 1.2); break;
+      case 'grass': this.noise(0.1, v * 0.9, 800 + r * 150, 0.5, 0, 'lowpass'); this.noise(0.08, v * 0.35, 3500, 0.6, 0.01, 'highpass'); break;
+      case 'wood': this.tone(115 + r * 25, 0.09, v * 1.2, 'triangle', 0, -40); this.noise(0.05, v * 0.6, 700, 1.5); break;
+      case 'tile': this.noise(0.04, v * 1.2, 2600 + r * 300, 2.5); this.tone(260, 0.05, v * 0.4, 'sine', 0, -80); break;
+      case 'carpet': this.noise(0.07, v * 0.6, 260 + r * 40, 0.7, 0, 'lowpass'); break;
+      case 'stone': this.noise(0.05, v * 1.1, 1500, 1.4); this.tone(150, 0.06, v * 0.5, 'triangle', 0, -50); break;
+      case 'metal': this.tone(300, 0.1, v * 0.7, 'square', 0, -120); this.noise(0.05, v * 0.8, 1700, 3); break;
+    }
   }
   /** Lift motor hum: call every frame while it is moving, with the listener's distance (negative = off). */
   liftHum(dist: number, speed: number) {

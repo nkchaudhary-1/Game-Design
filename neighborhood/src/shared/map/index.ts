@@ -40,6 +40,6 @@ export function buildMaple(): MapDef {
   return {
     world: mb.world, pieces: mb.pieces, doors: mb.doors, seats: mb.seats, switches: mb.switches, lamps: mb.lamps,
     labels: mb.labels, found: mb.found, interactables: mb.interactables, buildings: mb.buildings, groups: mb.groups,
-    zones: mb.zones, mapRects: mb.mapRects, lift, spawns: mb.spawns, bounds: { x0: WORLD.x0, z0: WORLD.z0, x1: WORLD.x1, z1: WORLD.z1 },
+    zones: mb.zones, mapRects: mb.mapRects, lift, spawns: mb.spawns, streetLamps: mb.streetLamps, chimneys: mb.chimneys, bounds: { x0: WORLD.x0, z0: WORLD.z0, x1: WORLD.x1, z1: WORLD.z1 },
   };
 }

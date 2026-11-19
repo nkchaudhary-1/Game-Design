@@ -1,7 +1,8 @@
 import { clamp } from '../shared/math';
 
-export interface Settings { sens: number; invertY: boolean; volume: number; muted: boolean; quality: 'high' | 'low'; zoom: number }
-export const DEFAULT_SETTINGS: Settings = { sens: 1, invertY: false, volume: 0.7, muted: false, quality: 'high', zoom: 4.6 };
+export type TimeSetting = 'live' | 'morning' | 'noon' | 'golden' | 'night';
+export interface Settings { sens: number; invertY: boolean; volume: number; muted: boolean; quality: 'high' | 'low'; zoom: number; time: TimeSetting }
+export const DEFAULT_SETTINGS: Settings = { sens: 1, invertY: false, volume: 0.7, muted: false, quality: 'high', zoom: 4.6, time: 'live' };
 
 /** Keyboard + mouse (pointer lock, with drag-to-look fallback). `inject` lets tests drive the same pipeline. */
 export class Input {

@@ -4,6 +4,8 @@ import { liftNearest, type LiftState } from '../shared/lift';
 import { PK, type DoorDef, type MapDef, type Piece } from '../shared/map';
 import { damp } from '../shared/math';
 
+const hash01 = (i: number) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
 const FONT = '"Outfit Variable", system-ui, sans-serif';
 
 function baseGeometry(k: number): THREE.BufferGeometry {
@@ -56,6 +58,11 @@ export class World3D {
   private lamps: LampObj[] = [];
   private lampLights: THREE.PointLight[] = [];
   private lampOn = new Set<number>();
+  private glowMats: THREE.MeshLambertMaterial[] = [];
+  private timeU = { value: 0 };
+  private pools: THREE.InstancedMesh | null = null;
+  private streetPos: THREE.Vector3[] = [];
+  private nightLevel = 0;
   private doorOpen = new Set<number>();
   private foundMeshes: { mesh: THREE.Group; id: number }[] = [];
   // lift
@@ -73,8 +80,9 @@ export class World3D {
     this.buildLamps();
     this.buildFound();
     this.buildLift();
-    for (let i = 0; i < 6; i++) {
-      const l = new THREE.PointLight(0xffd9a0, 0, 14, 2);
+    this.buildLampPools();
+    for (let i = 0; i < 8; i++) {
+      const l = new THREE.PointLight(0xffd9a0, 0, 15, 2);
       this.lampLights.push(l); this.root.add(l);
     }
   }
@@ -90,21 +98,32 @@ export class World3D {
   // ───────────────────────── merged static geometry ─────────────────────────
   private buildPieces() {
     const bases = new Map<number, THREE.BufferGeometry>();
-    const buckets = new Map<string, { group: number; alpha: number; cast: boolean; geos: THREE.BufferGeometry[] }>();
+    const buckets = new Map<string, { group: number; alpha: number; cast: boolean; glow: boolean; wind: boolean; geos: THREE.BufferGeometry[] }>();
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
+    let idx = 0;
     for (const p of this.map.pieces as Piece[]) {
-      const key = `${p.group}|${p.alpha}|${p.cast ? 1 : 0}`;
+      idx++;
+      const key = `${p.group}|${p.alpha}|${p.cast ? 1 : 0}|${p.glow ? 1 : 0}|${p.wind ? 1 : 0}`;
       let b = buckets.get(key);
-      if (!b) buckets.set(key, (b = { group: p.group, alpha: p.alpha, cast: p.cast, geos: [] }));
+      if (!b) buckets.set(key, (b = { group: p.group, alpha: p.alpha, cast: p.cast, glow: p.glow, wind: p.wind, geos: [] }));
       let base = bases.get(p.k);
       if (!base) bases.set(p.k, (base = baseGeometry(p.k)));
       const g = base.clone();
       q.setFromAxisAngle(yAxis, p.ry); pos.set(p.x, p.y, p.z); sc.set(p.sx, p.sy, p.sz);
       g.applyMatrix4(m4.compose(pos, q, sc));
       col.setHex(p.color);
-      const n = g.attributes.position.count, arr = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) { arr[i * 3] = col.r; arr[i * 3 + 1] = col.g; arr[i * 3 + 2] = col.b; }
+      const posA = g.attributes.position, n = posA.count, arr = new Float32Array(n * 3);
+      // a little per-piece variation, and darker where a box meets what is below it (contact shading baked into vertex colour)
+      const plain = p.alpha < 1 || p.glow;
+      const jit = plain ? 1 : 0.965 + hash01(idx) * 0.07;
+      const useAO = p.k === PK.BOX && p.sy >= 0.5 && !plain;
+      const yBase = p.y - p.sy / 2, band = Math.min(1.0, p.sy * 0.45);
+      for (let i = 0; i < n; i++) {
+        let f = jit;
+        if (useAO) { const t = Math.min(1, Math.max(0, (posA.getY(i) - yBase) / band)); f *= 1 - 0.2 * (1 - t) * (1 - t); }
+        arr[i * 3] = col.r * f; arr[i * 3 + 1] = col.g * f; arr[i * 3 + 2] = col.b * f;
+      }
       g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
       b.geos.push(g);
     }
@@ -113,10 +132,55 @@ export class World3D {
       for (const g of b.geos) g.dispose();
       if (!merged) continue;
       const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, transparent: b.alpha < 1, opacity: b.alpha, depthWrite: b.alpha >= 1 });
+      if (b.glow) { material.emissive = new THREE.Color(0xffc772); material.emissiveIntensity = 0; material.userData.glowScale = b.alpha < 1 ? 2.6 : 1.1; this.glowMats.push(material); }
+      if (b.wind) this.addSway(material);
       const mesh = new THREE.Mesh(merged, material);
       mesh.castShadow = b.cast; mesh.receiveShadow = true;
       this.register(mesh, b.group);
     }
+  }
+
+  /** Foliage moves in the wind: a vertex-shader sway that grows with height. Geometry is merged in world space, so `position` is world position. */
+  private addSway(material: THREE.MeshLambertMaterial) {
+    material.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = this.timeU;
+      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `
+        vec3 transformed = vec3( position );
+        float hf = clamp((position.y - 1.0) / 3.0, 0.0, 1.0);
+        float ph = position.x * 0.45 + position.z * 0.37;
+        transformed.x += (sin(uTime * 1.3 + ph) * 0.07 + sin(uTime * 2.9 + ph * 1.9) * 0.025) * hf;
+        transformed.z += sin(uTime * 1.1 + ph * 0.8) * 0.045 * hf;`);
+    };
+    material.customProgramCacheKey = () => 'sway';
+  }
+
+  /** Soft pools of warm light on the ground under each street lamp (additive, only visible at night). */
+  private buildLampPools() {
+    const lamps = this.map.streetLamps;
+    this.streetPos = lamps.map((l) => new THREE.Vector3(l.x, l.y, l.z));
+    if (!lamps.length) return;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffd59a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const inst = new THREE.InstancedMesh(geo, mat, lamps.length);
+    const m = new THREE.Matrix4();
+    lamps.forEach((l, i) => { m.compose(new THREE.Vector3(l.x, 0.16, l.z), new THREE.Quaternion(), new THREE.Vector3(7.5, 1, 7.5)); inst.setMatrixAt(i, m); });
+    inst.frustumCulled = false; inst.renderOrder = 2;
+    this.pools = inst;
+    this.root.add(inst);
+  }
+
+  /** 0 (day) … 1 (full night): windows and lamp heads glow, ground pools fade in. */
+  private setNight(n: number) {
+    if (Math.abs(n - this.nightLevel) < 0.003) return;
+    this.nightLevel = n;
+    for (const m of this.glowMats) m.emissiveIntensity = n * (m.userData.glowScale as number);
+    if (this.pools) (this.pools.material as THREE.MeshBasicMaterial).opacity = n * 0.5;
   }
 
   private buildLabels() {
@@ -273,8 +337,10 @@ export class World3D {
   isHidden(g: number) { return g >= 0 && this.hidden.has(g); }
 
   /** `nearLamps`: lamps nearest the viewer get a real light (pool of 6; the count never changes, so no shader recompiles). */
-  update(dt: number, lift: LiftState, viewer: THREE.Vector3, insideCab: boolean) {
+  update(dt: number, lift: LiftState, viewer: THREE.Vector3, insideCab: boolean, night = 0) {
     this.t += dt;
+    this.timeU.value += dt;
+    this.setNight(night);
     const def = this.map.lift;
     for (const d of this.doors) {
       const target = this.doorOpen.has(d.def.id) ? d.sgn * 1.65 : 0;
@@ -291,12 +357,13 @@ export class World3D {
     const arrow = lift.mode === 2 ? Math.sign(def.floors[lift.target] - lift.y) : 0;
     for (const r of this.indicators) this.drawIndicator(r, def.names[near], arrow);
     // lamps → pool of real lights
-    const cand: { l: LampObj; d: number }[] = [];
-    for (const l of this.lamps) if (this.lampOn.has(l.switchId) && !this.isHidden(l.group)) cand.push({ l, d: l.pos.distanceToSquared(viewer) });
+    const cand: { pos: THREE.Vector3; d: number; i: number; color: number }[] = [];
+    for (const l of this.lamps) if (this.lampOn.has(l.switchId) && !this.isHidden(l.group)) cand.push({ pos: l.pos, d: l.pos.distanceToSquared(viewer), i: 26, color: 0xffd9a0 });
+    if (this.nightLevel > 0.12) for (const p of this.streetPos) { const d = p.distanceToSquared(viewer); if (d < 1400) cand.push({ pos: p, d, i: 20 * this.nightLevel, color: 0xffcf8a }); }
     cand.sort((a, b) => a.d - b.d);
     this.lampLights.forEach((light, i) => {
       const c = cand[i];
-      if (c && c.d < 900) { light.position.copy(c.l.pos); light.intensity = 26; } else light.intensity = 0;
+      if (c && c.d < 1400) { light.position.copy(c.pos); light.intensity = c.i; light.color.setHex(c.color); } else light.intensity = 0;
     });
     for (const f of this.foundMeshes) { f.mesh.rotation.y = this.t * 1.6; f.mesh.children[0].position.y = 0.2 + Math.sin(this.t * 2.2) * 0.04; }
   }

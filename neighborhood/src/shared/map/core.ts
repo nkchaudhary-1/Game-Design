@@ -24,6 +24,8 @@ export interface Piece {
   group: number;
   alpha: number;
   cast: boolean;
+  glow: boolean;   // emissive at night (lamp heads, lit windows)
+  wind: boolean;   // sways in the wind (foliage)
 }
 
 export interface DoorDef {
@@ -88,12 +90,14 @@ export interface MapDef {
   mapRects: MapRect[];
   lift: LiftDef;
   spawns: { x: number; z: number; yaw: number }[];
+  streetLamps: { x: number; y: number; z: number }[];
+  chimneys: { x: number; y: number; z: number }[];
   bounds: { x0: number; z0: number; x1: number; z1: number };
 }
 
 export interface BoxOpts {
   solid?: boolean; group?: number; tag?: number; cast?: boolean; alpha?: number;
-  noPiece?: boolean; dyn?: boolean;
+  noPiece?: boolean; dyn?: boolean; glow?: boolean;
 }
 
 /** Local frame: u runs along a building's front wall, v runs inward. Rotations are quarter-turns so boxes stay axis-aligned. */
@@ -136,6 +140,8 @@ export class MB {
   zones: Zone[] = [];
   mapRects: MapRect[] = [];
   spawns: { x: number; z: number; yaw: number }[] = [];
+  streetLamps: { x: number; y: number; z: number }[] = [];
+  chimneys: { x: number; y: number; z: number }[] = [];
 
   newGroup(building: number, level: number): number {
     this.groups.push({ building, level });
@@ -148,7 +154,7 @@ export class MB {
     if (!o.noPiece)
       this.pieces.push({
         k: PK.BOX, x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2,
-        sx: x1 - x0, sy: y1 - y0, sz: z1 - z0, ry: 0, color, group, alpha: o.alpha ?? 1, cast: o.cast ?? true,
+        sx: x1 - x0, sy: y1 - y0, sz: z1 - z0, ry: 0, color, group, alpha: o.alpha ?? 1, cast: o.cast ?? true, glow: o.glow ?? false, wind: false,
       });
     if (o.solid ?? true)
       return this.world.add({ minX: x0, minY: y0, minZ: z0, maxX: x1, maxY: y1, maxZ: z1, group, tag: o.tag ?? 0, dyn: o.dyn ?? false });
@@ -163,8 +169,8 @@ export class MB {
     return this.box(x0, y0, z0, x1, y1, z1, color, o);
   }
   /** Visual-only primitive (cylinder/cone/ico/gable/sphere). */
-  prim(k: PieceKind, x: number, y: number, z: number, sx: number, sy: number, sz: number, color: number, o: { ry?: number; group?: number; cast?: boolean; alpha?: number } = {}) {
-    this.pieces.push({ k, x, y, z, sx, sy, sz, ry: o.ry ?? 0, color, group: o.group ?? -1, alpha: o.alpha ?? 1, cast: o.cast ?? true });
+  prim(k: PieceKind, x: number, y: number, z: number, sx: number, sy: number, sz: number, color: number, o: { ry?: number; group?: number; cast?: boolean; alpha?: number; glow?: boolean; wind?: boolean } = {}) {
+    this.pieces.push({ k, x, y, z, sx, sy, sz, ry: o.ry ?? 0, color, group: o.group ?? -1, alpha: o.alpha ?? 1, cast: o.cast ?? true, glow: o.glow ?? false, wind: o.wind ?? false });
   }
 
   interact(kind: InteractKind, x: number, y: number, z: number, ref: number, label: string, group = -1, text?: string): number {
@@ -188,7 +194,7 @@ export class MB {
       if (op.glass) {
         const g = 0.02;
         const rect = axis === 'u' ? f.rect(op.a, at - g, op.b, at + g) : f.rect(at - g, op.a, at + g, op.b);
-        this.box(rect[0], op.lo, rect[1], rect[2], op.hi, rect[3], C.glass, { group: o.group, alpha: 0.32, cast: false, tag: TAG_GLASS });
+        this.box(rect[0], op.lo, rect[1], rect[2], op.hi, rect[3], C.glass, { group: o.group, alpha: 0.32, cast: false, tag: TAG_GLASS, glow: true });
         const sr = axis === 'u' ? f.rect(op.a - 0.07, at - t / 2 - 0.08, op.b + 0.07, at + t / 2 + 0.08) : f.rect(at - t / 2 - 0.08, op.a - 0.07, at + t / 2 + 0.08, op.b + 0.07);
         this.box(sr[0], op.lo - 0.07, sr[1], sr[2], op.lo, sr[3], C.offWhite, { group: o.group, solid: false });
       }

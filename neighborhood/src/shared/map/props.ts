@@ -5,14 +5,14 @@ export function tree(mb: MB, x: number, z: number, s = 1, tone = 0) {
   const trunkH = 1.7 * s;
   mb.cbox(x, 0, z, 0.38 * s, trunkH, 0.38 * s, C.woodDark);
   const cols = [C.leaf, C.leafDark, C.leafLight];
-  mb.prim(PK.ICO, x, trunkH + 0.85 * s, z, 2.7 * s, 2.3 * s, 2.7 * s, cols[tone % 3]);
-  mb.prim(PK.ICO, x + 0.55 * s, trunkH + 0.25 * s, z - 0.3 * s, 1.6 * s, 1.4 * s, 1.6 * s, cols[(tone + 1) % 3]);
+  mb.prim(PK.ICO, x, trunkH + 0.85 * s, z, 2.7 * s, 2.3 * s, 2.7 * s, cols[tone % 3], { wind: true });
+  mb.prim(PK.ICO, x + 0.55 * s, trunkH + 0.25 * s, z - 0.3 * s, 1.6 * s, 1.4 * s, 1.6 * s, cols[(tone + 1) % 3], { wind: true });
 }
 export function pine(mb: MB, x: number, z: number, s = 1) {
   mb.cbox(x, 0, z, 0.34 * s, 1.2 * s, 0.34 * s, C.woodDark);
-  mb.prim(PK.CONE, x, 1.2 * s, z, 2.3 * s, 2.0 * s, 2.3 * s, C.leafDark);
-  mb.prim(PK.CONE, x, 2.4 * s, z, 1.8 * s, 1.8 * s, 1.8 * s, C.leaf);
-  mb.prim(PK.CONE, x, 3.5 * s, z, 1.2 * s, 1.5 * s, 1.2 * s, C.leafLight);
+  mb.prim(PK.CONE, x, 1.2 * s, z, 2.3 * s, 2.0 * s, 2.3 * s, C.leafDark, { wind: true });
+  mb.prim(PK.CONE, x, 2.4 * s, z, 1.8 * s, 1.8 * s, 1.8 * s, C.leaf, { wind: true });
+  mb.prim(PK.CONE, x, 3.5 * s, z, 1.2 * s, 1.5 * s, 1.2 * s, C.leafLight, { wind: true });
 }
 export function bush(mb: MB, x: number, z: number, s = 1, tone = 0) {
   const cols = [C.leaf, C.leafDark, C.leafLight];
@@ -24,8 +24,12 @@ export function lampPost(mb: MB, x: number, z: number, armDir: [number, number] 
   mb.cbox(x, 0, z, 0.38, 0.25, 0.38, C.charcoal, { solid: false });
   if (armDir[0] || armDir[1]) {
     mb.cbox(x + armDir[0] * 0.45, 3.95, z + armDir[1] * 0.45, 0.2 + Math.abs(armDir[0]) * 0.7, 0.12, 0.2 + Math.abs(armDir[1]) * 0.7, C.charcoal, { solid: false });
-    mb.cbox(x + armDir[0] * 0.8, 3.78, z + armDir[1] * 0.8, 0.5, 0.2, 0.5, C.yellow, { solid: false });
-  } else mb.prim(PK.SPHERE, x, 4.25, z, 0.5, 0.5, 0.5, C.yellow);
+    mb.cbox(x + armDir[0] * 0.8, 3.78, z + armDir[1] * 0.8, 0.5, 0.2, 0.5, C.yellow, { solid: false, glow: true });
+    mb.streetLamps.push({ x: x + armDir[0] * 0.8, y: 3.7, z: z + armDir[1] * 0.8 });
+  } else {
+    mb.prim(PK.SPHERE, x, 4.25, z, 0.5, 0.5, 0.5, C.yellow, { glow: true });
+    mb.streetLamps.push({ x, y: 4.2, z });
+  }
 }
 export function addSeat(mb: MB, x: number, y: number, z: number, yaw: number, group: number, name: string) {
   const id = mb.seats.length;

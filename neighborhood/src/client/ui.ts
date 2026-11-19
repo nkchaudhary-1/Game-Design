@@ -221,6 +221,9 @@ export class UI {
     const q = el('select'); for (const [v, t] of [['high', 'High (shadows)'], ['low', 'Low (faster)']] as const) { const o = el('option', '', t); o.value = v; q.append(o); }
     q.value = cur.quality; q.onchange = () => { cur.quality = q.value as Settings['quality']; upd(); };
     row('Graphics', q);
+    const tm = el('select'); for (const [v, t] of [['live', 'Live (30 min day)'], ['morning', 'Morning'], ['noon', 'Midday'], ['golden', 'Golden hour'], ['night', 'Night']] as const) { const o = el('option', '', t); o.value = v; tm.append(o); }
+    tm.value = cur.time; tm.onchange = () => { cur.time = tm.value as Settings['time']; upd(); };
+    row('Time of day', tm);
     const help = el('div', 'help');
     for (const [k, t] of [['WASD', 'move'], ['Shift', 'sprint'], ['Space', 'jump'], ['E', 'interact'], ['Mouse', 'look · wheel zooms'], ['1 / 2', 'wave / dance'], ['Enter', 'chat'], ['Esc', 'this menu']] as const) { const s2 = el('span'); s2.append(el('kbd', '', k), document.createTextNode(t)); help.append(s2); }
     p.append(help);

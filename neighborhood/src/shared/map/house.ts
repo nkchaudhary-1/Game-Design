@@ -65,6 +65,7 @@ export function buildHouse(mb: MB, s: HouseSpec): void {
   mb.prim(PK.GABLE, cx, TOP + 0.18 + 0.85, cz, W + 1.0, 1.7, D + 1.0, s.roof, { ry: odd ? Math.PI / 2 : 0, group: g1 });
   const [chx, chz] = f.p(W * 0.78, D * 0.3);
   mb.cbox(chx, TOP, chz, 0.6, 2.3, 0.6, s.trim, { group: g1, solid: false });
+  mb.chimneys.push({ x: chx, y: TOP + 2.35, z: chz });
 
   // ── yards (visual + low fences)
   const lawn = (u0: number, v0: number, u1: number, v1: number, color: number) => {

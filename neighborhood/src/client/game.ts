@@ -5,8 +5,10 @@ import { insideCab, LIFT, liftNearest, LM, newLiftState, syncLiftSolids, type Li
 import { buildMaple, APT, type Interactable, type MapDef } from '../shared/map';
 import { angleDiff, damp, wrapAngle } from '../shared/math';
 import { cleanName, FL, type InputCmd, type Look, type LiftWire, type PlayerInfo, type PlayerWire, type S2C } from '../shared/protocol';
+import { clockText, hourAt, phaseName } from '../shared/daycycle';
+import { Ambient } from './ambient';
 import { Avatar } from './avatar';
-import { Sound } from './audio';
+import { Sound, type Surface } from './audio';
 import { CameraRig } from './camera';
 import { DEFAULT_SETTINGS, Input, type Settings } from './input';
 import { Net, type NetLike } from './net';
@@ -60,6 +62,9 @@ export class Game {
   private last = performance.now();
   private fpsFrames = 0; private fpsTime = 0; private lowFps = 0;
   private tmpV = new THREE.Vector3();
+  private ambient: Ambient;
+  private roadRects: { x0: number; z0: number; x1: number; z1: number }[];
+  private hour = 18.2;
 
   constructor(canvas: HTMLCanvasElement, profile: Profile, settings: Settings, private saveSettings: (s: Settings) => void, private saveProfile: (p: Profile) => void, opts: { net?: NetLike; note?: string } = {}) {
     this.net = opts.net ?? new Net();
@@ -67,6 +72,9 @@ export class Game {
     this.rig = new Rig(canvas);
     this.world3d = new World3D(this.map);
     this.rig.scene.add(this.world3d.root);
+    this.ambient = new Ambient(this.map);
+    this.rig.scene.add(this.ambient.group);
+    this.roadRects = this.map.mapRects.filter((r) => r.kind === 'road');
     this.cam = new CameraRig(this.rig.camera, this.map.world);
     this.cam.isHidden = (g) => this.world3d.isHidden(g);
     this.cam.dist = this.settings.zoom;
@@ -361,9 +369,40 @@ export class Game {
     av.root.rotation.y = Math.atan2(this.rig.camera.position.x - c.x, this.rig.camera.position.z - c.z);
     av.update(dt, { speed: 0, grounded: true, seated: false, emote: 0 });
     av.setPlateAlpha(0);
-    this.world3d.update(dt, this.lift, c, false);
+    this.hour = this.hourNow(); this.rig.setTime(this.hour);
+    this.world3d.update(dt, this.lift, c, false, this.rig.night);
+    this.ambient.update(dt, this.rig.night, this.rig.camera.position, this.rig.renderer);
     this.rig.update(dt, c);
     this.sound.ambient(dt, true);
+  }
+
+  /** Hour of the in-game day: the server's clock, or a fixed time chosen in the pause menu. */
+  private hourNow(): number {
+    const fixed = { morning: 8.5, noon: 12.6, golden: 18.4, night: 23.0 }[this.settings.time as string];
+    if (fixed !== undefined) return fixed;
+    return hourAt((performance.now() + (this.state === 'play' && this.haveOffset ? this.offset : 0)) / 1000);
+  }
+
+  /** What the player is standing on, for footsteps. */
+  private surface(): Surface {
+    const b = this.body;
+    if (b.support === this.cabFloorSolid) return 'metal';
+    const at = this.buildingAt(b.x, b.y, b.z);
+    if (at) {
+      const z = this.zoneName;
+      if (/Roof/.test(z)) return 'pave';
+      if (/Kitchen|Lobby/.test(z)) return 'tile';
+      if (/Bedroom|corridor|Unit 1B/.test(z)) return 'carpet';
+      if (/Storage/.test(z)) return 'stone';
+      return 'wood';
+    }
+    if (b.y > 0.07) return 'pave';
+    for (const r of this.roadRects) if (b.x > r.x0 && b.x < r.x1 && b.z > r.z0 && b.z < r.z1) return 'road';
+    return 'grass';
+  }
+  private indoors() {
+    const at = this.buildingAt(this.body.x, this.body.y, this.body.z);
+    return !!at && !(at.b.floors.length >= 5 && at.level >= 4);
   }
 
   private focusPoint() { return this.tmpV.set(this.body.x + this.err.x, this.visY + 1.5, this.body.z + this.err.z); }
@@ -404,7 +443,7 @@ export class Game {
     this.myAvatar.update(dt, { speed, grounded: this.body.grounded, seated, emote: this.myEmote });
     this.myAvatar.setPlateAlpha(0);
     this.myAvatar.root.visible = this.cam.distance > 0.95;   // camera is practically inside the head: switch to a first-person feel
-    this.sound.step(dt, speed, this.body.grounded && !seated);
+    this.sound.step(dt, speed, this.body.grounded && !seated, () => this.surface());
 
     this.updateCutaway();
     const inCab = insideCab(def, live, this.body.x, this.body.y, this.body.z);
@@ -412,15 +451,19 @@ export class Game {
 
     this.cam.update(dt, this.focusPoint(), this.input.keys.has('ShiftLeft') && speed > 4, false, inCab);
     this.rig.update(dt, this.tmpV.set(this.body.x, this.visY, this.body.z));
-    this.world3d.update(dt, live, this.rig.camera.position, inCab);
+    this.hour = this.hourNow(); this.rig.setTime(this.hour);
+    this.world3d.update(dt, live, this.rig.camera.position, inCab, this.rig.night);
+    this.ambient.update(dt, this.rig.night, this.rig.camera.position, this.rig.renderer);
 
     const moving = live.mode === LM.MOVING;
     this.sound.liftHum(moving ? Math.hypot(this.body.x - def.cx, this.body.z - def.cz, (this.body.y - live.y) * 0.5) : -1, Math.abs(live.v));
-    this.sound.ambient(dt, !this.insideAnyBuilding());
+    const indoors = this.indoors();
+    this.sound.setIndoor(indoors);
+    this.sound.ambient(dt, !indoors);
 
     this.updateTarget(live, inCab);
     this.zoneTimer -= dt;
-    if (this.zoneTimer <= 0) { this.zoneTimer = 0.25; this.updateZone(); }
+    if (this.zoneTimer <= 0) { this.zoneTimer = 0.25; this.updateZone(); this.ui.setPlace(`${clockText(this.hour)} · ${phaseName(this.hour)}`); }
     this.mmTimer -= dt;
     if (this.mmTimer <= 0) {
       this.mmTimer = 1 / 15;
@@ -481,7 +524,6 @@ export class Game {
     }
     return null;
   }
-  private insideAnyBuilding() { return !!this.buildingAt(this.body.x, this.body.y, this.body.z); }
   private updateCutaway() {
     const h = new Set<number>();
     const at = this.buildingAt(this.body.x, this.body.y, this.body.z);
@@ -558,7 +600,7 @@ export class Game {
   expose() {
     (window as unknown as { __nb: unknown }).__nb = {
       game: this,
-      state: () => ({ x: this.body.x, y: this.body.y, z: this.body.z, yaw: this.body.yaw, grounded: this.body.grounded, seat: this.seat, lift: this.liftNow(), remotes: this.remotes.size, play: this.state, zone: this.zoneName, pending: this.pending.length, err: this.err.length(), rtt: this.net.rtt, camYaw: this.cam.yaw }),
+      state: () => ({ hour: this.hour, night: this.rig.night, x: this.body.x, y: this.body.y, z: this.body.z, yaw: this.body.yaw, grounded: this.body.grounded, seat: this.seat, lift: this.liftNow(), remotes: this.remotes.size, play: this.state, zone: this.zoneName, pending: this.pending.length, err: this.err.length(), rtt: this.net.rtt, camYaw: this.cam.yaw }),
       drive: (mx: number, mz: number, jump = false, sprint = false) => { this.input.inject = { mx, mz, jump, sprint }; },
       stop: () => { this.input.inject = null; },
       look: (yaw: number, pitch: number) => { this.cam.yaw = yaw; this.cam.pitch = pitch; },

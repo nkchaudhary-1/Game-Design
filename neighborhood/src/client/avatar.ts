@@ -26,6 +26,8 @@ export class Avatar {
   private arm: THREE.Group[] = [];
   private fore: THREE.Group[] = [];
   private hairGroup = new THREE.Group();
+  private eyes: THREE.Mesh[] = [];
+  private blink = 2 + Math.random() * 3;
   private mats: Record<'skin' | 'shirt' | 'pants' | 'hair', THREE.MeshLambertMaterial>;
   private phase = 0;
   private t = Math.random() * 10;
@@ -68,10 +70,15 @@ export class Avatar {
     // head
     this.head.position.set(0, 1.6, 0);
     this.head.add(mesh(ICO, this.mats.skin, 0.38, 0.4, 0.38));
-    for (const sx of [-1, 1]) this.head.add(mesh(BOX, dark, 0.045, 0.06, 0.03, sx * 0.075, 0.02, 0.185));
+    for (const sx of [-1, 1]) { const eye = mesh(BOX, dark, 0.045, 0.06, 0.03, sx * 0.075, 0.02, 0.185); this.eyes.push(eye); this.head.add(eye); }
     this.head.add(mesh(BOX, this.mats.skin, 0.05, 0.05, 0.04, 0, -0.03, 0.2));
     this.head.add(this.hairGroup);
     this.body.add(this.head);
+    this.body.add(mesh(BOX, this.mats.skin, 0.1, 0.13, 0.1, 0, 1.5, 0));   // neck
+    // soft blob under the feet: grounds the figure even where real shadows are off
+    const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 18), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.2, depthWrite: false }));
+    blob.rotation.x = -Math.PI / 2; blob.position.y = 0.025; blob.renderOrder = 1;
+    this.root.add(blob);
 
     this.nameSprite = this.makeNameplate(name);
     this.root.add(this.nameSprite);
@@ -153,6 +160,10 @@ export class Avatar {
     this.t += dt;
     const t = this.t;
     const { speed, grounded, seated, emote } = p;
+    this.blink -= dt;
+    const closed = this.blink < 0.12 && this.blink > 0;
+    if (this.blink <= 0) this.blink = 2.4 + Math.random() * 3.6;
+    for (const e of this.eyes) e.scale.y = closed ? 0.012 : 0.06;
     if (this.bubble) {
       this.bubbleLeft -= dt;
       (this.bubble.material as THREE.SpriteMaterial).opacity = clamp(this.bubbleLeft, 0, 1);

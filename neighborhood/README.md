@@ -7,7 +7,7 @@ ownership yet** — on purpose. The bet of this prototype is *"is this place enj
 ```
 npm install
 npm run dev          # http://localhost:5173  (client + game server, one process, one port)
-npm test             # 27 tests: controller, the real map, lift, and a real-WebSocket server suite
+npm test             # 31 tests: controller, the real map, lift, and a real-WebSocket server suite
 npm run build && npm start   # production: static client + game server on $PORT
 ```
 
@@ -103,6 +103,17 @@ nightmare.
 visibility group; the camera ignores hidden geometry. It reads like a doll's house, keeps interiors playable with a third-person
 camera, and costs nothing per frame. In the lift the camera rises and looks down into the cab, since a 2 m box has no room behind you.
 
+### Realism pass (stays flat-colour, on purpose)
+The brief says *avoid photorealism*, so "more realistic" here means a world that **behaves and lights like a real place**, not textures:
+- **Living light.** One in-game day = 30 real minutes, driven by the server clock (`shared/daycycle.ts`); the world starts at golden hour.
+  Sun and moon move, sky/fog/exposure follow keyframes, stars appear, street lamps and windows glow, warm light pools fall on the pavement,
+  and the nearest lamps become real point lights (a fixed pool of 8, so shaders never recompile). Pick Morning / Midday / Golden hour / Night in the pause menu.
+- **Contact shading.** Vertex colours darken where a box meets the ground and vary slightly per piece, so walls sit in the earth and nothing is perfectly uniform. No textures.
+- **Moving world.** Trees sway (vertex shader), the fountain sprays, chimneys smoke, birds circle. All are simulated only near you.
+- **Grounded people.** Soft contact shadow under each avatar, a neck, blinking.
+- **Sound.** Footsteps change with the surface (pavement, road, grass, wood, tile, carpet, stone, lift metal); everything softens when you step indoors.
+- **Not done:** moving traffic and pedestrians that yield to you, weather, interior detail (skirting, wall art, curtains), per-surface footsteps for *other* people.
+
 ### Performance
 - Static world merged by visibility group with vertex colours (one material per group); no textures. Measured **~105 draw calls/frame** in the two-player tour (doors, labels, lamps and avatars are separate objects) — comfortable, with headroom to instance trees and lamps later.
 - Shadow camera follows the player (±36 m, 2048²); point lights are a fixed pool of 6 (changing light count recompiles shaders).
@@ -112,9 +123,10 @@ camera, and costs nothing per frame. In the lift the camera rises and looks down
   None are needed for one block; all become relevant at Block 03+.
 
 ### Testing
-`npm test` — 27 tests, ~25 s:
+`npm test` — 31 tests, ~25 s:
 - **controller**: walls, no tunnelling at sprint speed, stair up/down with a max 0.2 m step per frame, step/headroom rules, jump height, moving platforms.
 - **map**: all spawns valid, the street is walkable end-to-end, world edge holds, door blocks/opens, **walk from the lobby up the stairs through every floor to the roof**, closed lift doors keep you out of the shaft, **lift carries riders between all four floors**.
+- **day cycle**: starts at golden hour, lamps ramp on smoothly through dusk, wraps after a full day.
 - **neighbours**: a 7-minute simulated run in which all three complete their routes with no stuck steps, sit, chat, and ride the lift to floor 2 and back.
 - **server (real WebSockets)**: two players see each other, authoritative movement, speed-hack clamp, door/seat rules, multi-rider lift trip, restart persistence.
 
