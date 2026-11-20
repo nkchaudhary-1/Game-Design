@@ -156,7 +156,7 @@ Known limitation: the server sends a player the contents of the house they are *
   None are needed for one block; all become relevant at Block 03+.
 
 ### Testing
-`npm test` — 54 tests, ~35 s:
+`npm test` — 56 tests, ~35 s:
 - **controller**: walls, no tunnelling at sprint speed, stair up/down with a max 0.2 m step per frame, step/headroom rules, jump height, moving platforms.
 - **map**: all spawns valid, the street is walkable end-to-end, world edge holds, door blocks/opens, **walk from the lobby up the stairs through every floor to the roof**, closed lift doors keep you out of the shaft, **lift carries riders between all four floors**.
 - **day cycle**: starts at golden hour, lamps ramp on smoothly through dusk, wraps after a full day.
@@ -164,6 +164,9 @@ Known limitation: the server sends a player the contents of the house they are *
 - **every house**: all ten are walkable from street to back door through every room.
 - **neighbours**: a 7-minute simulated run in which all three complete their routes with no stuck steps, sit, chat, and ride the lift to floor 2 and back.
 - **server (real WebSockets)**: two players see each other, authoritative movement, speed-hack clamp, door/seat rules, multi-rider lift trip, restart persistence.
+
+**Played in a real browser too** (headless Chromium, software GL, scripted input): buy a home → walk in → arrange a display → hand-place a camera → case a neighbour's house → pick the lock → loot → leave through the door → bank it; market buy/sell/tools, Crime Board, Back Room. That pass found six bugs the unit tests could not (house contents never reaching the client, a lock that trapped the burglar inside, a sofa out-targeting the loot, an invisible "Burgled" tag, unlabeled Buy buttons, kiosk prompts that ignored the camera), all fixed with regression tests where logic was involved. The same loop was re-run against the offline single-file build.
+**Not verified:** real-GPU frame rate, mouse-look with pointer lock, touch controls, the roof/park by hand, and the guard chase/arrest in a browser (unit-tested only).
 
 ## Deliberately not here (MVP vs later)
 
