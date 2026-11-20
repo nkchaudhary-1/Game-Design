@@ -155,6 +155,21 @@ describe('heists', () => {
     expect(lastNote(t.p)).toMatch(/Nobody lives/);
   });
 
+  it('a locked door never traps you: from the inside it opens freely after it has swung shut behind you', () => {
+    const id = 4, t = thief(id), d = def(id);
+    act(t.p, 'heist_start', { house: id });
+    const door = openFront(t, id);
+    run(lockSeconds(1, false, false) + 0.3);
+    expect(world.doorsOpen.has(door.id)).toBe(true);
+    const dl = Math.hypot(door.cx - d.front.x, door.cz - d.front.z), ux = (door.cx - d.front.x) / dl, uz = (door.cz - d.front.z) / dl;
+    goInside(t.p, id, 'bedroom'); run(34);                            // far from the door for longer than the auto-close delay (30 s): it swings shut
+    expect(world.doorsOpen.has(door.id)).toBe(false);
+    tele(t.p, door.cx + ux * 1.0, d.floorY, door.cz + uz * 1.0);   // just inside the door
+    world.onMessage(t.p, { t: 'interact', id: interactOf(door.id).id }); run(0.3);
+    expect(world.doorsOpen.has(door.id)).toBe(true);               // opened at once, no second pick
+    expect(dto(t.p).heist?.channel).toBeNull();
+  });
+
   it('full job on an easy house: pick the lock, take a valuable, slip away and bank it', () => {
     const id = 4, t = thief(id);
     const cash0 = dto(t.p).me.cash, item = world.play.houses[id].slots[0]!;
@@ -361,5 +376,19 @@ describe('burglars, jobs, persistence', () => {
     expect(w2.play.houses[0].slots[1]).not.toBeNull();
     const back = join('Ava', w2);
     expect(w2.play.dtoFor(back.p).me.cash).toBe(cash); expect(w2.play.dtoFor(back.p).me.home).toBe(0);
+  });
+});
+
+describe('the client learns which house it is in', () => {
+  it('sends an update when you walk into your home, with its contents, and again when you walk out', () => {
+    const a = join('Ava'); tele(a.p, def(0).front.x, 0.2, def(0).front.z); act(a.p, 'buy_home', { house: 0 });
+    run(1); a.msgs.length = 0;
+    goInside(a.p, 0); run(1.2);
+    const inside = a.msgs.filter((m) => m.t === 'game').map((m) => (m as { g: GameDto }).g).pop();
+    expect(inside?.view?.id).toBe(0); expect(inside?.view?.mine).toBe(true);
+    a.msgs.length = 0;
+    tele(a.p, def(0).front.x, 0.2, def(0).front.z); run(1.2);
+    const outside = a.msgs.filter((m) => m.t === 'game').map((m) => (m as { g: GameDto }).g).pop();
+    expect(outside?.view).toBeNull();
   });
 });

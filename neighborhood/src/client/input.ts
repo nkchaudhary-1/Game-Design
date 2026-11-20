@@ -11,7 +11,7 @@ export class Input {
   locked = false;
   enabled = true;               // false while typing, in menus, in the lift panel
   wheel = 0;
-  inject: { mx: number; mz: number; jump: boolean; sprint: boolean } | null = null;
+  inject: { mx: number; mz: number; jump: boolean; sprint: boolean; crouch?: boolean } | null = null;
   onInteract: () => void = () => {};
   onKey: (code: string) => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
@@ -51,7 +51,7 @@ export class Input {
   /** Movement in world space for a camera yaw. */
   move(camYaw: number) {
     if (this.inject) return { ...this.inject };
-    if (!this.enabled) return { mx: 0, mz: 0, jump: false, sprint: false };
+    if (!this.enabled) return { mx: 0, mz: 0, jump: false, sprint: false, crouch: false };
     const k = this.keys;
     const fw = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
     const rt = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
@@ -59,7 +59,7 @@ export class Input {
     let mx = sy * fw - cy * rt, mz = cy * fw + sy * rt;
     const l = Math.hypot(mx, mz);
     if (l > 1) { mx /= l; mz /= l; }
-    return { mx, mz, jump: k.has('Space'), sprint: k.has('ShiftLeft') || k.has('ShiftRight') };
+    return { mx, mz, jump: k.has('Space'), sprint: k.has('ShiftLeft') || k.has('ShiftRight'), crouch: k.has('KeyC') || k.has('ControlLeft') };
   }
   /** Consume accumulated look deltas. */
   look(sens: number, invertY: boolean) {

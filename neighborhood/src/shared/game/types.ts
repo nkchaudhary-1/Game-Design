@@ -25,7 +25,7 @@ export interface HomePub { id: number; owner: 'npc' | 'player' | 'vacant'; owner
 export interface ScoutInfo { sec: Security; items: number; best: number; wealth: string; until: number }
 export interface HouseView { id: number; slots: (ItemInst | null)[]; lock: number; devices: Device[]; tier: number; mine: boolean }
 export interface HeistDto {
-  house: number; phase: 'approach' | 'inside'; alert: number; threshold: number; alarm: number; left: number;
+  house: number; job: boolean; phase: 'approach' | 'inside'; alert: number; threshold: number; alarm: number; left: number;
   carrying: ItemInst[]; jam: number; dogAsleep: number; wanted: boolean; spotted: boolean;
   channel: { kind: string; p: number; label: string } | null; clear: number;
 }

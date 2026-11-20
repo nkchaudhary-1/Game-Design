@@ -7,7 +7,7 @@ ownership yet** — on purpose. The bet of this prototype is *"is this place enj
 ```
 npm install
 npm run dev          # http://localhost:5173  (client + game server, one process, one port)
-npm test             # 31 tests: controller, the real map, lift, and a real-WebSocket server suite
+npm test             # 54 tests: controller, the real map, lift, and a real-WebSocket server suite
 npm run build && npm start   # production: static client + game server on $PORT
 ```
 
@@ -114,6 +114,39 @@ The brief says *avoid photorealism*, so "more realistic" here means a world that
 - **Sound.** Footsteps change with the surface (pavement, road, grass, wood, tile, carpet, stone, lift metal); everything softens when you step indoors.
 - **Not done:** moving traffic and pedestrians that yield to you, weather, interior detail (skirting, wall art, curtains), per-surface footsteps for *other* people.
 
+## Prototype 02 — the game on top of the street
+
+The loop from the blueprint, all **server-authoritative** (`src/server/gameplay.ts`, rules in `src/shared/game/`), all inside the walkable world:
+
+**Own → Collect → Protect → Heist → Upgrade**
+
+| Stage | What you do | Where |
+|---|---|---|
+| **Own** | Buy a vacant house (4 are for sale, $1,500). Set visitors welcome / open to raids. Upgrade the tier (more display shelves, better devices). | Press **E** at a porch |
+| **Collect** | Find the three secrets, buy at the market, deliver parcels for cash, steal. Rarities Common → Mythic. Display up to 5 pieces on shelves. | Market stall, Crime Board, your home |
+| **Protect** | **Place security by hand** inside your home: CCTV (shows its cone), motion sensor (shows its zone), alarm, guard dog, safe, decoy valuables. Upgrade the door lock. | Home manager → Security → walk, aim, **E** |
+| **Heist** | **Scout** (stand still outside) → **plan** (tools, eligibility) → **enter** (pick the lock; time depends on the lock) → **explore & avoid detection** (crouch **C**, jammer **J**, treats **T**) → **loot** (hold still) → **escape** the Watch → **bank** it by getting clear. | The 3D street |
+| **Upgrade** | Spend on tiers, locks, devices, tools. Reputation unlocks tier 3. | Phone (**Tab**) |
+
+**Detection is physical, not a menu.** Cameras see a cone with line of sight; motion sensors trip on anyone moving within 3.2 m (crouching is slower, not silent); dogs bark within 8 m (4 m if you crouch); sprinting is loud. Alert fills; at 100 (60 with an alarm) the siren goes and the Watch is dispatched. The resident returns after 6 minutes. Decoys are wired to the alarm. Cameras and sensors draw their reach in red so a plan is possible.
+
+**The Watch** (`src/server/guards.ts`): two officers walk the pavements, using the same inputs and collision as any player. They only chase people who are *wanted* (alarm ringing, or carrying stolen goods in view); walls and closed doors hide you; at night they see less far. Catch = loot goes back, small fine, 2 minutes lying low. Neighbours can **R**-report a thief.
+
+**Burglars test your home while you are away** — online or offline. Your devices decide the odds (`thwartChance`), losses are capped at two items and insured for half; you get a *security log* on your phone. Stolen goods ("hot") can't be sold at the market, only in **the Back Room** behind the Community Hall at half price.
+
+### Fairness rules (the blueprint's "target eligibility"), enforced in `canRaid()`
+| Rule | Where |
+|---|---|
+| Player homes are raidable **only if the owner opts in** (off by default) | `HouseState.raidable` |
+| …and **only while the owner is online** (offline homes are never raided) | `canRaid` |
+| New-resident protection (5 min), a breather after being robbed (8 min), attacker cooldown (2 min) | `R` constants |
+| Loss cap: 2 items from a player's home (3 from NPCs); **insurance** pays 50% | `R.maxLoot`, `insurancePayout` |
+| Vacant and own homes can't be targeted; arrests return the loot | `canRaid`, `arrest()` |
+
+### What is deliberately not in Prototype 02
+Auction house and player-to-player trading, free-form furniture and interior decoration (display slots are fixed), avatar customisation beyond the picker, friends/events, a second block, weather, interior secret rooms, security lighting and a panic button. The data model has room for all of them; each is a feature, not a rewrite.
+Known limitation: the server sends a player the contents of the house they are *inside*, so a modified client could read device positions there; interest filtering is the next hardening step.
+
 ### Performance
 - Static world merged by visibility group with vertex colours (one material per group); no textures. Measured **~105 draw calls/frame** in the two-player tour (doors, labels, lamps and avatars are separate objects) — comfortable, with headroom to instance trees and lamps later.
 - Shadow camera follows the player (±36 m, 2048²); point lights are a fixed pool of 6 (changing light count recompiles shaders).
@@ -123,10 +156,12 @@ The brief says *avoid photorealism*, so "more realistic" here means a world that
   None are needed for one block; all become relevant at Block 03+.
 
 ### Testing
-`npm test` — 31 tests, ~25 s:
+`npm test` — 54 tests, ~35 s:
 - **controller**: walls, no tunnelling at sprint speed, stair up/down with a max 0.2 m step per frame, step/headroom rules, jump height, moving platforms.
 - **map**: all spawns valid, the street is walkable end-to-end, world edge holds, door blocks/opens, **walk from the lobby up the stairs through every floor to the roof**, closed lift doors keep you out of the shaft, **lift carries riders between all four floors**.
 - **day cycle**: starts at golden hour, lamps ramp on smoothly through dusk, wraps after a full day.
+- **game rules & server (gameplay.test.ts)**: ownership, hand-placed devices, fairness gates, a full heist (scout → pick → loot → bank), motion/camera/dog/alarm/decoy detection, the Watch chasing and arresting, burglars and insurance, offline log, jobs, persistence across restart.
+- **every house**: all ten are walkable from street to back door through every room.
 - **neighbours**: a 7-minute simulated run in which all three complete their routes with no stuck steps, sit, chat, and ride the lift to floor 2 and back.
 - **server (real WebSockets)**: two players see each other, authoritative movement, speed-hack clamp, door/seat rules, multi-rider lift trip, restart persistence.
 

@@ -103,3 +103,38 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
   .mini, .online, .fps { display: none; }
   .hints { display: none; }
 }
+
+/* ───────── game layer ───────── */
+.wallet { position: absolute; top: 112px; left: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px 14px; max-width: min(420px, 60vw); font-size: 14px; }
+.wallet b { font-size: 17px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.tag { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(243, 237, 224, 0.14); color: var(--paper); }
+.panel .tag.warn, .tag.warn { background: #b4492f; color: #fff; } .tag.info { background: #3f6b8f; color: #fff; } .tag.ok { background: #3f6b47; color: #fff; }
+.heist { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(430px, 92vw); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.heist .hrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; } .heist .hrow.small { font-size: 12px; }
+.meter { position: relative; height: 12px; border-radius: 999px; background: rgba(243, 237, 224, 0.16); overflow: hidden; }
+.meter i { position: absolute; inset: 0 auto 0 0; background: var(--sage); border-radius: 999px; transition: width 0.2s; } .meter i.warm { background: var(--gold); } .meter i.hot { background: #e5533d; }
+.meter u { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; opacity: 0.8; }
+.chip { border: 0; border-radius: 999px; padding: 5px 11px; font: 700 12px var(--font); background: rgba(243, 237, 224, 0.16); color: var(--paper); cursor: pointer; pointer-events: auto; } .chip:disabled { opacity: 0.4; cursor: default; }
+.heist .chip, .heist button { pointer-events: auto; }
+.chan { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); width: min(360px, 86vw); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; align-items: center; font-weight: 600; }
+.cbar { width: 100%; height: 10px; border-radius: 999px; background: rgba(243, 237, 224, 0.18); overflow: hidden; } .cbar i { display: block; height: 100%; background: var(--terra); } .chan small { opacity: 0.7; font-weight: 500; }
+.vig { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s; box-shadow: inset 0 0 160px 40px rgba(229, 83, 61, 0.55); } .vig.wanted { opacity: 0.45; } .vig.spotted { opacity: 0.95; animation: pulse 0.8s infinite alternate; }
+@keyframes pulse { to { opacity: 0.55; } }
+.banner { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); padding: 14px 26px; font-size: 20px; font-weight: 800; }
+.place { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); padding: 12px 20px; display: flex; flex-direction: column; align-items: center; gap: 3px; border-color: #6fd08c; } .place.bad { border-color: #e05a4a; } .place small { opacity: 0.7; }
+.panel.wide { width: min(560px, 94vw); max-height: 86vh; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .phead h2 { margin: 0; } .phead p { margin: 2px 0 0; }
+.btn.small { flex: 0 0 auto; padding: 8px 12px; font-size: 13px; border-radius: 10px; } .btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary:disabled { box-shadow: none; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; } .tab { border: 0; border-radius: 999px; padding: 7px 14px; font: 700 13px var(--font); background: var(--paper-2); color: #62666a; cursor: pointer; } .tab.on { background: var(--ink); color: var(--paper); }
+.sec { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--paper-2); border-radius: 14px; } .sec p { margin: 0; color: var(--ink); font-size: 14px; } .sec h3, .panel h3 { margin: 4px 0 0; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: #6a6e72; }
+.row2 { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .row2 small, .panel small { color: #6a6e72; font-size: 12px; } .panel .warn, .panel small.warn { color: #b4492f; font-weight: 600; } .panel .hint { font-size: 12.5px; color: #6a6e72; margin: 0; }
+.slotrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--paper-2); font-size: 14px; color: var(--ink); } .slotrow > span:first-child { min-width: 112px; font-weight: 600; } .slotrow.locked { opacity: 0.55; }
+.slotrow select { flex: 1; min-width: 0; padding: 7px 8px; border-radius: 10px; border: 0; background: #fff; font-weight: 600; color: var(--ink); }
+.slotrow .itxt { flex: 1; min-width: 0; display: flex; flex-direction: column; } .slotrow .itxt b { font-size: 14px; }
+.item { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; } .item .dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; } .item .itxt { flex: 1; min-width: 0; display: flex; flex-direction: column; } .item .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+.scout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; } .scout div { display: flex; flex-direction: column; } .scout b { font-size: 14px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .stats div { padding: 10px 12px; background: var(--paper-2); border-radius: 12px; display: flex; flex-direction: column; } .stats b { color: var(--ink); }
+.logrow { display: flex; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--paper-2); font-size: 13.5px; color: var(--ink); } .logrow.burglar { border-left: 4px solid #b4492f; } .logrow.thwart { border-left: 4px solid #3f6b47; } .logrow small { flex: 0 0 auto; }
+.toggle { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; background: var(--paper-2); border-radius: 12px; cursor: pointer; color: var(--ink); } .toggle input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--terra); } .toggle div { display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 720px) { .wallet { top: 104px; } .slotrow { flex-wrap: wrap; } }

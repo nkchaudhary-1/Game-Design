@@ -63,6 +63,24 @@ export class Sound {
   bell(d: number) { const a = this.att(d, 26); this.tone(784, 1.0, 0.2 * a, 'sine'); this.tone(622, 1.2, 0.2 * a, 'sine', 0.42); }
   click(d: number) { const a = this.att(d, 14); this.tone(1800, 0.04, 0.2 * a, 'square'); }
   ui() { this.tone(900, 0.05, 0.12, 'sine'); }
+  cash() { this.tone(1320, 0.09, 0.16, 'sine'); this.tone(1760, 0.16, 0.14, 'sine', 0.07); this.noise(0.04, 0.08, 4200, 3, 0.06); }
+  pick(d: number) { const a = this.att(d, 20); for (let i = 0; i < 4; i++) { this.tone(2400 + i * 180, 0.025, 0.14 * a, 'square', i * 0.11); this.noise(0.02, 0.1 * a, 3800, 4, i * 0.11); } }
+  arrest() { this.tone(220, 0.35, 0.22, 'sawtooth', 0, -90); this.tone(165, 0.5, 0.2, 'sawtooth', 0.28, -60); }
+  bark(d: number) { const a = this.att(d, 26); this.noise(0.12, 0.3 * a, 420, 1.4); this.tone(190, 0.12, 0.3 * a, 'sawtooth', 0, -70); this.noise(0.1, 0.28 * a, 460, 1.4, 0.22); this.tone(200, 0.1, 0.26 * a, 'sawtooth', 0.22, -70); }
+  whistle(d: number) { const a = this.att(d, 40); this.tone(2200, 0.35, 0.18 * a, 'sine', 0, 500); }
+  private sirenOsc: OscillatorNode | null = null; private sirenGain: GainNode | null = null;
+  /** Alarm siren: a two-tone wail, louder the closer you are. dist < 0 fades it out. */
+  siren(dist: number, t: number) {
+    const c = this.ctx; if (!c) return;
+    if (dist < 0) { this.sirenGain?.gain.setTargetAtTime(0, c.currentTime, 0.15); return; }
+    if (!this.sirenOsc) {
+      this.sirenGain = c.createGain(); this.sirenGain.gain.value = 0; this.sirenGain.connect(this.master);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200; lp.connect(this.sirenGain);
+      this.sirenOsc = c.createOscillator(); this.sirenOsc.type = 'sawtooth'; this.sirenOsc.connect(lp); this.sirenOsc.start();
+    }
+    this.sirenOsc.frequency.setTargetAtTime(Math.sin(t * 3.2) > 0 ? 880 : 640, c.currentTime, 0.04);
+    this.sirenGain!.gain.setTargetAtTime(0.1 * this.att(dist, 70), c.currentTime, 0.1);
+  }
   found() { [660, 880, 1175, 1568].forEach((f, i) => this.tone(f, 0.5, 0.18, 'sine', i * 0.09)); }
   toast() { this.tone(520, 0.08, 0.1, 'sine'); }
   jump() { this.noise(0.08, 0.12, 700, 0.8); }

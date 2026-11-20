@@ -55,7 +55,7 @@ export interface SwitchDef { id: number; x: number; y: number; z: number; group:
 export interface LampDef { id: number; switchId: number; x: number; y: number; z: number; color: number; group: number }
 export interface Label { text: string; x: number; y: number; z: number; w: number; h: number; ry: number; bg: number; fg: number; group: number }
 export interface FoundDef { id: number; x: number; y: number; z: number; name: string; text: string; group: number }
-export type InteractKind = 'door' | 'knock' | 'switch' | 'seat' | 'liftCall' | 'liftPanel' | 'bell' | 'found' | 'info' | 'porch' | 'slot' | 'market' | 'fence' | 'board';
+export type InteractKind = 'door' | 'knock' | 'switch' | 'seat' | 'liftCall' | 'liftPanel' | 'bell' | 'found' | 'info' | 'porch' | 'slot' | 'market' | 'fence' | 'board' | 'device';
 export interface Interactable {
   id: number; kind: InteractKind; x: number; y: number; z: number;
   ref: number; label: string; group: number; text?: string;

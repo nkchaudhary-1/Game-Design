@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { clamp } from '../shared/math';
 import { LOOK_HAIR, LOOK_PANTS, LOOK_SHIRT, LOOK_SKIN, type Look } from '../shared/protocol';
 
-export interface Pose { speed: number; grounded: boolean; seated: boolean; emote: number }
+export interface Pose { speed: number; grounded: boolean; seated: boolean; emote: number; crouch?: boolean }
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const ICO = new THREE.IcosahedronGeometry(0.5, 1);
@@ -160,6 +160,7 @@ export class Avatar {
     this.t += dt;
     const t = this.t;
     const { speed, grounded, seated, emote } = p;
+    const crouch = !!p.crouch && grounded && !seated;
     this.blink -= dt;
     const closed = this.blink < 0.12 && this.blink > 0;
     if (this.blink <= 0) this.blink = 2.4 + Math.random() * 3.6;
@@ -195,6 +196,15 @@ export class Avatar {
       this.arm[0].rotation.set(-2.4 + Math.sin(t * 6) * 0.5, 0, 0.4); this.arm[1].rotation.set(-2.4 - Math.sin(t * 6) * 0.5, 0, -0.4);
       this.fore[0].rotation.x = -0.6; this.fore[1].rotation.x = -0.6;
       this.head.rotation.z = Math.sin(t * 3) * 0.12;
+      return;
+    }
+    if (crouch) {
+      this.phase += dt * speed * 2.6;
+      const s = Math.sin(this.phase) * (speed > 0.3 ? 0.35 : 0);
+      this.body.position.y = -0.3; this.body.rotation.x = 0.32;
+      this.thigh[0].rotation.x = -0.95 - s; this.thigh[1].rotation.x = -0.95 + s; this.shin[0].rotation.x = 1.25; this.shin[1].rotation.x = 1.25;
+      this.arm[0].rotation.x = -0.35; this.arm[1].rotation.x = -0.35; this.fore[0].rotation.x = -0.6; this.fore[1].rotation.x = -0.6;
+      this.head.rotation.x = -0.25;
       return;
     }
     if (speed > 0.35) {

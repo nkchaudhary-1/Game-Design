@@ -50,6 +50,8 @@ export class Gameplay {
   private lastFlush = 0;
   private burglarTimer = 0;
   private houseDirty = false;
+  private houseVersion = 0;
+  private seenView = new Map<string, string>();   // what each player's client last learned about the house they are in
   private houseSaveAt = 0;
   private dogAsleep = new Map<string, number>();   // `${house}:${deviceId}` → sim time until asleep
   private rng = Math.random;
@@ -90,7 +92,7 @@ export class Gameplay {
     h.slots = pre.items.map((id) => (id ? { uid: this.uid++, def: id } : null));
   }
   private saveHouses() { this.w.store.setHouses({ houses: this.houses, uid: this.uid }); this.houseDirty = false; }
-  private touchHouses() { this.houseDirty = true; }
+  private touchHouses() { this.houseDirty = true; this.houseVersion++; }
 
   // ───────────────────────── players ─────────────────────────
   gameOf(id: string) { return this.games.get(id); }
@@ -110,6 +112,7 @@ export class Gameplay {
     const h = this.heists.get(p.id);
     if (h) this.endHeist(p, h, 'left');
     this.games.delete(p.id);
+    this.seenView.delete(p.id);
     this.scouts.delete(p.id);
     this.notes.delete(p.id);
   }
@@ -134,6 +137,8 @@ export class Gameplay {
   canOpenDoor(p: SPlayer, d: DoorDef): boolean {
     if (d.house === undefined || d.role === 'inner' || d.house < 0) return true;
     const h = this.houses[d.house];
+    // a lock only keeps people out: from the inside anyone can always leave (the door auto-closes behind a burglar)
+    if (this.insideHouse(p, d.house)) return true;
     return h.ownerId === p.id || h.open || h.ownerKind === 'vacant';
   }
   /** A locked house door was used. With an active heist against that house this starts lock-picking. */
@@ -483,6 +488,12 @@ export class Gameplay {
   }
   private slowTick() {
     const now = this.now();
+    // a player's view of "the house I am in" changes when they walk in or out, or its contents change
+    for (const [pid] of this.games) {
+      const p = this.w.players.get(pid); if (!p) continue;
+      const at = this.houseAt(p), key = `${at}:${at >= 0 ? this.houseVersion : 0}`;
+      if (this.seenView.get(pid) !== key) { this.seenView.set(pid, key); this.dirty.add(pid); }
+    }
     for (const h of this.houses) {
       if (h.ownerKind === 'npc' && h.restockAt && now >= h.restockAt) { this.fillNpc(h, this.def(h.id)); h.restockAt = 0; this.touchHouses(); }
     }
@@ -619,7 +630,7 @@ export class Gameplay {
       const h = this.houses[hs.house], ch = hs.channel ?? this.scoutCh.get(p.id) ?? null;
       const dog = h.devices.find((x) => x.kind === 'dog');
       heist = {
-        house: hs.house, phase: hs.phase, alert: Math.round(hs.alert), threshold: alarmThreshold(securityOf(h.lock, h.devices)), alarm: Math.ceil(hs.alarm),
+        house: hs.house, job: true, phase: hs.phase, alert: Math.round(hs.alert), threshold: alarmThreshold(securityOf(h.lock, h.devices)), alarm: Math.ceil(hs.alarm),
         left: hs.phase === 'inside' ? Math.max(0, Math.round(R.heistTime - (this.t - hs.insideAt))) : R.heistTime, carrying: hs.carrying, jam: Math.max(0, Math.ceil(hs.jam - this.t)),
         dogAsleep: dog ? Math.max(0, Math.ceil((this.dogAsleep.get(`${h.id}:${dog.id}`) ?? 0) - this.t)) : 0,
         wanted: hs.alarm > 0 || (hs.carrying.length > 0 && this.guards.sinceSeen(p.id) < 3), spotted: this.guards.sinceSeen(p.id) < 2,
@@ -627,7 +638,7 @@ export class Gameplay {
       };
     } else {
       const sc = this.scoutCh.get(p.id);
-      if (sc) heist = { house: sc.target, phase: 'approach', alert: 0, threshold: 100, alarm: 0, left: 0, carrying: [], jam: 0, dogAsleep: 0, wanted: false, spotted: false, channel: { kind: 'scout', p: Math.min(1, sc.done / sc.total), label: sc.label }, clear: 0 };
+      if (sc) heist = { house: sc.target, job: false, phase: 'approach', alert: 0, threshold: 100, alarm: 0, left: 0, carrying: [], jam: 0, dogAsleep: 0, wanted: false, spotted: false, channel: { kind: 'scout', p: Math.min(1, sc.done / sc.total), label: sc.label }, clear: 0 };
     }
     const scoutAll = this.scouts.get(p.id) ?? {};
     const scout: Record<number, ScoutInfo> = {};
