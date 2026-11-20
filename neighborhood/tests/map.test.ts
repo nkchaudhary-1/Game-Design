@@ -152,3 +152,47 @@ describe('Maple Street map', () => {
     expect(b.y).toBeCloseTo(def.floors[0], 2);
   });
 });
+
+describe('every house is a real, enterable home', () => {
+  it('has all ten houses with doors, slots and sane anchors', () => {
+    expect(map.houses).toHaveLength(10);
+    for (const h of map.houses) {
+      expect(h.slots).toHaveLength(5);
+      for (const k of ['front', 'back', 'bedroom', 'storage'] as const) expect(map.doors[h.doors[k]].house).toBe(h.id);
+      for (const [name, p] of Object.entries(h.rooms)) {
+        if (name === 'yard') continue;
+        expect(p.x > h.fp.x0 && p.x < h.fp.x1 && p.z > h.fp.z0 && p.z < h.fp.z1, `house ${h.id} room ${name} inside footprint`).toBe(true);
+        expect(bodyFree(map.world, p.x, h.floorY, p.z), `house ${h.id} ${name} is free standing space`).toBe(true);
+      }
+    }
+  });
+
+  it('you can walk from the street through the front door to every room and out the back, in all ten houses', () => {
+    for (const h of map.houses) {
+      const toOpen = [h.doors.front, h.doors.bedroom, h.doors.storage, h.doors.back];
+      for (const id of toOpen) map.world.solids[map.doors[id].solid].enabled = false;
+      const b = newBody(h.front.x, h.floorY + 0.05, h.front.z); settle(b);
+      const go = (name: string, x: number, z: number) => {
+        const n = walk(b, x, z, { tol: 0.3, max: 900 });
+        expect(n, `house ${h.id}: reached ${name} (${b.x.toFixed(1)},${b.z.toFixed(1)} → ${x.toFixed(1)},${z.toFixed(1)})`).toBeLessThan(900);
+      };
+      const fd = map.doors[h.doors.front];
+      const dl = Math.hypot(fd.cx - h.front.x, fd.cz - h.front.z), ux = (fd.cx - h.front.x) / dl, uz = (fd.cz - h.front.z) / dl;
+      go('door centre', fd.cx, fd.cz);
+      go('inside the door', fd.cx + ux * 1.1, fd.cz + uz * 1.1);
+      go('living', h.rooms.living.x, h.rooms.living.z);
+      go('kitchen', h.rooms.kitchen.x, h.rooms.kitchen.z);
+      go('living again', h.rooms.living.x, h.rooms.living.z);
+      go('archway', h.arch.x, h.arch.z);
+      go('hall', h.rooms.hall.x, h.rooms.hall.z);
+      go('bedroom', h.rooms.bedroom.x, h.rooms.bedroom.z);
+      go('hall again', h.rooms.hall.x, h.rooms.hall.z);
+      go('storage', h.rooms.storage.x, h.rooms.storage.z);
+      go('hall again 2', h.rooms.hall.x, h.rooms.hall.z);
+      const bd = map.doors[h.doors.back];
+      go('back door centre', bd.cx, bd.cz);
+      go('back door', h.back.x, h.back.z);
+      for (const id of toOpen) map.world.solids[map.doors[id].solid].enabled = true;
+    }
+  });
+});

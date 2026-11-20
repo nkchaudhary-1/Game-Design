@@ -9,6 +9,7 @@ export const P = {
   step: 0.46,        // max step-up / step-down
   walk: 3.1,
   sprint: 5.6,
+  crouch: 1.5,
   accel: 38,
   decel: 46,
   airControl: 0.35,

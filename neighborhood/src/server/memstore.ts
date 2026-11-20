@@ -19,23 +19,26 @@ export class MemoryStore implements StoreApi {
   private players: Record<string, PlayerRec> = {};
   private doors: number[] = [];
   private sw: number[] = [];
+  private hs: unknown = undefined;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private storage?: Storage1) {
     try {
       const raw = storage?.get();
-      if (raw) { const d = JSON.parse(raw); this.players = d.players ?? {}; this.doors = d.doors ?? []; this.sw = d.sw ?? []; }
+      if (raw) { const d = JSON.parse(raw); this.players = d.players ?? {}; this.doors = d.doors ?? []; this.sw = d.sw ?? []; this.hs = d.houses; }
     } catch { /* corrupt or unavailable: start clean */ }
   }
   player(id: string) { return this.players[id]; }
   setPlayer(id: string, rec: PlayerRec) { this.players[id] = rec; this.dirty(); }
   get world() { return { doors: this.doors, sw: this.sw }; }
   setWorld(doors: number[], sw: number[]) { this.doors = doors; this.sw = sw; this.dirty(); }
+  get houses() { return this.hs; }
+  setHouses(h: unknown) { this.hs = h; this.dirty(); }
   private dirty() {
     if (!this.storage || this.timer) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      try { this.storage!.set(JSON.stringify({ players: this.players, doors: this.doors, sw: this.sw })); } catch { /* quota / blocked */ }
+      try { this.storage!.set(JSON.stringify({ players: this.players, doors: this.doors, sw: this.sw, houses: this.hs })); } catch { /* quota / blocked */ }
     }, 2000);
   }
 }

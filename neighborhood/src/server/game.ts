@@ -6,6 +6,7 @@ import { round3 } from '../shared/math';
 import {
   cleanLook, cleanName, FL, type BodyWire, type C2S, type InputCmd, type Look, type LiftWire, type PlayerInfo, type PlayerWire, type S2C,
 } from '../shared/protocol';
+import { Gameplay } from './gameplay';
 import type { StoreApi } from './types';
 
 export interface Conn { send(msg: S2C): void; close(): void }
@@ -13,7 +14,7 @@ export interface Conn { send(msg: S2C): void; close(): void }
 interface SPlayer {
   id: string; name: string; look: Look; body: Body; conn: Conn;
   queue: InputCmd[]; ack: number; seat: number; emote: number; found: Set<number>;
-  lastChat: number; lastInteract: number; speed: number;
+  lastChat: number; lastInteract: number; speed: number; crouch: boolean;
 }
 
 const MAX_PLAYERS = 40;
@@ -24,6 +25,9 @@ export class GameWorld {
   readonly map: MapDef;
   readonly players = new Map<string, SPlayer>();
   readonly lift;
+  readonly play!: Gameplay;
+  /** Wall-clock seconds for anything that must survive a restart (cooldowns, protection windows). */
+  epoch: () => number = () => Date.now() / 1000;
   readonly doorsOpen = new Set<number>();
   readonly switchesOn = new Set<number>();
   private doorOpenedAt = new Map<number, number>();
@@ -38,6 +42,8 @@ export class GameWorld {
     this.cabFloorSolid = this.map.lift.cab[0].solid;
     for (const id of store.world.doors) this.setDoor(id, true, false);
     for (const id of store.world.sw) this.switchesOn.add(id);
+    this.play = new Gameplay(this);
+    this.play.start();
   }
 
   get online() { return this.players.size; }
@@ -55,9 +61,10 @@ export class GameWorld {
     const body = this.resolveSpawn(rec);
     const p: SPlayer = {
       id, name, look, body, conn, queue: [], ack: 0, seat: -1, emote: 0, found: new Set(rec?.found ?? []),
-      lastChat: 0, lastInteract: 0, speed: 0,
+      lastChat: 0, lastInteract: 0, speed: 0, crouch: false,
     };
     this.players.set(id, p);
+    this.play?.onJoin(p);
     this.persist(p);
     conn.send({
       t: 'welcome', id, name, look, you: this.bodyWire(body), seat: -1,
@@ -72,6 +79,7 @@ export class GameWorld {
     if (this.players.get(p.id) !== p) return;
     if (p.seat >= 0) this.unseat(p);
     this.persist(p);
+    this.play?.onLeave(p);
     this.players.delete(p.id);
     this.broadcast({ t: 'leave', id: p.id });
   }
@@ -95,7 +103,7 @@ export class GameWorld {
 
   private persist(p: SPlayer) {
     const b = p.body;
-    this.store.setPlayer(p.id, { name: p.name, look: p.look, x: b.x, y: b.y, z: b.z, yaw: b.yaw, found: [...p.found], seen: Date.now() });
+    this.store.setPlayer(p.id, { name: p.name, look: p.look, x: b.x, y: b.y, z: b.z, yaw: b.yaw, found: [...p.found], seen: Date.now(), game: this.play?.gameOf(p.id) ?? this.store.player(p.id)?.game });
   }
 
   // ───────────────────────── messages ─────────────────────────
@@ -106,11 +114,12 @@ export class GameWorld {
         for (const c of m.inputs.slice(0, 12)) {
           if (!c || !Number.isFinite(c.s) || c.s <= p.ack) continue;
           if (p.queue.length >= 24) p.queue.shift();     // a flooding client only hurts itself
-          p.queue.push({ s: c.s, x: num(c.x), z: num(c.z), j: c.j ? 1 : 0, r: c.r ? 1 : 0 });
+          p.queue.push({ s: c.s, x: num(c.x), z: num(c.z), j: c.j ? 1 : 0, r: c.r ? 1 : 0, c: c.c ? 1 : 0 });
         }
         return;
       }
       case 'interact': return this.interact(p, m.id);
+      case 'act': this.play.onAct(p, m); return;
       case 'lift': {
         const def = this.map.lift;
         if (insideCab(def, this.lift, p.body.x, p.body.y, p.body.z) && Number.isInteger(m.floor) && requestFloor(def, this.lift, m.floor))
@@ -143,6 +152,7 @@ export class GameWorld {
     switch (it.kind) {
       case 'door': {
         const open = !this.doorsOpen.has(it.ref);
+        if (open && !this.play.canOpenDoor(p, this.map.doors[it.ref])) { this.play.onLockedDoor(p, this.map.doors[it.ref]); return; }
         if (!open && this.doorBlocked(it.ref)) { p.conn.send({ t: 'toast', text: 'Something is in the way.' }); return; }
         this.setDoor(it.ref, open, true);
         const dd = this.map.doors[it.ref];
@@ -177,13 +187,14 @@ export class GameWorld {
         const f = this.map.found[it.ref];
         this.persist(p);
         p.conn.send({ t: 'found', id: f.id, name: f.name, text: f.text, total: this.map.found.length, count: p.found.size });
+        this.play.onFound(p, it.ref);
         return;
       }
       default: return;
     }
   }
 
-  private setDoor(id: number, open: boolean, persist: boolean) {
+  setDoor(id: number, open: boolean, persist: boolean) {
     const d = this.map.doors[id];
     if (!d) return;
     this.map.world.solids[d.solid].enabled = !open;
@@ -239,13 +250,15 @@ export class GameWorld {
       let n = p.queue.length > 4 ? 2 : 1;
       while (n-- > 0 && p.queue.length) {
         const c = p.queue.shift()!;
-        stepBody(this.map.world, b, { mx: c.x, mz: c.z, jump: !!c.j, sprint: !!c.r }, SIM_DT);
+        stepBody(this.map.world, b, { mx: c.x, mz: c.z, jump: !!c.j, sprint: !!c.r, crouch: !!c.c }, SIM_DT);
+        p.crouch = !!c.c;
         p.ack = c.s;
         if (c.x || c.z || c.j) p.emote = 0;
       }
       p.speed = Math.hypot(b.vx, b.vz);
       if (b.y < -15) { Object.assign(b, this.resolveSpawn(undefined)); p.conn.send({ t: 'toast', text: 'Back to the street.' }); }
     }
+    this.play.tick(SIM_DT);
     if (this.stepNo % SNAP_EVERY === 0) this.snapshot();
     if (this.stepNo % (60 * 15) === 0) for (const p of this.players.values()) this.persist(p);
   }
@@ -273,7 +286,7 @@ export class GameWorld {
   private playerWire(p: SPlayer): PlayerWire {
     const b = p.body;
     const onLift = b.grounded && b.support === this.cabFloorSolid;
-    const f = (b.grounded ? FL.GROUNDED : 0) | (onLift ? FL.ON_LIFT : 0) | (p.emote << FL.EMOTE_SHIFT) | (p.seat >= 0 ? FL.SEATED : 0);
+    const f = (b.grounded ? FL.GROUNDED : 0) | (onLift ? FL.ON_LIFT : 0) | (p.emote << FL.EMOTE_SHIFT) | (p.seat >= 0 ? FL.SEATED : 0) | (p.crouch ? FL.CROUCH : 0);
     return { i: p.id, x: round3(b.x), y: round3(b.y), z: round3(b.z), r: round3(b.yaw), s: Math.round(p.speed * 10), f, k: p.seat + 1 };
   }
   private snapshot() {
@@ -286,7 +299,7 @@ export class GameWorld {
     }
   }
 
-  private broadcast(m: S2C, except?: SPlayer) { for (const p of this.players.values()) if (p !== except) p.conn.send(m); }
+  broadcast(m: S2C, except?: SPlayer) { for (const p of this.players.values()) if (p !== except) p.conn.send(m); }
   private broadcastWorld() { this.broadcast({ t: 'world', doors: [...this.doorsOpen], sw: [...this.switchesOn] }); }
 
   /** Nearest stop to the cab (used by tests/diagnostics). */

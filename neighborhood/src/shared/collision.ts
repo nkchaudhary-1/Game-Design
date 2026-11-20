@@ -117,7 +117,7 @@ export interface Body {
   coyote: number;
   support: number;                        // id of the solid being stood on (-1 none)
 }
-export interface MoveInput { mx: number; mz: number; jump: boolean; sprint: boolean }
+export interface MoveInput { mx: number; mz: number; jump: boolean; sprint: boolean; crouch?: boolean }
 
 export const newBody = (x = 0, y = 0, z = 0, yaw = 0): Body => ({
   x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: false, coyote: 0, support: -1,
@@ -198,7 +198,7 @@ export function stepBody(w: CollisionWorld, b: Body, inp: MoveInput, dt: number)
   const len = Math.hypot(mx, mz);
   if (len > 1) { mx /= len; mz /= len; }
   const has = len > 0.01;
-  const speed = inp.sprint ? P.sprint : P.walk;
+  const speed = inp.crouch ? P.crouch : inp.sprint ? P.sprint : P.walk;
   const tvx = has ? mx * speed : 0, tvz = has ? mz * speed : 0;
   const control = b.grounded ? 1 : P.airControl;
   const a = (has ? P.accel : P.decel) * control * dt;

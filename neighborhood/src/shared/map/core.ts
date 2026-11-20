@@ -36,13 +36,26 @@ export interface DoorDef {
   width: number; y0: number; height: number; thick: number;
   color: number; group: number; name: string;
   cx: number; cz: number;      // centre of the closed leaf
+  house?: number; role?: 'front' | 'back' | 'inner';
+}
+
+/** Everything the game layer needs to know about a house, in world coordinates. */
+export interface HouseDef {
+  id: number; bid: number; number: string; npcName: string;
+  fp: { x0: number; z0: number; x1: number; z1: number }; floorY: number;
+  front: { x: number; z: number }; back: { x: number; z: number }; arch: { x: number; z: number };
+  slots: { x: number; y: number; z: number }[];
+  anchors: { camera: { x: number; z: number; yaw: number }; motion: { x: number; z: number }; alarm: { x: number; z: number }; dog: { x: number; z: number; yaw: number }; safe: { x: number; z: number; yaw: number }; decoy: { x: number; z: number } };
+  sign: { x: number; y: number; z: number; ry: number };
+  rooms: Record<'living' | 'kitchen' | 'bedroom' | 'storage' | 'hall' | 'yard', { x: number; z: number }>;
+  doors: { front: number; back: number; bedroom: number; storage: number };
 }
 export interface SeatDef { id: number; x: number; y: number; z: number; yaw: number; group: number; name: string }
 export interface SwitchDef { id: number; x: number; y: number; z: number; group: number; name: string }
 export interface LampDef { id: number; switchId: number; x: number; y: number; z: number; color: number; group: number }
 export interface Label { text: string; x: number; y: number; z: number; w: number; h: number; ry: number; bg: number; fg: number; group: number }
 export interface FoundDef { id: number; x: number; y: number; z: number; name: string; text: string; group: number }
-export type InteractKind = 'door' | 'knock' | 'switch' | 'seat' | 'liftCall' | 'liftPanel' | 'bell' | 'found' | 'info';
+export type InteractKind = 'door' | 'knock' | 'switch' | 'seat' | 'liftCall' | 'liftPanel' | 'bell' | 'found' | 'info' | 'porch' | 'slot' | 'market' | 'fence' | 'board';
 export interface Interactable {
   id: number; kind: InteractKind; x: number; y: number; z: number;
   ref: number; label: string; group: number; text?: string;
@@ -92,6 +105,7 @@ export interface MapDef {
   spawns: { x: number; z: number; yaw: number }[];
   streetLamps: { x: number; y: number; z: number }[];
   chimneys: { x: number; y: number; z: number }[];
+  houses: HouseDef[];
   bounds: { x0: number; z0: number; x1: number; z1: number };
 }
 
@@ -140,6 +154,7 @@ export class MB {
   zones: Zone[] = [];
   mapRects: MapRect[] = [];
   spawns: { x: number; z: number; yaw: number }[] = [];
+  houses: HouseDef[] = [];
   streetLamps: { x: number; y: number; z: number }[] = [];
   chimneys: { x: number; y: number; z: number }[] = [];
 

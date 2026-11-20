@@ -18,7 +18,7 @@ export function buildMaple(): MapDef {
   const laneW = (zc: number) => new Frame(-25, zc - 5, 1);
   const laneE = (zc: number) => new Frame(-3, zc + 5, 3);
   const base = { trim: C.offWhite };
-  const houses: Omit<HouseSpec, 'bid'>[] = [
+  const houses: Omit<HouseSpec, 'bid' | 'idx'>[] = [
     { number: '12', owner: 'The Okafors', frame: north(-49), enterable: true, wall: C.terra, roof: C.roofDark, door: C.blueDark, accent: C.sageDark, variant: 0, yardTree: true, secret: true, ...base },
     { number: '13', owner: 'The Lindqvists', frame: south(-49, true), enterable: true, wall: C.sage, roof: C.roofTerra, door: C.terra, accent: C.blueDark, variant: 1, yardTree: true, ...base },
     { number: '14', owner: 'Mira & Dev', frame: north(-35), enterable: false, wall: C.blue, roof: C.roofDark, door: C.terra, accent: C.sageDark, variant: 1, yardTree: true, ...base },
@@ -31,7 +31,7 @@ export function buildMaple(): MapDef {
     { number: '3', owner: 'The Nowaks', frame: laneE(-42), enterable: false, wall: C.beige, roof: C.roofTerra, door: C.sageDark, accent: C.blue, variant: 0, ...base },
   ];
   let bid = 0;
-  for (const h of houses) buildHouse(mb, { ...h, bid: bid++ });
+  houses.forEach((h, idx) => buildHouse(mb, { ...h, enterable: true, idx, bid: bid++ }));
   const lift = buildApartment(mb, new Frame(3, 11, 0), bid++);
   buildPark(mb);
   buildParking(mb);
@@ -40,6 +40,6 @@ export function buildMaple(): MapDef {
   return {
     world: mb.world, pieces: mb.pieces, doors: mb.doors, seats: mb.seats, switches: mb.switches, lamps: mb.lamps,
     labels: mb.labels, found: mb.found, interactables: mb.interactables, buildings: mb.buildings, groups: mb.groups,
-    zones: mb.zones, mapRects: mb.mapRects, lift, spawns: mb.spawns, streetLamps: mb.streetLamps, chimneys: mb.chimneys, bounds: { x0: WORLD.x0, z0: WORLD.z0, x1: WORLD.x1, z1: WORLD.z1 },
+    zones: mb.zones, mapRects: mb.mapRects, lift, spawns: mb.spawns, streetLamps: mb.streetLamps, chimneys: mb.chimneys, houses: mb.houses, bounds: { x0: WORLD.x0, z0: WORLD.z0, x1: WORLD.x1, z1: WORLD.z1 },
   };
 }

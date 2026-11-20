@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import type { PlayerRec, StoreApi } from './types';
 
 export type { PlayerRec };
-interface Data { v: 1; players: Record<string, PlayerRec>; doors: number[]; sw: number[] }
+interface Data { v: 1; players: Record<string, PlayerRec>; doors: number[]; sw: number[]; houses?: unknown }
 
 /** Public id derived from the login token. Only this hash is stored — never the token. */
 export const idFromToken = (token: string) => createHash('sha256').update(token).digest('hex').slice(0, 10);
@@ -24,6 +24,8 @@ export class Store implements StoreApi {
   player(id: string): PlayerRec | undefined { return this.data.players[id]; }
   setPlayer(id: string, rec: PlayerRec) { this.data.players[id] = rec; this.dirty(); }
   get world() { return { doors: this.data.doors, sw: this.data.sw }; }
+  get houses() { return this.data.houses; }
+  setHouses(h: unknown) { this.data.houses = h; this.dirty(); }
   setWorld(doors: number[], sw: number[]) { this.data.doors = doors; this.data.sw = sw; this.dirty(); }
   private dirty() { if (!this.path || this.timer) return; this.timer = setTimeout(() => { this.timer = null; this.flush(); }, 3000); }
   flush() {

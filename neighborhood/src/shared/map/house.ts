@@ -1,8 +1,8 @@
-import { C, Frame, MB, PK } from './core';
+import { C, Frame, MB, PK, type DoorDef } from './core';
 import { addFound, addLamp, addSwitch, bench, bush, mailbox, plant, rug, sofa, table, tree, wallLabel } from './props';
 
 export interface HouseSpec {
-  bid: number; number: string; owner: string; frame: Frame; enterable: boolean;
+  bid: number; idx: number; number: string; owner: string; frame: Frame; enterable: boolean;
   wall: number; trim: number; roof: number; door: number; accent: number; variant: 0 | 1;
   yardTree?: boolean; secret?: boolean;
 }
@@ -49,15 +49,18 @@ export function buildHouse(mb: MB, s: HouseSpec): void {
   mb.fbox(f, -0.3, -0.3, W + 0.3, D + 0.3, TOP, TOP + 0.18, s.trim, { group: g1, solid: false });
 
   // ── door, plates, awning
+  let frontDoor!: DoorDef;
   if (s.enterable) {
-    mb.door(f, 'u', 0, 4.4, 1.2, FY, 2.15, { hingeA: true, swing: 1, color: s.door, group: g0, name: 'Front door' });
+    frontDoor = mb.door(f, 'u', 0, 4.4, 1.2, FY, 2.15, { hingeA: true, swing: 1, color: s.door, group: g0, name: 'Front door' });
+    frontDoor.house = s.idx; frontDoor.role = 'front';
     const [dbx, dbz] = f.p(6.05, -0.5);
     mb.interact('bell', dbx, 1.3, dbz, 0, 'Ring doorbell', g0);
+    const [ppx, ppz] = f.p(5.0, -1.1);
+    mb.interact('porch', ppx, 1.2, ppz, s.idx, `No. ${s.number}`, g0);
   } else mb.lockedDoor(f, 'u', 0, 4.4, 1.2, FY, 2.15, s.door, g0, 'Locked door', T, -1);
   mb.fbox(f, 3.7, -1.4, 6.3, -T / 2, FY + 2.3, FY + 2.42, s.trim, { group: g0, solid: false });
   for (const u of [3.8, 6.2]) mb.fbox(f, u - 0.05, -1.4, u + 0.05, -1.3, FY, FY + 2.3, s.trim, { group: g0, solid: false });
   wallLabel(mb, f, 6.4, -T / 2, 1.7, 0.42, 0.42, s.number, C.charcoal, C.white, [0, -1], g0);
-  wallLabel(mb, f, 3.35, -T / 2, 1.45, 1.1, 0.3, s.owner, C.beige, C.charcoal, [0, -1], g0);
 
   // ── roof (hidden when you step inside)
   const [cx, cz] = f.p(W / 2, D / 2);
@@ -100,9 +103,10 @@ export function buildHouse(mb: MB, s: HouseSpec): void {
   mb.wall(f, 'u', 5.2, 0, W, FY, TOP, IT, C.offWhite, [{ a: 5.0, b: 6.4, lo: FY, hi: FY + 2.3 }], iw);
   mb.wall(f, 'v', 5.0, 5.2, D, FY, TOP, IT, C.offWhite, [{ a: 6.3, b: 7.4, lo: FY, hi: FY + 2.1 }], iw);
   mb.wall(f, 'v', 6.4, 5.2, D, FY, TOP, IT, C.offWhite, [{ a: 6.5, b: 7.6, lo: FY, hi: FY + 2.1 }], iw);
-  mb.door(f, 'v', 5.0, 6.3, 1.1, FY, 2.1, { hingeA: true, swing: -1, color: C.beige, group: g0, name: 'Bedroom door' });
-  mb.door(f, 'v', 6.4, 6.5, 1.1, FY, 2.1, { hingeA: true, swing: 1, color: C.beige, group: g0, name: 'Storage door' });
-  mb.door(f, 'u', D, 5.1, 1.2, FY, 2.15, { hingeA: true, swing: 1, color: s.door, group: g0, name: 'Back door' });
+  const bedDoor = mb.door(f, 'v', 5.0, 6.3, 1.1, FY, 2.1, { hingeA: true, swing: -1, color: C.beige, group: g0, name: 'Bedroom door' });
+  const stoDoor = mb.door(f, 'v', 6.4, 6.5, 1.1, FY, 2.1, { hingeA: true, swing: 1, color: C.beige, group: g0, name: 'Storage door' });
+  const backDoor = mb.door(f, 'u', D, 5.1, 1.2, FY, 2.15, { hingeA: true, swing: 1, color: s.door, group: g0, name: 'Back door' });
+  bedDoor.house = stoDoor.house = backDoor.house = s.idx; bedDoor.role = stoDoor.role = 'inner'; backDoor.role = 'back';
 
   // lights
   const [s1x, s1z] = f.p(3.9, 0.22), [s2x, s2z] = f.p(4.82, 5.7);
@@ -150,9 +154,30 @@ export function buildHouse(mb: MB, s: HouseSpec): void {
   for (const [u, y, c] of [[7.4, 1.05, C.terra], [8.4, 1.05, C.blue], [9.1, 1.45, C.yellow]] as const) mb.fbox(f, u - 0.25, 8.5, u + 0.25, 8.85, FY + y - 0.3, FY + y + 0.1, c, { group: g0, solid: false });
   mb.fbox(f, 9.0, 5.6, 9.85, 6.45, FY, FY + 0.8, C.woodDark, iw);
   mb.fbox(f, 9.15, 5.75, 9.7, 6.3, FY + 0.8, FY + 1.5, C.wood, iw);
-  mb.fbox(f, 6.7, 8.1, 7.5, 8.9, FY, FY + 0.7, C.charcoal, iw);   // safe
-  { const [x, z] = f.p(7.1, 8.1); mb.prim(PK.CYL, x, FY + 0.42, z, 0.2, 0.05, 0.2, C.gold, { group: g0 }); mb.interact('info', x, FY + 0.5, z, 0, 'Inspect safe', g0, 'A heavy safe. Vaults, valuables and security arrive in a later prototype.'); }
-  if (s.secret) { const [x, z] = f.p(8.0, 5.95); addFound(mb, x, FY + 0.05, z, 'Brass Key', 'A tarnished brass key, wedged behind the crates. It does not fit anything here. Yet.', g0); }
+  mb.fbox(f, 7.7, 5.85, 8.4, 6.4, FY, FY + 0.7, C.woodDark, iw);   // side table: a display slot
+  if (s.secret) { const [x, z] = f.p(9.4, 7.2); addFound(mb, x, FY + 0.05, z, 'Brass Key', 'A tarnished brass key, wedged behind the crates. It does not fit anything here. Yet.', g0); }
+
+  // ── game layer: display slots, porch, sign and device anchors (world coordinates)
+  const wp = (u: number, v: number) => { const [x, z] = f.p(u, v); return { x, z }; };
+  const slotUV: [number, number, number][] = [[1.7, 4.84, FY + 0.5], [2.8, 4.84, FY + 0.5], [9.5, 2.2, FY + 0.97], [2.95, 8.35, FY + 0.52], [8.05, 6.1, FY + 0.7]];
+  const slots = slotUV.map(([u, v, y]) => { const p = wp(u, v); return { x: p.x, y, z: p.z }; });
+  slots.forEach((sl, k) => mb.interact('slot', sl.x, sl.y + 0.25, sl.z, s.idx * 8 + k, 'Display', g0));
+  const yawOf = (du: number, dv: number) => { const [vx, vz] = f.vec(du, dv); return Math.atan2(vx, vz); };
+  const cam = wp(0.35, 0.35);
+  const [sgx, sgz] = f.vec(0, -1);
+  const fp = { x0: bx0, z0: bz0, x1: bx1, z1: bz1 };
+  const sg = wp(1.8, -2.9);
+  mb.houses.push({
+    id: s.idx, bid: s.bid, number: s.number, npcName: s.owner, fp, floorY: FY,
+    front: wp(5.0, -1.2), back: wp(5.7, D + 0.7), arch: wp(5.7, 4.3), slots,
+    anchors: {
+      camera: { ...cam, yaw: yawOf(3.2, 2.8) }, motion: wp(5.7, 6.0), alarm: wp(5.4, 0.25), dog: { ...wp(0.6, 3.4), yaw: yawOf(1, 0) },
+      safe: { ...wp(7.1, 8.2), yaw: yawOf(0, -1) }, decoy: wp(3.3, 0.7),
+    },
+    sign: { x: sg.x, y: 0.75, z: sg.z, ry: Math.atan2(sgx, sgz) },
+    rooms: { living: wp(3.5, 2.4), kitchen: wp(6.0, 1.2), bedroom: wp(3.2, 6.0), storage: wp(8.2, 7.3), hall: wp(5.7, 7.0), yard: wp(7.4, D + 2.2) },
+    doors: { front: frontDoor.id, back: backDoor.id, bedroom: bedDoor.id, storage: stoDoor.id },
+  });
 
   // backyard
   mb.fbox(f, 4.1, D + 0.14, 7.3, D + 2.2, 0, 0.05, C.path, { group: -1, solid: false });

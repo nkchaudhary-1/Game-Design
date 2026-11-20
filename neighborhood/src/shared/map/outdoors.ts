@@ -186,6 +186,27 @@ export function buildCommunity(mb: MB, bid: number) {
   { const [lx, lz] = f.p(10, -1.4); mb.label('Office · Auction House · Events — opening in a later prototype', lx, 2.5, lz, 4.6, 0.3, Math.PI, C.beige, C.charcoal); }
   mb.fbox(f, 8.2, -4.0, 11.8, -1.6, 0, 0.03, C.path, { solid: false, cast: false });
   mb.box(33, 0, 7.1, 53, 0.03, 11, C.path, { solid: false, cast: false });
+  // ── the economy: market stall, crime board, the Watch booth, and a back room behind the hall
+  mb.box(48.2, 0, 8.4, 51.8, 1.0, 9.2, C.terra); mb.box(48.0, 1.0, 8.3, 52.0, 1.08, 9.3, C.woodDark, { solid: false });
+  for (const x of [48.0, 51.9]) mb.cbox(x, 0, 8.1, 0.12, 2.6, 0.12, C.charcoal);
+  mb.box(47.7, 2.6, 7.9, 52.3, 2.76, 9.5, C.sageDark, { solid: false });
+  mb.label('MAPLE MARKET', 50, 2.3, 7.95, 3.6, 0.5, Math.PI, C.charcoal, C.white);
+  for (const [dx, c] of [[48.9, C.yellow], [50, C.blue], [51.1, C.sage]] as const) mb.box(dx - 0.28, 1.08, 8.55, dx + 0.28, 1.4, 8.95, c, { solid: false });
+  mb.interact('market', 50, 1.3, 7.7, 0, 'Browse the market', -1);
+  for (const x of [35.7, 38.3]) mb.cbox(x, 0, 8.95, 0.14, 2.5, 0.14, C.woodDark);
+  mb.box(35.5, 1.0, 8.9, 38.5, 2.4, 9.0, C.sageDark, { solid: false });
+  mb.label('CRIME BOARD', 37, 2.05, 8.86, 2.6, 0.45, Math.PI, C.charcoal, C.white);
+  mb.label('JOBS · LEADS · WATCH', 37, 1.55, 8.86, 2.4, 0.28, Math.PI, C.beige, C.charcoal);
+  mb.interact('board', 37, 1.4, 8.2, 0, 'Read the Crime Board', -1);
+  mb.box(41.4, 0, 8.8, 43.4, 2.4, 10.0, 0x2b3f6b); mb.box(41.2, 2.4, 8.6, 43.6, 2.55, 10.2, C.offWhite, { solid: false });
+  mb.label('NEIGHBORHOOD WATCH', 42.4, 1.95, 8.76, 1.9, 0.34, Math.PI, 0x2b3f6b, C.white);
+  mb.box(42.0, 0, 27.0, 46.0, 2.7, 29.0, C.charcoal); mb.box(41.8, 2.7, 26.8, 46.2, 2.85, 29.2, C.terraDark, { solid: false });
+  mb.box(42.3, 0, 26.35, 45.7, 0.95, 26.9, C.woodDark, { solid: false });
+  mb.label('THE BACK ROOM', 44, 2.2, 26.96, 3.0, 0.42, Math.PI, C.terraDark, C.white);
+  mb.label('no questions', 44, 1.7, 26.96, 1.6, 0.26, Math.PI, C.charcoal, C.beige);
+  mb.interact('fence', 44, 1.3, 25.9, 0, 'Visit the back room', -1);
+  mb.zones.push({ name: 'Maple Market', x0: 46, z0: 7, x1: 54, z1: 11, prio: 4 }, { name: 'The Back Room', x0: 40, z0: 24.5, x1: 48, z1: 30, prio: 4 });
+  mb.mapRects.push({ x0: 42, z0: 27, x1: 46, z1: 29, color: C.charcoal, kind: 'building' }, { x0: 41.4, z0: 8.8, x1: 43.4, z1: 10, color: 0x2b3f6b, kind: 'building' });
   bench(mb, 29.5, 8.6, 'z', 1); bench(mb, 56, 8.8, 'x', -1, 0, -1, C.sageDark);
   for (const [x, z] of [[30.5, 12], [54.5, 13]] as const) tree(mb, x, z, 1.1, 1);
   fenceX(mb, 53, 62, 10.9, 0.7); fenceZ(mb, 11, 25, 62, 0.7);
